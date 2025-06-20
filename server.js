@@ -36,6 +36,29 @@ const db = new sqlite3.Database(dbPath, (err) => {
   }
 });
 
+// Helper function to convert PEM to JWK for COSE signing
+function pemToJwk(pemCert, pemKey) {
+  try {
+    // Parse the private key
+    const keyObject = crypto.createPrivateKey(pemKey);
+    
+    // Get the key details
+    const keyDetails = keyObject.asymmetricKeyDetails;
+    const keyType = keyObject.asymmetricKeyType;
+    
+    if (keyType !== 'ec') {
+      throw new Error('Only EC (Elliptic Curve) keys are supported for COSE signing');
+    }
+    
+    // Export the key in JWK format
+    const jwk = keyObject.export({ format: 'jwk' });
+    
+    return jwk;
+  } catch (error) {
+    throw new Error(`Failed to convert PEM to JWK: ${error.message}`);
+  }
+}
+
 // Initialize database with SHL tables
 function initializeDatabase() {
   const createConfigTable = `
@@ -93,14 +116,25 @@ function initializeDatabase() {
           }
         }
       });
-      // Insert default JWK if not exists
+      // Insert default certificate PEM if not exists
       db.run('INSERT OR IGNORE INTO config (key, value) VALUES (?, ?)', 
-        ['jwk', '{"kty":"EC","crv":"P-256","x":"example","y":"example"}'], function(err) {
+        ['cert_pem', '-----BEGIN CERTIFICATE-----\nEXAMPLE_CERTIFICATE_DATA_HERE\n-----END CERTIFICATE-----'], function(err) {
         if (!err) {
           if (this.changes > 0) {
-            console.log('Default JWK added to config');
+            console.log('Default certificate PEM added to config');
           } else {
-            console.log('JWK already configured');
+            console.log('Certificate PEM already configured');
+          }
+        }
+      });
+      // Insert default private key PEM if not exists
+      db.run('INSERT OR IGNORE INTO config (key, value) VALUES (?, ?)', 
+        ['key_pem', '-----BEGIN PRIVATE KEY-----\nEXAMPLE_PRIVATE_KEY_DATA_HERE\n-----END PRIVATE KEY-----'], function(err) {
+        if (!err) {
+          if (this.changes > 0) {
+            console.log('Default private key PEM added to config');
+          } else {
+            console.log('Private key PEM already configured');
           }
         }
       });
@@ -222,7 +256,7 @@ app.post('/shl/create', (req, res) => {
     
     db.run(insertSql, [uuid, vhl, expiryDateString, newPassword], function(err) {
       if (err) {
-        return res.status(500).json({ error: 'Failed to create SHL entry' });
+        return res.status(500).json({ error: 'Failed to create SHL entry: '+err });
       }
       
       // Get the host from the request
@@ -301,32 +335,8 @@ app.post('/shl/upload', (req, res) => {
       
       Promise.all(insertPromises)
         .then(() => {
-          // Files uploaded successfully, prepare response
-          const response = { msg: 'ok' };
-          
-          // If vhl is true, get JWK from config
-          if (row.vhl) {
-            const getJWKSql = 'SELECT value FROM config WHERE key = ?';
-            
-            db.get(getJWKSql, ['jwk'], (err, jwkRow) => {
-              if (err) {
-                return res.status(500).json({ error: 'Failed to retrieve JWK' });
-              }
-              
-              if (jwkRow) {
-                try {
-                  response.JWK = JSON.parse(jwkRow.value);
-                } catch (parseErr) {
-                  console.error('JWK parse error:', parseErr);
-                  response.JWK = jwkRow.value; // Return as string if not valid JSON
-                }
-              }
-              
-              res.json(response);
-            });
-          } else {
-            res.json(response);
-          }
+          // Files uploaded successfully
+          res.json({ msg: 'ok' });
         })
         .catch((error) => {
           console.error('File upload error:', error);
@@ -482,47 +492,49 @@ app.post('/shl/sign', async (req, res) => {
   }
   
   try {
-    // Get both issuer and JWK from config table
-    const getConfigSql = 'SELECT key, value FROM config WHERE key IN (?, ?)';
+    // Get issuer, certificate PEM, and private key PEM from config table
+    const getConfigSql = 'SELECT key, value FROM config WHERE key IN (?, ?, ?)';
     
-    db.all(getConfigSql, ['vhl.issuer', 'jwk'], async (err, configRows) => {
+    db.all(getConfigSql, ['vhl.issuer', 'cert_pem', 'key_pem'], async (err, configRows) => {
       if (err) {
         return res.status(500).json({ error: 'Database error retrieving config' });
       }
       
       // Parse config values
       let issuer = 'XXX';
-      let jwk = null;
+      let certPem = null;
+      let keyPem = null;
       
       configRows.forEach(row => {
         if (row.key === 'vhl.issuer') {
           issuer = row.value;
-        } else if (row.key === 'jwk') {
-          try {
-            jwk = JSON.parse(row.value);
-          } catch (parseErr) {
-            console.error('Failed to parse JWK from config:', parseErr);
-          }
+        } else if (row.key === 'cert_pem') {
+          certPem = row.value;
+        } else if (row.key === 'key_pem') {
+          keyPem = row.value;
         }
       });
       
-      if (!jwk) {
-        return res.status(500).json({ error: 'JWK not found or invalid in config' });
+      if (!certPem || !keyPem) {
+        return res.status(500).json({ error: 'Certificate PEM or private key PEM not found in config' });
       }
       
       try {
+        // Convert PEM to JWK for COSE signing
+        const jwk = pemToJwk(certPem, keyPem);
+        
         // Step 1: Wrap the URL in the specified payload structure with issuer
         const payload = {
           "1": issuer,
           "-260": {
-            "5": url
+            "5": [url]
           }
         };
         
         // Step 2: CBOR encode the object to bytes
         const cborEncoded = CBOR.encode(payload);
         
-        // Step 3: COSE sign the bytes using JWK from config
+        // Step 3: COSE sign the bytes using JWK converted from PEM
         const headers = {
           p: { alg: 'ES256' },
           u: { kid: '11' }
