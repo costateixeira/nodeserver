@@ -5,7 +5,6 @@ const path = require('path');
 const crypto = require('crypto');
 const cron = require('node-cron');
 const CBOR = require('cbor');
-const cose = require('cose-js');
 const pako = require('pako');
 const base45 = require('base45');
 
@@ -57,6 +56,97 @@ function pemToJwk(pemCert, pemKey) {
   } catch (error) {
     throw new Error(`Failed to convert PEM to JWK: ${error.message}`);
   }
+}
+
+async function createCOSESign1(payload, privateKeyJWK, kid) {
+  const crypto = require('crypto');
+  const CBOR = require('cbor');
+
+  try {
+    // Create COSE Sign1 structure manually using Node.js crypto
+    // Protected headers map
+    const protectedHeaders = new Map();
+    protectedHeaders.set(1, -7);  // alg: ES256
+    protectedHeaders.set(4, kid); // kid
+
+    const protectedEncoded = CBOR.encode(protectedHeaders);
+
+    // Sig_structure for COSE Sign1: ["Signature1", protected, external_aad, payload]
+    const sigStructure = [
+      "Signature1",           // context
+      protectedEncoded,       // protected headers (bstr)
+      Buffer.alloc(0),        // external_aad (bstr, empty)
+      payload                 // payload (bstr)
+    ];
+
+    const sigStructureEncoded = CBOR.encode(sigStructure);
+
+    // Convert JWK private key to Node.js KeyObject
+    const privateKey = crypto.createPrivateKey({
+      key: {
+        kty: privateKeyJWK.kty,
+        crv: privateKeyJWK.crv,
+        x: privateKeyJWK.x,
+        y: privateKeyJWK.y,
+        d: privateKeyJWK.d
+      },
+      format: 'jwk'
+    });
+
+    // Sign using Node.js crypto (which we know works with Java)
+    const signer = crypto.createSign('SHA256');
+    signer.update(sigStructureEncoded);
+    const signatureDER = signer.sign(privateKey);
+
+    // Convert DER signature to raw r||s format for COSE
+    const rawSignature = derToRaw(signatureDER);
+
+    // Build COSE Sign1 message: [protected, unprotected, payload, signature]
+    const coseSign1Array = [
+      protectedEncoded,       // protected headers (bstr)
+      new Map(),              // unprotected headers (empty map)
+      payload,                // payload (bstr)
+      rawSignature            // signature (bstr)
+    ];
+
+    // Add COSE Sign1 tag (18) and encode
+    const taggedMessage = new CBOR.Tagged(18, coseSign1Array);
+    const encoded = CBOR.encode(taggedMessage);
+
+    return encoded;
+
+  } catch (error) {
+    console.error('COSE Sign1 creation error:', error);
+    throw error;
+  }
+}
+
+// Helper function to convert DER signature to raw r||s format
+function derToRaw(derSignature) {
+  let offset = 2; // Skip SEQUENCE tag and length
+
+  // First INTEGER (r)
+  offset++; // Skip INTEGER tag
+  const rLen = derSignature[offset++];
+  const r = Buffer.alloc(32);
+
+  // Handle potential leading zero padding in DER
+  const rStart = Math.max(0, rLen - 32);
+  const rCopyLen = Math.min(rLen, 32);
+  derSignature.copy(r, 32 - rCopyLen, offset + rStart, offset + rLen);
+  offset += rLen;
+
+  // Second INTEGER (s)
+  offset++; // Skip INTEGER tag
+  const sLen = derSignature[offset++];
+  const s = Buffer.alloc(32);
+
+  // Handle potential leading zero padding in DER
+  const sStart = Math.max(0, sLen - 32);
+  const sCopyLen = Math.min(sLen, 32);
+  derSignature.copy(s, 32 - sCopyLen, offset + sStart, offset + sLen);
+
+  return Buffer.concat([r, s]);
 }
 
 // Initialize database with SHL tables
@@ -135,6 +225,17 @@ function initializeDatabase() {
             console.log('Default private key PEM added to config');
           } else {
             console.log('Private key PEM already configured');
+          }
+        }
+      });
+      // Insert default KID if not exists
+      db.run('INSERT OR IGNORE INTO config (key, value) VALUES (?, ?)', 
+        ['kid', '11'], function(err) {
+        if (!err) {
+          if (this.changes > 0) {
+            console.log('Default KID set to: 11');
+          } else {
+            console.log('KID already configured');
           }
         }
       });
@@ -492,18 +593,19 @@ app.post('/shl/sign', async (req, res) => {
   }
   
   try {
-    // Get issuer, certificate PEM, and private key PEM from config table
-    const getConfigSql = 'SELECT key, value FROM config WHERE key IN (?, ?, ?)';
+    // Get issuer, certificate PEM, private key PEM, and KID from config table
+    const getConfigSql = 'SELECT key, value FROM config WHERE key IN (?, ?, ?, ?)';
     
-    db.all(getConfigSql, ['vhl.issuer', 'cert_pem', 'key_pem'], async (err, configRows) => {
+    db.all(getConfigSql, ['vhl.issuer', 'cert_pem', 'key_pem', 'kid'], async (err, configRows) => {
       if (err) {
         return res.status(500).json({ error: 'Database error retrieving config' });
       }
       
       // Parse config values
-      let issuer = 'XXX';
+      let issuer = 'XX';
       let certPem = null;
       let keyPem = null;
+      let kid = '11'; // Default fallback
       
       configRows.forEach(row => {
         if (row.key === 'vhl.issuer') {
@@ -512,11 +614,17 @@ app.post('/shl/sign', async (req, res) => {
           certPem = row.value;
         } else if (row.key === 'key_pem') {
           keyPem = row.value;
+        } else if (row.key === 'kid') {
+          kid = row.value;
         }
       });
       
       if (!certPem || !keyPem) {
         return res.status(500).json({ error: 'Certificate PEM or private key PEM not found in config' });
+      }
+      
+      if (!kid) {
+        return res.status(500).json({ error: 'KID not found in config' });
       }
       
       try {
@@ -530,28 +638,19 @@ app.post('/shl/sign', async (req, res) => {
             "5": [url]
           }
         };
-        
+
         // Step 2: CBOR encode the object to bytes
         const cborEncoded = CBOR.encode(payload);
-        
+
         // Step 3: COSE sign the bytes using JWK converted from PEM
-        const headers = {
-          p: { alg: 'ES256' },
-          u: { kid: '11' }
-        };
-        
-        const signer = {
-          key: jwk
-        };
-        
-        const coseSigned = await cose.sign.create(headers, cborEncoded, signer);
-        
+        const coseSigned = await createCOSESign1(cborEncoded, jwk, kid);
+
         // Step 4: Deflate the signed bytes
         const deflated = pako.deflate(coseSigned);
         
         // Step 5: Base45 encode the deflated bytes
         const base45Encoded = base45.encode(deflated);
-        
+
         // Return the result
         res.json({
           signature: base45Encoded
@@ -571,6 +670,79 @@ app.post('/shl/sign', async (req, res) => {
       error: 'Failed to sign URL'
     });
   }
+});
+
+// Configuration management endpoints (optional - for runtime config updates)
+app.get('/config/:key', (req, res) => {
+  const { key } = req.params;
+  
+  // Only allow reading certain config keys for security
+  const allowedKeys = ['vhl.issuer', 'kid'];
+  
+  if (!allowedKeys.includes(key)) {
+    return res.status(403).json({ error: 'Access to this config key is not allowed' });
+  }
+  
+  const getConfigSql = 'SELECT value FROM config WHERE key = ?';
+  
+  db.get(getConfigSql, [key], (err, row) => {
+    if (err) {
+      return res.status(500).json({ error: 'Database error' });
+    }
+    
+    if (!row) {
+      return res.status(404).json({ error: 'Config key not found' });
+    }
+    
+    res.json({
+      key: key,
+      value: row.value
+    });
+  });
+});
+
+app.put('/config/:key', (req, res) => {
+  const { key } = req.params;
+  const { value, password } = req.body;
+  
+  // Only allow updating certain config keys for security
+  const allowedKeys = ['vhl.issuer', 'kid'];
+  
+  if (!allowedKeys.includes(key)) {
+    return res.status(403).json({ error: 'Updating this config key is not allowed' });
+  }
+  
+  if (!value || !password) {
+    return res.status(400).json({ error: 'value and password are required' });
+  }
+  
+  // Check password against config table
+  const checkPasswordSql = 'SELECT value FROM config WHERE key = ?';
+  
+  db.get(checkPasswordSql, ['shl_password'], (err, row) => {
+    if (err) {
+      return res.status(500).json({ error: 'Database error' });
+    }
+    
+    if (!row || row.value !== password) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+    
+    // Update the config value
+    const updateConfigSql = 'INSERT OR REPLACE INTO config (key, value) VALUES (?, ?)';
+    
+    db.run(updateConfigSql, [key, value], function(err) {
+      if (err) {
+        return res.status(500).json({ error: 'Failed to update config' });
+      }
+      
+      res.json({
+        message: 'Config updated successfully',
+        key: key,
+        value: value
+      });
+    });
+  });
 });
 
 // Health check endpoint
