@@ -587,7 +587,7 @@ app.get('/shl/file/:fileId', (req, res) => {
     // Decode base64 content and serve with proper content type
     try {
       const fileBuffer = Buffer.from(fileRow.cnt, 'base64');
-      res.set('Content-Type', fileRow.type);
+      res.set('Content-Type', 'application/jose');
       res.send(fileBuffer);
     } catch (decodeErr) {
       res.status(500).json({ error: 'Failed to decode file content' });
