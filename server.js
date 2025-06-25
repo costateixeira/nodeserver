@@ -447,16 +447,26 @@ app.post('/shl/upload', (req, res) => {
   });
 });
 
-// SHL access endpoint
-app.post('/shl/access/:uuid', (req, res) => {
+// Helper function for the shared access logic
+function handleSHLAccess(req, res) {
   const { uuid } = req.params;
-  const { recipient, embeddedLengthMax } = req.body;
   
-  // Validation - recipient is required
-  if (!recipient) {
-    return res.status(400).json({
-      error: 'recipient is required in request body'
-    });
+  // For GET requests, set recipient to 'anonymous' and embeddedLengthMax to undefined
+  // For POST requests, get from request body
+  let recipient, embeddedLengthMax;
+  
+  if (req.method === 'GET') {
+    recipient = 'anonymous';
+    embeddedLengthMax = undefined;
+  } else {
+    ({ recipient, embeddedLengthMax } = req.body);
+    
+    // Validation - recipient is required for POST
+    if (!recipient) {
+      return res.status(400).json({
+        error: 'recipient is required in request body'
+      });
+    }
   }
   
   // Get client IP address
@@ -530,7 +540,11 @@ app.post('/shl/access/:uuid', (req, res) => {
       });
     });
   });
-});
+}
+
+// SHL access endpoint - now supports both GET and POST
+app.get('/shl/access/:uuid', handleSHLAccess);
+app.post('/shl/access/:uuid', handleSHLAccess);
 
 // SHL file endpoint - serves individual files
 app.get('/shl/file/:fileId', (req, res) => {
