@@ -367,7 +367,7 @@ app.post('/shl/create', (req, res) => {
       res.status(201).json({
         uuid: uuid,
         pword: newPassword,
-        link: `${protocol}://${host}/shl/access/${uuid}`
+        link: `https://${host}/shl/access/${uuid}`
       });
     });
   });
