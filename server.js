@@ -8,6 +8,9 @@ const CBOR = require('cbor');
 const pako = require('pako');
 const base45 = require('base45');
 
+// Import the FHIR Validator
+const FhirValidator = require('fhir-validator-wrapper');
+
 // Try to load vhl.js module, but don't fail if it doesn't exist
 let vhlProcessor;
 try {
@@ -20,9 +23,17 @@ try {
 const app = express();
 const PORT = process.env.PORT || 3000;
 
+// Global validator instance
+let fhirValidator = null;
+
 // Middleware
 app.use(express.json());
-app.use(cors());
+app.use(express.raw({ type: 'application/fhir+json', limit: '10mb' }));
+app.use(express.raw({ type: 'application/fhir+xml', limit: '10mb' }));
+app.use(cors({
+  origin: true, // Allow all origins for development
+  credentials: true
+}));
 
 // Database setup
 const dbPath = path.join(__dirname, 'database.db');
@@ -149,7 +160,68 @@ function derToRaw(derSignature) {
   return Buffer.concat([r, s]);
 }
 
-// Initialize database with SHL tables
+// Initialize FHIR Validator
+async function initializeFhirValidator() {
+  try {
+    console.log('Initializing FHIR Validator...');
+    
+    // Get validator configuration from database
+    const getConfigSql = 'SELECT key, value FROM config WHERE key LIKE "validator.%"';
+    
+    return new Promise((resolve, reject) => {
+      db.all(getConfigSql, [], async (err, rows) => {
+        if (err) {
+          console.error('Failed to get validator config:', err);
+          return reject(err);
+        }
+        
+        // Parse configuration
+        const config = {};
+        const packages = [];
+        
+        rows.forEach(row => {
+          if (row.key.startsWith('validator.package.')) {
+            packages.push(row.value);
+          } else {
+            const key = row.key.replace('validator.', '');
+            config[key] = row.value;
+          }
+        });
+        
+        // Set defaults
+        const validatorConfig = {
+          version: config.version || '4.0.1',
+          txServer: config.txServer || 'http://tx.fhir.org/r4',
+          txLog: config.txLog || './tx.log',
+          port: parseInt(config.port || '8081'),
+          igs: packages,
+          timeout: 60000 // 60 second timeout for startup
+        };
+        
+        console.log('Starting FHIR Validator with config:', validatorConfig);
+        
+        try {
+          // Path to validator JAR in same directory
+          const validatorJarPath = path.join(__dirname, 'validator_cli.jar');
+          
+          fhirValidator = new FhirValidator(validatorJarPath);
+          await fhirValidator.start(validatorConfig);
+          
+          console.log('FHIR Validator started successfully');
+          resolve();
+        } catch (error) {
+          console.error('Failed to start FHIR Validator:', error);
+          reject(error);
+        }
+      });
+    });
+  } catch (error) {
+    console.error('FHIR Validator initialization error:', error);
+    throw error;
+  }
+}
+
+// Initialize database with SHL tables and validator config
 function initializeDatabase() {
   const createConfigTable = `
     CREATE TABLE IF NOT EXISTS config (
@@ -195,61 +267,40 @@ function initializeDatabase() {
       console.error('Error creating config table:', err.message);
     } else {
       console.log('Config table ready');
-      // Insert default password if not exists
-      db.run('INSERT OR IGNORE INTO config (key, value) VALUES (?, ?)', 
-        ['shl_password', 'default123'], function(err) {
-        if (!err) {
-          if (this.changes > 0) {
-            console.log('Default SHL password set to: default123');
-          } else {
-            console.log('SHL password already configured');
+      
+      // Insert default configurations
+      const defaultConfigs = [
+        ['shl_password', 'default123'],
+        ['cert_pem', '-----BEGIN CERTIFICATE-----\nEXAMPLE_CERTIFICATE_DATA_HERE\n-----END CERTIFICATE-----'],
+        ['key_pem', '-----BEGIN PRIVATE KEY-----\nEXAMPLE_PRIVATE_KEY_DATA_HERE\n-----END PRIVATE KEY-----'],
+        ['kid', '11'],
+        ['vhl.issuer', 'XXX'],
+        // FHIR Validator configuration
+        ['validator.version', '4.0.1'],
+        ['validator.txServer', 'http://tx.fhir.org/r4'],
+        ['validator.txLog', './tx.log'],
+        ['validator.port', '8081'],
+        // Default packages - add more as needed
+        ['validator.package.1', 'hl7.fhir.us.core#6.0.0'],
+        ['validator.package.2', 'hl7.fhir.uv.ips#1.1.0']
+      ];
+      
+      defaultConfigs.forEach(([key, value]) => {
+        db.run('INSERT OR IGNORE INTO config (key, value) VALUES (?, ?)', 
+          [key, value], function(err) {
+          if (!err && this.changes > 0) {
+            console.log(`Default config set: ${key}`);
           }
-        }
+        });
       });
-      // Insert default certificate PEM if not exists
-      db.run('INSERT OR IGNORE INTO config (key, value) VALUES (?, ?)', 
-        ['cert_pem', '-----BEGIN CERTIFICATE-----\nEXAMPLE_CERTIFICATE_DATA_HERE\n-----END CERTIFICATE-----'], function(err) {
-        if (!err) {
-          if (this.changes > 0) {
-            console.log('Default certificate PEM added to config');
-          } else {
-            console.log('Certificate PEM already configured');
-          }
-        }
-      });
-      // Insert default private key PEM if not exists
-      db.run('INSERT OR IGNORE INTO config (key, value) VALUES (?, ?)', 
-        ['key_pem', '-----BEGIN PRIVATE KEY-----\nEXAMPLE_PRIVATE_KEY_DATA_HERE\n-----END PRIVATE KEY-----'], function(err) {
-        if (!err) {
-          if (this.changes > 0) {
-            console.log('Default private key PEM added to config');
-          } else {
-            console.log('Private key PEM already configured');
-          }
-        }
-      });
-      // Insert default KID if not exists
-      db.run('INSERT OR IGNORE INTO config (key, value) VALUES (?, ?)', 
-        ['kid', '11'], function(err) {
-        if (!err) {
-          if (this.changes > 0) {
-            console.log('Default KID set to: 11');
-          } else {
-            console.log('KID already configured');
-          }
-        }
-      });
-      // Insert default VHL issuer if not exists
-      db.run('INSERT OR IGNORE INTO config (key, value) VALUES (?, ?)', 
-        ['vhl.issuer', 'XXX'], function(err) {
-        if (!err) {
-          if (this.changes > 0) {
-            console.log('Default VHL issuer set to: XXX');
-          } else {
-            console.log('VHL issuer already configured');
-          }
-        }
-      });
+      
+      // Initialize FHIR Validator after database setup
+      setTimeout(() => {
+        initializeFhirValidator().catch(error => {
+          console.error('Failed to initialize FHIR Validator:', error);
+          console.log('Server will continue without validation capabilities');
+        });
+      }, 1000);
     }
   });
   
@@ -303,6 +354,127 @@ cron.schedule('0 * * * *', () => {
 });
 
 // Routes
+
+// FHIR Validation endpoint
+app.post('/validate', async (req, res) => {
+  console.log("validate! (1)");
+  if (!fhirValidator || !fhirValidator.isRunning()) {
+    return res.status(503).json({
+      resourceType: 'OperationOutcome',
+      issue: [{
+        severity: 'error',
+        code: 'exception',
+        diagnostics: 'FHIR Validator service is not available'
+      }]
+    });
+  }
+  
+  try {
+    // Get content type to determine format
+    const contentType = req.get('Content-Type') || 'application/fhir+json';
+
+    // Get validation options from query parameters
+    const options = {};
+    
+    if (req.query.profiles) {
+      options.profiles = req.query.profiles.split(',');
+    }
+    if (req.query.resourceIdRule) {
+      options.resourceIdRule = req.query.resourceIdRule;
+    }
+    if (req.query.anyExtensionsAllowed !== undefined) {
+      options.anyExtensionsAllowed = req.query.anyExtensionsAllowed === 'true';
+    }
+    if (req.query.bpWarnings) {
+      options.bpWarnings = req.query.bpWarnings;
+    }
+    if (req.query.displayOption) {
+      options.displayOption = req.query.displayOption;
+    }
+    console.log("validate! (4)");
+
+    // Validate the resource
+    let resource;
+    if (Buffer.isBuffer(req.body)) {
+      resource = req.body;
+    } else if (typeof req.body === 'string') {
+      resource = req.body;
+    } else {
+      resource = JSON.stringify(req.body);
+    }
+      console.log("validate! (5)");
+
+    const operationOutcome = await fhirValidator.validate(resource, options);
+      console.log("validate! (6)");
+
+    // Return the OperationOutcome
+    res.json(operationOutcome);
+      console.log("validate! (7)");
+
+  } catch (error) {
+    console.error('Validation error:', error);
+    res.status(500).json({
+      resourceType: 'OperationOutcome',
+      issue: [{
+        severity: 'error',
+        code: 'exception',
+        diagnostics: `Validation failed: ${error.message}`
+      }]
+    });
+  }
+});
+
+// Validator status endpoint
+app.get('/validate/status', (req, res) => {
+  const status = {
+    validatorRunning: fhirValidator ? fhirValidator.isRunning() : false,
+    validatorInitialized: fhirValidator !== null
+  };
+  
+  res.json(status);
+});
+
+// Load additional IG endpoint
+app.post('/validate/loadig', async (req, res) => {
+  if (!fhirValidator || !fhirValidator.isRunning()) {
+    return res.status(503).json({
+      resourceType: 'OperationOutcome',
+      issue: [{
+        severity: 'error',
+        code: 'exception',
+        diagnostics: 'FHIR Validator service is not available'
+      }]
+    });
+  }
+  
+  const { packageId, version } = req.body;
+  
+  if (!packageId || !version) {
+    return res.status(400).json({
+      resourceType: 'OperationOutcome',
+      issue: [{
+        severity: 'error',
+        code: 'required',
+        diagnostics: 'packageId and version are required'
+      }]
+    });
+  }
+  
+  try {
+    const result = await fhirValidator.loadIG(packageId, version);
+    res.json(result);
+  } catch (error) {
+    console.error('Load IG error:', error);
+    res.status(500).json({
+      resourceType: 'OperationOutcome',
+      issue: [{
+        severity: 'error',
+        code: 'exception',
+        diagnostics: `Failed to load IG: ${error.message}`
+      }]
+    });
+  }
+});
 
 // SHL create endpoint
 app.post('/shl/create', (req, res) => {
@@ -596,6 +768,7 @@ app.get('/shl/file/:fileId', (req, res) => {
 });
 
 // SHL sign endpoint
+// SHL sign endpoint - enhanced to return all intermediate steps
 app.post('/shl/sign', async (req, res) => {
   const { url } = req.body;
   
@@ -665,9 +838,51 @@ app.post('/shl/sign', async (req, res) => {
         // Step 5: Base45 encode the deflated bytes
         const base45Encoded = base45.encode(deflated);
 
-        // Return the result
+        // Create JWK for response (excluding private key components)
+        const publicJwk = {
+          kty: jwk.kty,
+          crv: jwk.crv,
+          x: jwk.x,
+          y: jwk.y
+          // Explicitly excluding 'd' (private key)
+        };
+
+        // Return the result with all intermediate steps, for the ICVP step
         res.json({
-          signature: base45Encoded
+          signature: base45Encoded,
+          steps: {
+            input: {
+              url: url,
+              issuer: issuer,
+              kid: kid
+            },
+            step1_payload: payload,
+            step1_payload_json: JSON.stringify(payload),
+            step2_cbor_encoded: Array.from(cborEncoded), // Convert Buffer to array for JSON serialization
+            step2_cbor_encoded_hex: cborEncoded.toString('hex'),
+            step2_cbor_encoded_base64: cborEncoded.toString('base64'),
+            step3_cose_signed: Array.from(coseSigned),
+            step3_cose_signed_hex: coseSigned.toString('hex'),
+            step3_cose_signed_base64: coseSigned.toString('base64'),
+            step4_deflated: Array.from(deflated),
+            step4_deflated_hex: Buffer.from(deflated).toString('hex'),
+            step4_deflated_base64: Buffer.from(deflated).toString('base64'),
+            step5_base45_encoded: base45Encoded,
+            crypto_info: {
+              public_key_jwk: publicJwk,
+              certificate_pem: certPem,
+              algorithm: "ES256",
+              curve: "P-256"
+            },
+            sizes: {
+              original_url_bytes: Buffer.byteLength(url, 'utf8'),
+              payload_json_bytes: Buffer.byteLength(JSON.stringify(payload), 'utf8'),
+              cbor_encoded_bytes: cborEncoded.length,
+              cose_signed_bytes: coseSigned.length,
+              deflated_bytes: deflated.length,
+              base45_encoded_bytes: Buffer.byteLength(base45Encoded, 'utf8')
+            }
+          }
         });
         
       } catch (error) {
@@ -691,7 +906,7 @@ app.get('/config/:key', (req, res) => {
   const { key } = req.params;
   
   // Only allow reading certain config keys for security
-  const allowedKeys = ['vhl.issuer', 'kid'];
+  const allowedKeys = ['vhl.issuer', 'kid', 'validator.version', 'validator.txServer', 'validator.port'];
   
   if (!allowedKeys.includes(key)) {
     return res.status(403).json({ error: 'Access to this config key is not allowed' });
@@ -720,7 +935,7 @@ app.put('/config/:key', (req, res) => {
   const { value, password } = req.body;
   
   // Only allow updating certain config keys for security
-  const allowedKeys = ['vhl.issuer', 'kid'];
+  const allowedKeys = ['vhl.issuer', 'kid', 'validator.version', 'validator.txServer', 'validator.port'];
   
   if (!allowedKeys.includes(key)) {
     return res.status(403).json({ error: 'Updating this config key is not allowed' });
@@ -764,7 +979,8 @@ app.get('/health', (req, res) => {
   res.json({
     status: 'OK',
     timestamp: new Date().toISOString(),
-    database: 'Connected'
+    database: 'Connected',
+    validator: fhirValidator ? (fhirValidator.isRunning() ? 'Running' : 'Stopped') : 'Not initialized'
   });
 });
 
@@ -776,8 +992,21 @@ app.use((req, res) => {
 });
 
 // Graceful shutdown
-process.on('SIGINT', () => {
+process.on('SIGINT', async () => {
   console.log('\nShutting down server...');
+  
+  // Stop FHIR validator
+  if (fhirValidator) {
+    try {
+      console.log('Stopping FHIR validator...');
+      await fhirValidator.stop();
+      console.log('FHIR validator stopped');
+    } catch (error) {
+      console.error('Error stopping FHIR validator:', error);
+    }
+  }
+  
+  // Close database
   db.close((err) => {
     if (err) {
       console.error('Error closing database:', err.message);
@@ -792,5 +1021,6 @@ process.on('SIGINT', () => {
 app.listen(PORT, () => {
   console.log(`Server running on http://localhost:${PORT}`);
   console.log(`Health check: http://localhost:${PORT}/health`);
-  console.log(`API endpoints: http://localhost:${PORT}/api/users`);
+  console.log(`Validation endpoint: http://localhost:${PORT}/validate`);
+  console.log(`Validator status: http://localhost:${PORT}/validate/status`);
 });

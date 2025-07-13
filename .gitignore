@@ -6,3 +6,5 @@ database.db
 node_modules/
 
 package-lock.json
+
+validator_cli.jar
