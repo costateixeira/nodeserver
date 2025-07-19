@@ -11,6 +11,12 @@ const base45 = require('base45');
 // Import the FHIR Validator
 const FhirValidator = require('fhir-validator-wrapper');
 
+// Import the VCL Parser
+const { parseVCL, parseVCLAndSetId, validateVCLExpression, VCLParseException } = require('./vcl-parser.js');
+
+// Import the XIG module
+const xigModule = require('./xig.js');
+
 // Try to load vhl.js module, but don't fail if it doesn't exist
 let vhlProcessor;
 try {
@@ -354,6 +360,52 @@ cron.schedule('0 * * * *', () => {
 });
 
 // Routes
+
+// VCL parsing endpoint
+app.get('/VCL', (req, res) => {
+  var { vcl } = req.query;
+  
+  // Validation
+  if (!vcl) {
+    return res.status(400).json({
+      error: 'VCL expression is required as query parameter: ?vcl=<expression>'
+    });
+  }
+  
+  if (vcl.startsWith('http://fhir.org/VCL/')) {
+    vcl = vcl.substring(20);
+  }
+  try {
+    // Validate the VCL expression first
+    if (!validateVCLExpression(vcl)) {
+      return res.status(400).json({
+        error: 'Invalid VCL expression syntax'
+      });
+    }
+    
+    // Parse the VCL expression and generate ValueSet with ID
+    const valueSet = parseVCLAndSetId(vcl);
+    
+    // Return the ValueSet as JSON
+    res.json(valueSet);
+    
+  } catch (error) {
+    console.error('VCL parsing error:', error);
+    
+    if (error instanceof VCLParseException) {
+      return res.status(400).json({
+        error: 'VCL parsing error',
+        message: error.message,
+        position: error.position >= 0 ? error.position : undefined
+      });
+    } else {
+      return res.status(500).json({
+        error: 'Internal server error while parsing VCL',
+        message: error.message
+      });
+    }
+  }
+});
 
 // FHIR Validation endpoint
 app.post('/validate', async (req, res) => {
@@ -974,6 +1026,12 @@ app.put('/config/:key', (req, res) => {
   });
 });
 
+// XIG routes - delegate to xig module
+app.use('/xig', xigModule.router);
+
+// Serve static files - place after API routes
+app.use(express.static(path.join(__dirname, 'static')));
+
 // Health check endpoint
 app.get('/health', (req, res) => {
   res.json({
@@ -1006,6 +1064,14 @@ process.on('SIGINT', async () => {
     }
   }
   
+  // Shutdown XIG module
+  try {
+    console.log('Shutting down XIG module...');
+    await xigModule.shutdown();
+    console.log('XIG module shut down');
+  } catch (error) {
+    console.error('Error shutting down XIG module:', error);
+  }
   // Close database
   db.close((err) => {
     if (err) {
@@ -1023,4 +1089,8 @@ app.listen(PORT, () => {
   console.log(`Health check: http://localhost:${PORT}/health`);
   console.log(`Validation endpoint: http://localhost:${PORT}/validate`);
   console.log(`Validator status: http://localhost:${PORT}/validate/status`);
+  console.log(`VCL parsing endpoint: http://localhost:${PORT}/VCL?vcl=<expression>`);
+  console.log(`XIG endpoints: http://localhost:${PORT}/xig`);
+  console.log(`XIG statistics: http://localhost:${PORT}/xig/stats`);
+  console.log(`XIG resources: http://localhost:${PORT}/xig/resources`);
 });

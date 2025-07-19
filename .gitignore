@@ -8,3 +8,11 @@ node_modules/
 package-lock.json
 
 validator_cli.jar
+
+server_claude.js
+
+xig-download.log
+
+xig.db
+
+xig_claude.js
