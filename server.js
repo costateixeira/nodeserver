@@ -227,6 +227,54 @@ async function initializeFhirValidator() {
   }
 }
 
+async function initializeXigIfEnabled() {
+  try {
+    // Check if XIG is enabled in config
+    const getXigConfigSql = 'SELECT value FROM config WHERE key = ?';
+    
+    return new Promise((resolve, reject) => {
+      db.get(getXigConfigSql, ['xig.enabled'], async (err, row) => {
+        if (err) {
+          console.error('Failed to get XIG config:', err);
+          return reject(err);
+        }
+        
+        const xigEnabled = row && row.value === 'true';
+        
+        if (xigEnabled) {
+          console.log('XIG is enabled, initializing...');
+          
+          try {
+            await xigModule.initializeXigModule();
+            
+            // Register XIG routes
+            app.use('/xig', xigModule.router);
+            console.log('XIG module initialized and routes registered');
+            
+            resolve(true);
+          } catch (error) {
+            console.error('XIG initialization failed:', error);
+            reject(error);
+          }
+        } else {
+          console.log('XIG is disabled in configuration');
+          resolve(false);
+        }
+      });
+    });
+  } catch (error) {
+    console.error('XIG initialization check failed:', error);
+    throw error;
+  }
+
+  // Error handling middleware
+  app.use((req, res) => {
+    res.status(404).json({
+      error: 'Route not found'
+    });
+  });
+}
+
 // Initialize database with SHL tables and validator config
 function initializeDatabase() {
   const createConfigTable = `
@@ -281,6 +329,8 @@ function initializeDatabase() {
         ['key_pem', '-----BEGIN PRIVATE KEY-----\nEXAMPLE_PRIVATE_KEY_DATA_HERE\n-----END PRIVATE KEY-----'],
         ['kid', '11'],
         ['vhl.issuer', 'XXX'],
+        ['xig.enabled', 'false'],  // XIG disabled by default
+        ['xig.auto_update', 'true'], // Auto-update when enabled
         // FHIR Validator configuration
         ['validator.version', '4.0.1'],
         ['validator.txServer', 'http://tx.fhir.org/r4'],
@@ -300,6 +350,13 @@ function initializeDatabase() {
         });
       });
       
+      setTimeout(() => {
+        initializeXigIfEnabled().catch(error => {
+          console.error('Failed to initialize XIG:', error);
+          console.log('Server will continue without XIG capabilities');
+        });
+      }, 2000);
+
       // Initialize FHIR Validator after database setup
       setTimeout(() => {
         initializeFhirValidator().catch(error => {
@@ -1026,28 +1083,43 @@ app.put('/config/:key', (req, res) => {
   });
 });
 
-// XIG routes - delegate to xig module
-app.use('/xig', xigModule.router);
-
 // Serve static files - place after API routes
 app.use(express.static(path.join(__dirname, 'static')));
 
 // Health check endpoint
-app.get('/health', (req, res) => {
+app.get('/health', async (req, res) => {
+    // Check XIG status
+    let xigStatus = 'Disabled';
+    try {
+      const getXigConfigSql = 'SELECT value FROM config WHERE key = ?';
+      const xigConfigResult = await new Promise((resolve, reject) => {
+        db.get(getXigConfigSql, ['xig.enabled'], (err, row) => {
+          if (err) reject(err);
+          else resolve(row);
+        });
+      });
+      
+      if (xigConfigResult && xigConfigResult.value === 'true') {
+        // XIG is enabled, check if module is loaded
+        if (xigModule && xigModule.isCacheLoaded && xigModule.isCacheLoaded()) {
+          xigStatus = 'Running';
+        } else {
+          xigStatus = 'Enabled but not loaded';
+        }
+      }
+    } catch (error) {
+      xigStatus = 'Error checking XIG status';
+    }
+
   res.json({
     status: 'OK',
     timestamp: new Date().toISOString(),
     database: 'Connected',
-    validator: fhirValidator ? (fhirValidator.isRunning() ? 'Running' : 'Stopped') : 'Not initialized'
+    validator: fhirValidator ? (fhirValidator.isRunning() ? 'Running' : 'Stopped') : 'Not initialized',
+    xig: xigStatus
   });
 });
 
-// Error handling middleware
-app.use((req, res) => {
-  res.status(404).json({
-    error: 'Route not found'
-  });
-});
 
 // Graceful shutdown
 process.on('SIGINT', async () => {
@@ -1066,9 +1138,11 @@ process.on('SIGINT', async () => {
   
   // Shutdown XIG module
   try {
-    console.log('Shutting down XIG module...');
-    await xigModule.shutdown();
-    console.log('XIG module shut down');
+    if (xigModule && typeof xigModule.shutdown === 'function') {
+      console.log('Shutting down XIG module...');
+      await xigModule.shutdown();
+      console.log('XIG module shut down');
+    }
   } catch (error) {
     console.error('Error shutting down XIG module:', error);
   }

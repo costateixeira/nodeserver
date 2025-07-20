@@ -2513,6 +2513,9 @@ async function initializeXigModule() {
       }, 5000);
     }
     
+    // Check if auto-update is enabled
+    // Note: This assumes we're called only when XIG is enabled
+    logMessage('Setting up XIG scheduled update');
     cron.schedule('0 2 * * *', () => {
       logMessage('Scheduled daily update triggered');
       updateXigDatabase();
@@ -2522,6 +2525,7 @@ async function initializeXigModule() {
     
   } catch (error) {
     logMessage(`XIG module initialization failed: ${error.message}`);
+    throw error; // Re-throw so caller knows about failure
   }
 }
 
@@ -2543,9 +2547,6 @@ function shutdown() {
     }
   });
 }
-
-// Initialize the module when it's loaded
-initializeXigModule();
 
 // Export everything
 module.exports = {
