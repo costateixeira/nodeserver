@@ -1,0 +1,46 @@
+{
+  "server": {
+    "port": 3000,
+    "cors": {
+      "origin": true,
+      "credentials": true
+    }
+  },
+  "modules": {
+    "shl": {
+      "enabled": false,
+      "database": "shl.db",
+      "password": "<!-- Uuid -->",
+      "certificates": {
+        "certFile": "<!-- filename -->",
+        "keyFile": "<!-- filename -->",
+        "kid": "<!-- kid -->"
+      },
+      "vhl": {
+        "issuer": "XXX"
+      },
+      "cleanup": {
+        "schedule": "0 * * * *"
+      },
+      "validator": {
+        "enabled": true,
+        "version": "4.0.1",
+        "txServer": "http://tx.fhir.org/r4",
+        "txLog": "./tx.log",
+        "port": 8081,
+        "packages": [
+          "hl7.fhir.us.core#6.0.0",
+          "hl7.fhir.uv.ips#1.1.0"
+        ],
+        "timeout": 60000
+      }
+    },
+    "vcl": {
+      "enabled": false
+    },
+    "xig": {
+      "enabled": false,
+      "autoUpdate": true
+    }
+  }
+}

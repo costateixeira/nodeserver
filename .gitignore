@@ -16,3 +16,7 @@ xig-download.log
 xig.db
 
 xig_claude.js
+
+config.json
+
+*.pem

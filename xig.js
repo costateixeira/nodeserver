@@ -486,7 +486,7 @@ async function buildResourceTable(queryParams, resourceCount, offset = 0) {
   
   try {
     // Add pagination controls
-    parts.push(buildPaginationControls(resourceCount, offset, '/xig/resources', queryParams));
+    parts.push(buildPaginationControls(resourceCount, offset, '/xig', queryParams));
     
     // Build table start and headers
     parts.push(
@@ -1825,52 +1825,8 @@ function getDatabaseInfo() {
 
 // Routes
 
-// Main XIG endpoint
-router.get('/', async (req, res) => {
-  try {
-    const title = getMetadata('title') || 'Implementation Guide Statistics';
-    
-    const content = `
-      <p class="lead">Welcome to the FHIR Implementation Guide Statistics Server</p>
-      
-      <div class="row">
-        <div class="col-md-4">
-          <div class="card">
-            <div class="card-body">
-              <h5 class="card-title">📊 Statistics</h5>
-              <p class="card-text">View comprehensive system statistics including cache sizes, database info, and request metrics.</p>
-              <a href="/xig/stats" class="btn btn-primary">View Statistics</a>
-            </div>
-          </div>
-        </div>
-        
-        <div class="col-md-4">
-          <div class="card">
-            <div class="card-body">
-              <h5 class="card-title">📋 Resources</h5>
-              <p class="card-text">Browse FHIR resources with filtering by version, authority, realm, and resource type.</p>
-              <a href="/xig/resources" class="btn btn-primary">Browse Resources</a>
-            </div>
-          </div>
-        </div>
-      </div>      
-      
-    `;
-    const stats = await gatherPageStatistics();
-    stats.processingTime = Date.now() - startTime; // Update with actual processing time
- 
-    const html = renderPage(title, content, stats);
-    
-    res.setHeader('Content-Type', 'text/html');
-    res.send(html);
-  } catch (error) {
-    logMessage(`Error rendering homepage: ${error.message}`);
-    res.status(500).send(`<h1>Error</h1><p>Failed to render page: ${error.message}</p>`);
-  }
-});
-
 // Resources list endpoint with control panel
-router.get('/resources', async (req, res) => {
+router.get('/', async (req, res) => {
   const startTime = Date.now(); // Add this at the very beginning
   
   try {
@@ -1891,7 +1847,7 @@ router.get('/resources', async (req, res) => {
     const offset = parseInt(queryParams.offset) || 0;
     
     // Build control panel
-    const controlPanel = buildControlPanel('/xig/resources', queryParams);
+    const controlPanel = buildControlPanel('/xig', queryParams);
     
     // Build dynamic heading
     const pageHeading = buildPageHeading(queryParams);
@@ -1931,7 +1887,7 @@ router.get('/resources', async (req, res) => {
     const additionalForm = buildAdditionalForm(queryParams);
     
     // Build summary statistics
-    const summaryStats = await buildSummaryStats(queryParams, '/xig/resources');
+    const summaryStats = await buildSummaryStats(queryParams, '/xig');
     
     // Build resource table
     const resourceTable = await buildResourceTable(queryParams, resourceCount, offset);
@@ -2094,7 +2050,7 @@ router.get('/resource/:packagePid/:resourceType/:resourceId', async (req, res) =
       <div class="alert alert-danger">
         <h4>Error Loading Resource</h4>
         <p>${escapeHtml(error.message)}</p>
-        <p><a href="/xig/resources" class="btn btn-primary">Back to Resources</a></p>
+        <p><a href="/xig" class="btn btn-primary">Back to Resources</a></p>
       </div>
     `;   
     const stats = await gatherPageStatistics();
