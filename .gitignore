@@ -1,22 +1,18 @@
 
-database.db
-
 .DS_Store
+
+data/
 
 node_modules/
 
+config.json
+
 package-lock.json
+
+private-key.pem
+
+public-key.pem
 
 validator_cli.jar
 
-server_claude.js
-
 xig-download.log
-
-xig.db
-
-xig_claude.js
-
-config.json
-
-*.pem

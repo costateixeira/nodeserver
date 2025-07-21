@@ -41,6 +41,15 @@
     "xig": {
       "enabled": false,
       "autoUpdate": true
+    },
+    "packages": {
+      "enabled": false,
+      "database": "/absolute/path/to/packages.db",
+      "mirrorPath": "/absolute/path/to/mirror",
+      "crawler": {
+        "enabled": true,
+        "schedule": "0 * * * *"
+      }
     }
   }
 }

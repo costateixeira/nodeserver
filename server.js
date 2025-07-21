@@ -7,6 +7,7 @@ const fs = require('fs');
 const SHLModule = require('./shl.js');
 const VCLModule = require('./vcl.js');
 const xigModule = require('./xig.js');
+const PackagesModule = require('./packages.js');
 
 const app = express();
 
@@ -82,6 +83,21 @@ async function initializeModules() {
     console.log('XIG module is disabled in configuration');
   }
 
+  // Initialize Packages module
+  if (config.modules.packages.enabled) {
+    try {
+      modules.packages = new PackagesModule();
+      await modules.packages.initialize(config.modules.packages);
+      app.use('/packages', modules.packages.router);
+      console.log('Packages module loaded and routes registered');
+    } catch (error) {
+      console.error('Failed to initialize Packages module:', error);
+      throw error;
+    }
+  } else {
+    console.log('Packages module is disabled in configuration');
+  }
+
   console.log('All enabled modules initialized successfully');
 }
 
@@ -115,13 +131,6 @@ app.get('/health', async (req, res) => {
   res.json(healthStatus);
 });
 
-// Error handling middleware
-// app.use((req, res) => {
-//   res.status(404).json({
-//     error: 'Route not found'
-//   });
-// });
-
 // Initialize everything
 async function startServer() {
   try {
@@ -150,9 +159,15 @@ async function startServer() {
       }
       
       if (config.modules.xig.enabled) {
-        console.log(`XIG endpoints: http://localhost:${PORT}/xig`);
+        console.log(`XIG main (resources): http://localhost:${PORT}/xig`);
         console.log(`XIG statistics: http://localhost:${PORT}/xig/stats`);
-        console.log(`XIG resources: http://localhost:${PORT}/xig`);
+      }
+      
+      if (config.modules.packages.enabled) {
+        console.log(`Packages endpoints: http://localhost:${PORT}/packages`);
+        console.log(`Packages crawler: http://localhost:${PORT}/packages/crawl`);
+        console.log(`Packages stats: http://localhost:${PORT}/packages/stats`);
+        console.log(`Packages log: http://localhost:${PORT}/packages/log`);
       }
       
       console.log(`====================================================\n`);

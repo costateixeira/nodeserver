@@ -15,7 +15,10 @@
     "node-cron": "^3.0.2",
     "pako": "^2.1.0",
     "sqlite3": "^5.1.6",
-    "fhir-validator-wrapper" : "1.0.0"
+    "fhir-validator-wrapper" : "1.0.0",
+    "axios": "^1.6.0",
+    "fast-xml-parser": "^4.3.0",
+    "tar": "^6.2.0"
   },
   "devDependencies": {
     "nodemon": "^3.0.1"
