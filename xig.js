@@ -12,7 +12,7 @@ const router = express.Router();
 
 // Configuration
 const XIG_DB_URL = 'http://fhir.org/guides/stats/xig.db';
-const XIG_DB_PATH = path.join(__dirname, 'xig.db');
+const XIG_DB_PATH = path.join(__dirname, 'data', 'xig.db');
 const DOWNLOAD_LOG_PATH = path.join(__dirname, 'xig-download.log');
 const TEMPLATE_PATH = path.join(__dirname, 'xig-template.html');
 
@@ -364,6 +364,9 @@ function buildResourceListQuery(queryParams, offset = 0, limit = 50) {
       Content,
       Supplements,
       Details,
+      FMM,
+      WG, 
+      StandardsStatus,
       Web
     FROM Resources
     ${whereClause}
@@ -503,6 +506,8 @@ async function buildResourceTable(queryParams, resourceCount, offset = 0) {
       '<th>Identity</th>',
       '<th>Name/Title</th>',
       '<th>Status</th>',
+      '<th>FMM</th>',
+      '<th>WG</th>',
       '<th>Date</th>'
     );
     
@@ -614,7 +619,15 @@ async function buildResourceTable(queryParams, resourceCount, offset = 0) {
       parts.push(`<td>${escapeHtml(displayName)}</td>`);
       
       // Status column
-      parts.push(`<td>${escapeHtml(row.Status || '')}</td>`);
+      if (row.StandardsStatus) {
+        parts.push(`<td>${escapeHtml(row.StandardsStatus || '')}</td>`);
+      } else {
+        parts.push(`<td>${escapeHtml(row.Status || '')}</td>`);
+      }
+      
+      // FMM/WG Columns
+      parts.push(`<td>${escapeHtml(row.FMM || '')}</td>`);
+      parts.push(`<td>${escapeHtml(row.WG || '')}</td>`);
       
       // Date column
       parts.push(`<td>${formatDate(row.Date)}</td>`);
@@ -1824,6 +1837,25 @@ function getDatabaseInfo() {
 }
 
 // Routes
+router.get('/:packagePid/:resourceType/:resourceId', async (req, res) => {
+  const { packagePid, resourceType, resourceId } = req.params;
+  
+  // Check if this looks like a package/resource pattern
+  // Package PIDs typically contain dots and pipes: hl7.fhir.uv.extensions|current
+  // Resource types are FHIR resource names: StructureDefinition, ValueSet, etc.
+  
+  const isPackagePidFormat = packagePid.includes('.') || packagePid.includes('|');
+  const isFhirResourceType = /^[A-Z][a-zA-Z]+$/.test(resourceType);
+  
+  if (isPackagePidFormat && isFhirResourceType) {
+    // This looks like a legacy resource URL, redirect to the proper format
+    // logMessage(`Redirecting legacy URL: /${packagePid}/${resourceType}/${resourceId} -> /resource/${packagePid}/${resourceType}/${resourceId}`);
+    res.redirect(301, `/xig/resource/${packagePid}/${resourceType}/${resourceId}`);
+  } else {
+    // Not a resource URL pattern, return 404
+    res.status(404).send('Not Found');
+  }
+});
 
 // Resources list endpoint with control panel
 router.get('/', async (req, res) => {

@@ -391,40 +391,56 @@ class PackageCrawler {
   async extractNpmPackage(packageBuffer, source) {
     try {
       const files = {};
+      const zlib = require('zlib');
+      const { Readable } = require('stream');
       
-      // Extract .tgz to memory
-      await new Promise((resolve, reject) => {
-        const stream = tar.extract({
-          gzip: true,
-          onentry: (entry) => {
-            // Only extract files we need
-            const fileName = entry.path.replace(/^package\//, ''); // Remove package/ prefix
-            
-            if (fileName === 'package.json' || fileName === '.index.json' || fileName === 'ig.ini') {
-              const chunks = [];
-              
-              entry.on('data', (chunk) => {
-                chunks.push(chunk);
-              });
-              
-              entry.on('end', () => {
-                files[fileName] = Buffer.concat(chunks).toString('utf8');
-              });
-              
-              entry.resume();
-            } else {
-              entry.resume(); // Skip other files
-            }
+      // First decompress the gzip
+      const decompressed = zlib.gunzipSync(packageBuffer);
+      
+      // Parse tar manually without any file system operations
+      let offset = 0;
+      
+      while (offset < decompressed.length) {
+        // Read tar header (512 bytes)
+        if (offset + 512 > decompressed.length) break;
+        
+        const header = decompressed.slice(offset, offset + 512);
+        
+        // Check if this is the end (null header)
+        if (header[0] === 0) break;
+        
+        // Extract filename (first 100 bytes, null-terminated)
+        let filename = '';
+        for (let i = 0; i < 100; i++) {
+          if (header[i] === 0) break;
+          filename += String.fromCharCode(header[i]);
+        }
+        
+        // Extract file size (12 bytes starting at offset 124, octal)
+        let sizeStr = '';
+        for (let i = 124; i < 136; i++) {
+          if (header[i] === 0 || header[i] === 32) break; // null or space
+          sizeStr += String.fromCharCode(header[i]);
+        }
+        const fileSize = parseInt(sizeStr, 8) || 0;
+        
+        // Move past header
+        offset += 512;
+        
+        // Extract file content if we need this file
+        if (fileSize > 0) {
+          const cleanFilename = filename.replace(/^package\//, ''); // Remove package/ prefix
+          
+          if (cleanFilename === 'package.json' || cleanFilename === '.index.json' || cleanFilename === 'ig.ini') {
+            const fileContent = decompressed.slice(offset, offset + fileSize);
+            files[cleanFilename] = fileContent.toString('utf8');
           }
-        });
+        }
         
-        stream.on('error', reject);
-        stream.on('end', resolve);
-        
-        // Write the package buffer to the stream
-        stream.write(packageBuffer);
-        stream.end();
-      });
+        // Move to next file (files are padded to 512-byte boundaries)
+        const paddedSize = Math.ceil(fileSize / 512) * 512;
+        offset += paddedSize;
+      }
       
       // Parse package.json (required)
       if (!files['package.json']) {

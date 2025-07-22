@@ -269,7 +269,7 @@ class PackagesModule {
       this.crawlerJob = cron.schedule(this.config.crawler.schedule, async () => {
         console.log('Starting scheduled package crawler...');
         try {
-          await this.runWebCrawler();
+          await this.runCrawler();
           console.log('Scheduled package crawler completed successfully');
         } catch (error) {
           console.error('Scheduled package crawler failed:', error.message);
@@ -1150,6 +1150,368 @@ class PackagesModule {
     // this.router.get('/packages', this.listPackages.bind(this));
     // this.router.get('/package/:id', this.getPackage.bind(this));
   }
+  async serveSearch(req, res) {
+  const {
+    name = '',
+    dependson = '',
+    canonicalPkg = '',
+    canonicalUrl = '',
+    fhirVersion = '',
+    dependency = '',
+    sort = '',
+    objWrapper = false
+  } = req.query;
+
+  const secure = req.secure || req.headers['x-forwarded-proto'] === 'https';
+
+  try {
+    const results = await this.searchPackages({
+      name,
+      dependson,
+      canonicalPkg,
+      canonicalUrl,
+      fhirVersion,
+      dependency,
+      sort
+    });
+
+    // Check if client wants HTML response
+    const acceptsHtml = req.headers.accept && req.headers.accept.includes('text/html');
+    
+    if (acceptsHtml) {
+      // Return HTML response (simplified - you'd want a proper template engine)
+      const html = this.generateSearchHtml(req, results, {
+        name, dependson, canonicalPkg, canonicalUrl, fhirVersion, secure
+      });
+      res.setHeader('Content-Type', 'text/html');
+      res.send(html);
+    } else {
+      // Return JSON response
+      let responseData;
+      
+      if (objWrapper) {
+        responseData = {
+          objects: results.map(pkg => ({ package: pkg }))
+        };
+      } else {
+        responseData = results;
+      }
+      
+      res.json(responseData);
+    }
+  } catch (error) {
+    console.error('Error in search:', error);
+    res.status(500).json({ error: 'Search failed', message: error.message });
+  }
+}
+
+async searchPackages(params) {
+  const {
+    name = '',
+    dependson = '',
+    canonicalPkg = '',
+    canonicalUrl = '',
+    fhirVersion = '',
+    dependency = '',
+    sort = ''
+  } = params;
+
+  return new Promise((resolve, reject) => {
+    const results = [];
+    const deps = [];
+    const depsDone = new Set();
+    let versioned = false;
+
+    const processSearch = () => {
+      let filter = '';
+      
+      // Build name filter
+      if (name) {
+        versioned = name.includes('#');
+        if (name.includes('#')) {
+          const [packageId, version] = name.split('#');
+          filter += ` AND PackageVersions.Id LIKE '%${this.escapeSql(packageId)}%' AND PackageVersions.Version LIKE '${this.escapeSql(version)}%'`;
+        } else {
+          filter += ` AND PackageVersions.Id LIKE '%${this.escapeSql(name)}%'`;
+        }
+      }
+
+      // Build dependency filters
+      if (deps.length > 0) {
+        const depList = deps.map(d => `'${this.escapeSql(d)}'`).join(',');
+        filter += ` AND PackageVersions.PackageVersionKey IN (SELECT PackageDependencies.PackageVersionKey FROM PackageDependencies WHERE PackageDependencies.Dependency IN (${depList}))`;
+      } else if (dependson) {
+        filter += ` AND PackageVersions.PackageVersionKey IN (SELECT PackageDependencies.PackageVersionKey FROM PackageDependencies WHERE PackageDependencies.Dependency LIKE '%${this.escapeSql(dependson)}%')`;
+        versioned = dependson.includes('#');
+      }
+
+      // Build canonical package filter
+      if (canonicalPkg) {
+        if (canonicalPkg.endsWith('%')) {
+          filter += ` AND PackageVersions.Canonical LIKE '${this.escapeSql(canonicalPkg)}'`;
+        } else {
+          filter += ` AND PackageVersions.Canonical = '${this.escapeSql(canonicalPkg)}'`;
+        }
+      }
+
+      // Build canonical URL filter
+      if (canonicalUrl) {
+        filter += ` AND PackageVersions.PackageVersionKey IN (SELECT PackageVersionKey FROM PackageURLs WHERE URL LIKE '${this.escapeSql(canonicalUrl)}%')`;
+      }
+
+      // Build FHIR version filter
+      if (fhirVersion) {
+        const version = this.getVersion(fhirVersion);
+        filter += ` AND PackageVersions.PackageVersionKey IN (SELECT PackageVersionKey FROM PackageFHIRVersions WHERE Version LIKE '${this.escapeSql(version)}%')`;
+      }
+
+      // Build dependency filter
+      if (dependency) {
+        if (dependency.includes('#')) {
+          filter += ` AND PackageVersions.PackageVersionKey IN (SELECT PackageVersionKey FROM PackageDependencies WHERE Dependency LIKE '${this.escapeSql(dependency)}%')`;
+        } else if (dependency.includes('|')) {
+          const normalizedDep = dependency.replace('|', '#');
+          filter += ` AND PackageVersions.PackageVersionKey IN (SELECT PackageVersionKey FROM PackageDependencies WHERE Dependency LIKE '${this.escapeSql(normalizedDep)}%')`;
+        } else {
+          filter += ` AND PackageVersions.PackageVersionKey IN (SELECT PackageVersionKey FROM PackageDependencies WHERE Dependency LIKE '${this.escapeSql(dependency)}#%')`;
+        }
+      }
+
+      // Build SQL query
+      let sql;
+      if (versioned) {
+        sql = `SELECT Id, Version, PubDate, FhirVersions, Kind, Canonical, Description 
+               FROM PackageVersions 
+               WHERE PackageVersions.PackageVersionKey > 0 ${filter} 
+               ORDER BY PubDate`;
+      } else {
+        sql = `SELECT Packages.Id, Version, PubDate, FhirVersions, Kind, PackageVersions.Canonical, Packages.DownloadCount, Description 
+               FROM Packages, PackageVersions 
+               WHERE Packages.CurrentVersion = PackageVersions.PackageVersionKey ${filter} 
+               ORDER BY PubDate`;
+      }
+
+      console.log('Executing search SQL:', sql);
+
+      this.db.all(sql, (err, rows) => {
+        if (err) {
+          reject(err);
+          return;
+        }
+
+        deps.length = 0; // Clear deps array
+
+        for (const row of rows) {
+          const dep = `${row.Id}#${row.Version}`;
+          
+          if (!versioned || !depsDone.has(dep)) {
+            if (versioned) {
+              depsDone.add(dep);
+              if (dependson) {
+                deps.push(`'${dep}'`);
+              }
+            }
+
+            const packageInfo = {
+              name: row.Id,
+              version: row.Version,
+              fhirVersion: this.interpretVersion(row.FhirVersions),
+              canonical: row.Canonical,
+              kind: this.codeForKind(row.Kind),
+              url: this.buildPackageUrl(row.Id, row.Version, false) // secure parameter would come from request
+            };
+
+            if (row.PubDate) {
+              packageInfo.date = new Date(row.PubDate).toISOString();
+            }
+
+            if (!versioned && row.DownloadCount) {
+              packageInfo.count = row.DownloadCount;
+            }
+
+            if (row.Description) {
+              packageInfo.description = row.Description;
+            }
+
+            results.push(packageInfo);
+          }
+        }
+
+        // Continue processing if there are more dependencies to resolve
+        if (deps.length > 0) {
+          setImmediate(processSearch);
+        } else {
+          // Apply sorting if specified
+          const sortedResults = this.applySorting(results, sort);
+          resolve(sortedResults);
+        }
+      });
+    };
+
+    processSearch();
+  });
+}
+
+escapeSql(str) {
+  if (!str) return '';
+  return str.replace(/'/g, "''");
+}
+
+getVersion(fhirVersion) {
+  // Map common FHIR version aliases to actual versions
+  const versionMap = {
+    'R2': '1.0.2',
+    'R3': '3.0.2', 
+    'R4': '4.0.1',
+    'R5': '5.0.0'
+  };
+  
+  return versionMap[fhirVersion] || fhirVersion;
+}
+
+interpretVersion(fhirVersions) {
+  if (!fhirVersions) return '';
+  
+  // Handle comma-separated versions
+  const versions = fhirVersions.split(',').map(v => v.trim());
+  
+  // Return the primary version or join multiple versions
+  return versions.length === 1 ? versions[0] : versions.join(', ');
+}
+
+codeForKind(kind) {
+  const kindMap = {
+    0: 'fhir.core',
+    1: 'fhir.ig', 
+    2: 'fhir.template'
+  };
+  
+  return kindMap[kind] || 'fhir.ig';
+}
+
+buildPackageUrl(id, version, secure = false) {
+  const protocol = secure ? 'https:' : 'http:';
+  const baseUrl = this.config.baseUrl || `${protocol}//localhost:${this.config.port || 3000}`;
+  return `${baseUrl}/packages/${id}/${version}`;
+}
+
+applySorting(results, sort) {
+  if (!sort) return results;
+  
+  const descending = sort.startsWith('-');
+  const sortField = descending ? sort.substring(1) : sort;
+  
+  return results.sort((a, b) => {
+    let comparison = 0;
+    
+    switch (sortField) {
+      case 'name':
+        comparison = a.name.localeCompare(b.name);
+        break;
+      case 'version':
+        comparison = this.compareVersions(a.version, b.version);
+        break;
+      case 'date':
+        comparison = new Date(a.date || 0) - new Date(b.date || 0);
+        break;
+      case 'count':
+        comparison = (a.count || 0) - (b.count || 0);
+        break;
+      default:
+        return 0;
+    }
+    
+    return descending ? -comparison : comparison;
+  });
+}
+
+compareVersions(a, b) {
+  const aParts = a.split('.').map(Number);
+  const bParts = b.split('.').map(Number);
+  
+  for (let i = 0; i < Math.max(aParts.length, bParts.length); i++) {
+    const aPart = aParts[i] || 0;
+    const bPart = bParts[i] || 0;
+    
+    if (aPart !== bPart) {
+      return aPart - bPart;
+    }
+  }
+  
+  return 0;
+}
+
+generateSearchHtml(req, results, params) {
+  // Simplified HTML generation - you'd want to use a proper template engine
+  const { name, dependson, canonicalPkg, canonicalUrl, fhirVersion, secure } = params;
+  
+  const baseUrl = this.buildPackageUrl('', '', secure).replace('/packages/', '');
+  
+  return `
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <title>FHIR Package Search</title>
+      <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .search-form { background: #f5f5f5; padding: 20px; margin-bottom: 20px; }
+        .search-form input, .search-form select { margin: 5px; padding: 5px; }
+        .results { margin-top: 20px; }
+        .package { border: 1px solid #ddd; margin: 10px 0; padding: 15px; }
+        .package-name { font-weight: bold; font-size: 1.2em; }
+        .package-details { color: #666; margin-top: 5px; }
+      </style>
+    </head>
+    <body>
+      <h1>FHIR Package Search</h1>
+      
+      <form class="search-form" method="GET">
+        <input type="text" name="name" placeholder="Package name" value="${this.escapeHtml(name)}">
+        <input type="text" name="dependson" placeholder="Depends on" value="${this.escapeHtml(dependson)}">
+        <input type="text" name="canonicalPkg" placeholder="Canonical package" value="${this.escapeHtml(canonicalPkg)}">
+        <input type="text" name="canonicalUrl" placeholder="Canonical URL" value="${this.escapeHtml(canonicalUrl)}">
+        <select name="fhirVersion">
+          <option value="">Any FHIR version</option>
+          <option value="R2" ${fhirVersion === 'R2' ? 'selected' : ''}>R2</option>
+          <option value="R3" ${fhirVersion === 'R3' ? 'selected' : ''}>R3</option>
+          <option value="R4" ${fhirVersion === 'R4' ? 'selected' : ''}>R4</option>
+          <option value="R5" ${fhirVersion === 'R5' ? 'selected' : ''}>R5</option>
+        </select>
+        <button type="submit">Search</button>
+      </form>
+      
+      <div class="results">
+        <h2>Results (${results.length} packages found)</h2>
+        ${results.map(pkg => `
+          <div class="package">
+            <div class="package-name">
+              <a href="${pkg.url}">${this.escapeHtml(pkg.name)}</a> v${this.escapeHtml(pkg.version)}
+            </div>
+            <div class="package-details">
+              <strong>FHIR Version:</strong> ${this.escapeHtml(pkg.fhirVersion)}<br>
+              <strong>Type:</strong> ${this.escapeHtml(pkg.kind)}<br>
+              <strong>Canonical:</strong> ${this.escapeHtml(pkg.canonical)}<br>
+              ${pkg.description ? `<strong>Description:</strong> ${this.escapeHtml(pkg.description)}<br>` : ''}
+              ${pkg.date ? `<strong>Published:</strong> ${new Date(pkg.date).toLocaleDateString()}<br>` : ''}
+              ${pkg.count ? `<strong>Downloads:</strong> ${pkg.count}<br>` : ''}
+            </div>
+          </div>
+        `).join('')}
+      </div>
+    </body>
+    </html>
+  `;
+}
+
+escapeHtml(str) {
+  if (!str) return '';
+  return str
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
 
   async shutdown() {
     console.log('Shutting down Packages module...');
