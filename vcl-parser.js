@@ -1,3 +1,9 @@
+//
+// Copyright 2025, Health Intersections Pty Ltd (http://www.healthintersections.com.au)
+//
+// Licensed under BSD-3: https://opensource.org/license/bsd-3-clause
+//
+
 /**
  * Value Set Composition Language (VCL) Parser for JavaScript FHIR
  * Based on the Java VCL parser but adapted for JavaScript

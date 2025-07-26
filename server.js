@@ -1,3 +1,9 @@
+//
+// Copyright 2025, Health Intersections Pty Ltd (http://www.healthintersections.com.au)
+//
+// Licensed under BSD-3: https://opensource.org/license/bsd-3-clause
+//
+
 const express = require('express');
 const cors = require('cors');
 const path = require('path');
