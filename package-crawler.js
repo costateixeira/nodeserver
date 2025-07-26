@@ -230,7 +230,7 @@ class PackageCrawler {
       itemLog.guid = guid;
       
       // Extract title (package ID)
-      const id = item.title && item.title['#text'] ? item.title['#text'] : '';
+      const id = item.title;
       itemLog.id = id;
       
       if (!id) {
@@ -269,15 +269,16 @@ class PackageCrawler {
       // Parse publication date
       let pubDate;
       try {
-        pubDate = this.parsePubDate(item.pubDate && item.pubDate['#text'] ? item.pubDate['#text'] : '');
+        let pd = item.pubDate;
+        pubDate = this.parsePubDate(pd);
       } catch (error) {
-        itemLog.error = `Invalid date format: ${error.message}`;
+        itemLog.error = `Invalid date format '{pd}': ${error.message}`;
         itemLog.status = 'error';
         return;
       }
       
       // Extract URL and fetch package
-      const url = this.fixUrl(item.link && item.link['#text'] ? item.link['#text'] : '');
+      const url = this.fixUrl(item.link);
       if (!url) {
         itemLog.error = 'no link provided';
         itemLog.status = 'error';
@@ -296,6 +297,9 @@ class PackageCrawler {
       console.error(`Exception processing item ${itemLog.guid || index}:`, error.message);
       itemLog.status = 'Exception';
       itemLog.error = error.message;
+      if (error.message.includes('RATE_LIMITED')) {
+        throw error;
+      }
     }
   }
 
@@ -657,7 +661,7 @@ class PackageCrawler {
           (PackageVersionKey, GUID, PubDate, Indexed, Id, Version, Kind, DownloadCount, 
            Canonical, FhirVersions, UploadCount, Description, ManualToken, Hash, 
            Author, License, HomePage, Content) 
-          VALUES (?, ?, ?, datetime('now'), ?, ?, ?, 0, ?, ?, 1, ?, '', ?, ?, ?, ?)
+          VALUES (?, ?, ?, datetime('now'), ?, ?, ?, 0, ?, ?, 1, ?, '', ?, ?, ?, ?, ?)
         `;
         
         this.db.run(insertVersionSql, [

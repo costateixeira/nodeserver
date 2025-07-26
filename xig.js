@@ -7,6 +7,8 @@ const cron = require('node-cron');
 const sqlite3 = require('sqlite3').verbose();
 const { EventEmitter } = require('events');
 const zlib = require('zlib');
+const htmlServer = require('./html-server');
+
 
 const router = express.Router();
 
@@ -59,16 +61,14 @@ function logMessage(message) {
 
 // Template Functions
 
-// Function to load HTML template
 function loadTemplate() {
   try {
-    if (fs.existsSync(TEMPLATE_PATH)) {
-      htmlTemplate = fs.readFileSync(TEMPLATE_PATH, 'utf8');
-      logMessage('HTML template loaded successfully');
+    // Load using shared HTML server
+    const templateLoaded = htmlServer.loadTemplate('xig', TEMPLATE_PATH);
+    if (templateLoaded) {
+      logMessage('HTML template loaded successfully via shared framework');
     } else {
-      // Use the provided template as fallback
-      htmlTemplate = "Template Not Found";
-      logMessage('xig-template.html');
+      logMessage('Failed to load HTML template via shared framework');
     }
   } catch (error) {
     logMessage(`Failed to load HTML template: ${error.message}`);
@@ -92,33 +92,14 @@ function escapeHtml(text) {
   return text.replace(/[&<>"']/g, function(m) { return map[m]; });
 }
 
-// Function to render a page using the template
 function renderPage(title, content, options = {}) {
-  if (!htmlTemplate) {
-    throw new Error('HTML template not loaded');
+  try {
+    return htmlServer.renderPage('xig', title, content, options);
+  } catch (error) {
+    throw new Error(`Failed to render page: ${error.message}`);
   }
-  
-  // Get version from options or metadata cache
-  const fhirVersion = options.version || getMetadata('fhir-version') || '4.0.1';
-  
-  // Get statistics - use provided values or defaults
-  const downloadDate = options.downloadDate || getDatabaseAgeInfo().status || 'Unknown';
-  const totalResources = options.totalResources || 'Unknown';
-  const totalPackages = options.totalPackages || 'Unknown';
-  const processingTime = options.processingTime || 0;
-  
-  // Simple string replacement
-  let html = htmlTemplate
-    .replace(/\[%title%\]/g, escapeHtml(title))
-    .replace(/\[%content%\]/g, content) // Content is assumed to be already-safe HTML
-    .replace(/\[%ver%\]/g, escapeHtml(fhirVersion))
-    .replace(/\[%download-date%\]/g, escapeHtml(downloadDate))
-    .replace(/\[%total-resources%\]/g, escapeHtml(totalResources.toLocaleString()))
-    .replace(/\[%total-packages%\]/g, escapeHtml(totalPackages.toLocaleString()))
-    .replace(/\[%ms%\]/g, escapeHtml(processingTime.toString()));
-  
-  return html;
 }
+
 async function gatherPageStatistics() {
   const startTime = Date.now();
   
@@ -128,7 +109,7 @@ async function gatherPageStatistics() {
     let downloadDate = 'Unknown';
     
     if (dbAge.lastDownloaded) {
-      downloadDate = dbAge.lastDownloaded.toISOString().split('T')[0]; // Just the date part
+      downloadDate = dbAge.lastDownloaded.toISOString().split('T')[0];
     } else {
       downloadDate = 'Never';
     }
@@ -143,7 +124,8 @@ async function gatherPageStatistics() {
       downloadDate: downloadDate,
       totalResources: tableCounts.resources || 0,
       totalPackages: tableCounts.packages || 0,
-      processingTime: processingTime
+      processingTime: processingTime,
+      version: getMetadata('fhir-version') || '4.0.1'
     };
     
   } catch (error) {
@@ -156,7 +138,8 @@ async function gatherPageStatistics() {
       downloadDate: 'Error',
       totalResources: 0,
       totalPackages: 0,
-      processingTime: processingTime
+      processingTime: processingTime,
+      version: '4.0.1'
     };
   }
 }
@@ -1931,19 +1914,7 @@ router.get('/', async (req, res) => {
     content += additionalForm;
     content += summaryStats;
     content += resourceTable;
-    
-    // Show current filters for debugging (commented out for production)
-    /*
-    const activeFilters = Object.keys(queryParams)
-      .filter(key => queryParams[key] && queryParams[key] !== '')
-      .map(key => `${key}: ${queryParams[key]}`);
-      
-    if (activeFilters.length > 0) {
-      content += '<div class="alert alert-info">';
-      content += '<strong>Active Filters:</strong> ' + activeFilters.join(', ');
-      content += '</div>';
-    }
-    */
+    // Gather statistics and render
     const stats = await gatherPageStatistics();
     stats.processingTime = Date.now() - startTime;
     
@@ -1953,12 +1924,7 @@ router.get('/', async (req, res) => {
     
   } catch (error) {
     logMessage(`Error rendering resources page: ${error.message}`);
-     const stats = await gatherPageStatistics();
-    stats.processingTime = Date.now() - startTime;
-       const errorContent = `<h1>Error</h1><p>Failed to render page: ${escapeHtml(error.message)}</p>`;
-    const html = renderPage('Error', errorContent, stats);
- 
-    res.status(500).send(`<h1>Error</h1><p>Failed to render page: ${error.message}</p>`);
+    htmlServer.sendErrorResponse(res, 'xig', error);
   }
 });
 
@@ -2000,31 +1966,16 @@ router.get('/stats', async (req, res) => {
     
     const fullContent = introContent + content;
     
-    const footer = ``;
-    const stats = await gatherPageStatistics();
+   const stats = await gatherPageStatistics();
     stats.processingTime = Date.now() - startTime;
     
-    const html = renderPage('FHIR IG Statistics Status', fullContent + footer, stats);
+    const html = renderPage('FHIR IG Statistics Status', fullContent, stats);
     res.setHeader('Content-Type', 'text/html');
     res.send(html);
     
   } catch (error) {
     logMessage(`Error generating stats page: ${error.message}`);
-
-    const stats = await gatherPageStatistics();
-    stats.processingTime = Date.now() - startTime;
-
-    const errorContent = `
-      <div class="alert alert-danger">
-        <h4>Error Generating Statistics</h4>
-        <p>${escapeHtml(error.message)}</p>
-        <p><a href="/xig/stats" class="btn btn-primary">Try Again</a></p>
-      </div>
-    `;
-    
-    const html = renderPage('Statistics Error', errorContent, stats);
-    res.status(500).setHeader('Content-Type', 'text/html');
-    res.send(html);
+    htmlServer.sendErrorResponse(res, 'xig', error);
   }
 });
 
@@ -2078,19 +2029,7 @@ router.get('/resource/:packagePid/:resourceType/:resourceId', async (req, res) =
     
   } catch (error) {
     logMessage(`Error rendering resource detail page: ${error.message}`);
-    const errorContent = `
-      <div class="alert alert-danger">
-        <h4>Error Loading Resource</h4>
-        <p>${escapeHtml(error.message)}</p>
-        <p><a href="/xig" class="btn btn-primary">Back to Resources</a></p>
-      </div>
-    `;   
-    const stats = await gatherPageStatistics();
-    stats.processingTime = Date.now() - startTime;
-
-    const html = renderPage('Error', errorContent, stats);
-    res.status(500).setHeader('Content-Type', 'text/html');
-    res.send(html);
+    htmlServer.sendErrorResponse(res, 'xig', error);
   }
 });
 
@@ -2116,7 +2055,7 @@ async function buildResourceDetailPage(packageObj, resourceData, secure = false)
     html += await buildResourceMetadataTable(packageObj, resourceData);
     
     // Build dependencies sections
-    html += await buildResourceDependencies(resourceData.ResourceKey, secure);
+    html += await buildResourceDependencies(resourceData, secure);
     
     // Build narrative section (if available)
     html += await buildResourceNarrative(resourceData.ResourceKey, packageObj);
@@ -2144,7 +2083,7 @@ async function buildResourceMetadataTable(packageObj, resourceData) {
   }
   
   // Type
-  html += `<tr><td><strong>Type</strong></td><td>${escapeHtml(resourceData.ResourceType)}</td></tr>`;
+  html += `<tr><td><strong>Resource Type</strong></td><td>${escapeHtml(resourceData.ResourceType)}</td></tr>`;
   
   // Id
   html += `<tr><td><strong>Id</strong></td><td>${escapeHtml(resourceData.Id)}</td></tr>`;
@@ -2200,7 +2139,7 @@ async function buildResourceMetadataTable(packageObj, resourceData) {
 }
 
 // Build resources that use this resource (dependencies pointing TO this resource)
-async function buildResourceDependencies(resourceKey, secure = false) {
+async function buildResourceDependencies(resourceData, secure = false) {
   let html = '<hr/><h3>Resources that use this resource</h3>';
   
   try {
@@ -2214,7 +2153,7 @@ async function buildResourceDependencies(resourceKey, secure = false) {
     `;
     
     const dependencies = await new Promise((resolve, reject) => {
-      xigDb.all(dependenciesQuery, [resourceKey], (err, rows) => {
+      xigDb.all(dependenciesQuery, [resourceData.ResourceKey], (err, rows) => {
         if (err) reject(err);
         else resolve(rows || []);
       });
@@ -2239,7 +2178,7 @@ async function buildResourceDependencies(resourceKey, secure = false) {
     `;
     
     const uses = await new Promise((resolve, reject) => {
-      xigDb.all(usesQuery, [resourceKey], (err, rows) => {
+      xigDb.all(usesQuery, [resourceData.ResourceKey], (err, rows) => {
         if (err) reject(err);
         else resolve(rows || []);
       });
@@ -2250,14 +2189,69 @@ async function buildResourceDependencies(resourceKey, secure = false) {
     } else {
       html += buildDependencyTable(uses, secure);
     }
-    
+    if (resourceData && resourceData.ResourceType === 'StructureDefinition' && resourceData.Type === 'Extension') {
+      html += await buildExtensionExamplesSection(resourceData.Url);
+    }
   } catch (error) {
     html += `<div class="alert alert-warning">Error loading dependencies: ${escapeHtml(error.message)}</div>`;
   }
   
   return html;
 }
+async function buildExtensionExamplesSection(resourceUrl) {
+  let html = '<hr/><h3>Examples of Use for Extension</h3>';
+  
+  try {
+    if (!xigDb) {
+      html += '<p style="color: #808080"><em>Database not available</em></p>';
+      return html;
+    }
+    
+    // Query to find extension examples using the resource URL
+    const extensionExamplesQuery = `
+      SELECT eu.Url, eu.Name, eu.Version 
+      FROM ExtensionDefns ed
+      JOIN ExtensionUsages eusage ON ed.ExtensionDefnKey = eusage.ExtensionDefnKey
+      JOIN ExtensionUsers eu ON eusage.ExtensionUserKey = eu.ExtensionUserKey
+      WHERE ed.Url = ?
+      ORDER BY eu.Name
+    `;
+    
+    const extensionExamples = await new Promise((resolve, reject) => {
+      xigDb.all(extensionExamplesQuery, [resourceUrl], (err, rows) => {
+        if (err) reject(err);
+        else resolve(rows || []);
+      });
+    });
+    
+    if (extensionExamples.length === 0) {
+      html += '<p style="color: #808080">No extension usage examples found</p>';
+    } else {
+      html += '<table class="table table-bordered table-striped">';
+      html += '<thead><tr><th>Resource</th><th>Version</th></tr></thead>';
+      html += '<tbody>';
+      
+      extensionExamples.forEach(example => {
+        const versionMap = { 1: 'R2', 2: 'R2B', 3: 'R3', 4: 'R4', 5: 'R4B', 6: 'R5' };
+        const versionName = example.Version ? (versionMap[example.Version] || example.Version.toString()) : '';
 
+        html += '<tr>';
+        html += `<td><a href="${escapeHtml(example.Url || '')}">${escapeHtml(example.Name || '')}</a></td>`;
+        html += `<td>${escapeHtml(versionName)}</td>`;
+        html += '</tr>';
+      });
+      
+      html += '</tbody>';
+      html += '</table>';
+    }
+    
+  } catch (error) {
+    logMessage(`Error loading extension examples: ${error.message}`);
+    html += `<div class="alert alert-warning">Error loading extension examples: ${escapeHtml(error.message)}</div>`;
+  }
+  
+  return html;
+}
 // Helper function to build dependency tables
 function buildDependencyTable(dependencies, secure = false) {
   let html = '';
@@ -2408,7 +2402,7 @@ async function buildResourceSource(resourceKey) {
     
     // Parse and format as JSON
     const jsonData = JSON.parse(decompressedData.toString('utf8'));
-    if (jsonData.text.div) {
+    if (jsonData.text && jsonData.text.div) {
       jsonData.text.div = "<!-- snip (see above) -->";
     }
     const formattedJson = JSON.stringify(jsonData, null, 2);

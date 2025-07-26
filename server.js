@@ -8,6 +8,7 @@ const SHLModule = require('./shl.js');
 const VCLModule = require('./vcl.js');
 const xigModule = require('./xig.js');
 const PackagesModule = require('./packages.js');
+const htmlServer = require('./html-server');
 
 const app = express();
 
@@ -101,6 +102,127 @@ async function initializeModules() {
   console.log('All enabled modules initialized successfully');
 }
 
+async function loadTemplates() {
+  console.log('Loading HTML templates...');
+
+  try {
+    // Load Root template
+    const rootTemplatePath = path.join(__dirname, 'root-template.html');
+    htmlServer.loadTemplate('root', rootTemplatePath);
+
+    // Load XIG template
+    const xigTemplatePath = path.join(__dirname, 'xig-template.html');
+    htmlServer.loadTemplate('xig', xigTemplatePath);
+
+    // Load Packages template
+    const packagesTemplatePath = path.join(__dirname, 'packages-template.html');
+    htmlServer.loadTemplate('packages', packagesTemplatePath);
+
+    console.log('HTML templates loaded successfully');
+  } catch (error) {
+    console.error('Failed to load templates:', error);
+    // Don't fail initialization if templates fail to load
+  }
+}
+
+function buildRootPageContent() {
+  let content = '<div class="row mb-4">';
+  content += '<div class="col-12">';
+
+  content += '<h3>Available Modules</h3>';
+  content += '<ul class="list-group">';
+
+  // Check which modules are enabled and add them to the list
+  if (config.modules.packages.enabled) {
+    content += '<li class="list-group-item">';
+    content += '<a href="/packages" class="text-decoration-none">Package Server</a>: Browse and download FHIR Implementation Guide packages<';
+    content += '</li>';
+  }
+
+  if (config.modules.xig.enabled) {
+    content += '<li class="list-group-item">';
+    content += '<a href="/xig" class="text-decoration-none">FHIR IG Statistics</a>: Statistics and analysis of FHIR Implementation Guides';
+    content += '</li>';
+  }
+
+  if (config.modules.shl.enabled) {
+    content += '<li class="list-group-item">';
+    content += '<a href="/shl" class="text-decoration-none">SHL Server</a>: SMART Health Links management and validation';
+    content += '</li>';
+  }
+
+  if (config.modules.vcl.enabled) {
+    content += '<li class="list-group-item">';
+    content += '<a href="/VCL" class="text-decoration-none">VCL Server</a>: ValueSet Compose Language expression parsing';
+    content += '</li>';
+  }
+
+  content += '</ul>';
+  content += '</div>';
+
+  return content;
+}
+
+app.get('/', async (req, res) => {
+  // Check if client wants HTML response
+  const acceptsHtml = req.headers.accept && req.headers.accept.includes('text/html');
+
+  if (acceptsHtml) {
+    try {
+      const startTime = Date.now();
+
+      // Load template if not already loaded
+      if (!htmlServer.hasTemplate('root')) {
+        const templatePath = path.join(__dirname, 'root-template.html');
+        htmlServer.loadTemplate('root', templatePath);
+      }
+
+      const content = buildRootPageContent();
+      
+      // Build basic stats for root page
+      const stats = {
+        version: '1.0.0',
+        enabledModules: Object.keys(config.modules).filter(m => config.modules[m].enabled).length,
+        processingTime: Date.now() - startTime
+      };
+
+      const html = htmlServer.renderPage('root', 'FHIR Development Server', content, stats);
+      res.setHeader('Content-Type', 'text/html');
+      res.send(html);
+    } catch (error) {
+      console.error('Error rendering root page:', error);
+      htmlServer.sendErrorResponse(res, 'root', error);
+    }
+  } else {
+    // Return JSON response for API clients
+    const enabledModules = {};
+    Object.keys(config.modules).forEach(moduleName => {
+      if (config.modules[moduleName].enabled) {
+        enabledModules[moduleName] = {
+          enabled: true,
+          endpoint: moduleName === 'vcl' ? '/VCL' : `/${moduleName}`
+        };
+      }
+    });
+
+    res.json({
+      message: 'FHIR Development Server',
+      version: '1.0.0',
+      modules: enabledModules,
+      endpoints: {
+        health: '/health',
+        ...Object.fromEntries(
+          Object.keys(enabledModules).map(m => [
+            m, 
+            m === 'vcl' ? '/VCL' : `/${m}`
+          ])
+        )
+      }
+    });
+  }
+});
+
+
 // Serve static files
 app.use(express.static(path.join(__dirname, 'static')));
 
@@ -134,6 +256,9 @@ app.get('/health', async (req, res) => {
 // Initialize everything
 async function startServer() {
   try {
+    // Load HTML templates
+    await loadTemplates();
+
     // Initialize modules
     await initializeModules().catch(error => {
       console.error('Failed to initialize modules:', error);
@@ -144,35 +269,37 @@ async function startServer() {
     app.listen(PORT, () => {
       console.log(`\n=== Server running on http://localhost:${PORT} ===`);
       console.log(`Health check: http://localhost:${PORT}/health`);
-      
+
       if (config.modules.shl.enabled) {
         console.log(`SHL endpoints: http://localhost:${PORT}/shl/`);
-        
+
         if (config.modules.shl.validator.enabled) {
           console.log(`FHIR Validation endpoint: http://localhost:${PORT}/shl/validate`);
           console.log(`Validator status: http://localhost:${PORT}/shl/validate/status`);
         }
       }
-      
+
       if (config.modules.vcl.enabled) {
         console.log(`VCL parsing endpoint: http://localhost:${PORT}/VCL?vcl=<expression>`);
       }
-      
+
       if (config.modules.xig.enabled) {
         console.log(`XIG main (resources): http://localhost:${PORT}/xig`);
         console.log(`XIG statistics: http://localhost:${PORT}/xig/stats`);
       }
-      
+
       if (config.modules.packages.enabled) {
         console.log(`Packages endpoints: http://localhost:${PORT}/packages`);
         console.log(`Packages crawler: http://localhost:${PORT}/packages/crawl`);
         console.log(`Packages stats: http://localhost:${PORT}/packages/stats`);
         console.log(`Packages log: http://localhost:${PORT}/packages/log`);
       }
-      
+
       console.log(`====================================================\n`);
     });
-
+    if (modules.packages && config.modules.packages.enabled) {
+      modules.packages.startInitialCrawler();
+    }
   } catch (error) {
     console.error('Failed to start server:', error);
     process.exit(1);
@@ -182,7 +309,7 @@ async function startServer() {
 // Graceful shutdown
 process.on('SIGINT', async () => {
   console.log('\nShutting down server...');
-  
+
   // Shutdown all modules
   for (const [moduleName, moduleInstance] of Object.entries(modules)) {
     try {
@@ -195,7 +322,7 @@ process.on('SIGINT', async () => {
       console.error(`Error shutting down ${moduleName} module:`, error);
     }
   }
-  
+
   console.log('Server shutdown complete');
   process.exit(0);
 });
