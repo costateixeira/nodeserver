@@ -10,10 +10,10 @@ const path = require('path');
 const fs = require('fs');
 
 // Import modules
-const SHLModule = require('./shl.js');
-const VCLModule = require('./vcl.js');
-const xigModule = require('./xig.js');
-const PackagesModule = require('./packages.js');
+const SHLModule = require('./shl/shl.js');
+const VCLModule = require('./vcl/vcl.js');
+const xigModule = require('./xig/xig.js');
+const PackagesModule = require('./packages/packages.js');
 const htmlServer = require('./html-server');
 
 const app = express();
@@ -141,7 +141,7 @@ function buildRootPageContent() {
   // Check which modules are enabled and add them to the list
   if (config.modules.packages.enabled) {
     content += '<li class="list-group-item">';
-    content += '<a href="/packages" class="text-decoration-none">Package Server</a>: Browse and download FHIR Implementation Guide packages<';
+    content += '<a href="/packages" class="text-decoration-none">Package Server</a>: Browse and download FHIR Implementation Guide packages';
     content += '</li>';
   }
 

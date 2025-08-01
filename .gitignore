@@ -9,10 +9,12 @@ config.json
 
 package-lock.json
 
-private-key.pem
+data/private-key.pem
 
-public-key.pem
+data/public-key.pem
 
 validator_cli.jar
 
-xig-download.log
+xig/xig-download.log
+
+.idea/codeStyles/

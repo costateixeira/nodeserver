@@ -10,7 +10,7 @@ const cron = require('node-cron');
 const path = require('path');
 const fs = require('fs');
 const PackageCrawler = require('./package-crawler.js');
-const htmlServer = require('./html-server');
+const htmlServer = require('../html-server');
 
 class PackagesModule {
   constructor() {
@@ -835,7 +835,7 @@ this.router.get('/log', async (req, res) => {
             : row.Description
         ) : undefined,
         kind: this.codeForKind(row.Kind),
-        url: this.buildPackageUrl(row.Id, row.Version, secure)
+        url: this.buildPackageUrl(row.Id, row.Version, secure, req)
       }));
 
       // Check if client wants HTML response
@@ -1233,7 +1233,7 @@ this.router.get('/log', async (req, res) => {
         kind: this.codeForKind(pv.Kind),
         count: pv.DownloadCount || 0,
         canonical: pv.Canonical,
-        url: this.buildPackageUrl(id, pv.Version, secure),
+        url: this.buildPackageUrl(id, pv.Version, secure, req),
         dist: {
           shasum: pv.Hash,
           tarball: this.buildTarballUrl(id, pv.Version, secure, req)
@@ -1445,7 +1445,7 @@ this.router.get('/log', async (req, res) => {
         fhirVersion: fhirversion,
         dependency,
         sort
-      });
+      }, req, secure);
 
       // Check if client wants HTML response
       const acceptsHtml = req.headers.accept && req.headers.accept.includes('text/html');
@@ -1482,7 +1482,7 @@ this.router.get('/log', async (req, res) => {
     }
   }
 
-  async searchPackages(params) {
+  async searchPackages(params, req = null, secure = false) {
     const {
       name = '',
       dependson = '',
@@ -1594,7 +1594,7 @@ this.router.get('/log', async (req, res) => {
                   fhirVersion: this.interpretVersion(row.FhirVersions),
                   canonical: row.Canonical,
                   kind: this.codeForKind(row.Kind),
-                  url: this.buildPackageUrl(row.Id, row.Version, false) // secure parameter would come from request
+                  url: this.buildPackageUrl(row.Id, row.Version, false, req) // secure parameter would come from request
                 };
 
                 if (row.PubDate) {
@@ -1885,10 +1885,25 @@ this.router.get('/log', async (req, res) => {
     return kindMap[kind] || 'fhir.ig';
   }
 
-  buildPackageUrl(id, version, secure = false) {
-    const protocol = secure ? 'https:' : 'http:';
-    const baseUrl = this.config.baseUrl || `${protocol}//localhost:${this.config.port || 3000}`;
-    return `${baseUrl}/packages/${id}/${version}`;
+  buildPackageUrl(id, version, secure = false, req = null) {
+    if (this.config.bucketPath) {
+      // Use bucket storage
+      const bucketUrl = secure
+        ? this.config.bucketPath.replace('http:', 'https:')
+        : this.config.bucketPath;
+      return `${bucketUrl}${id}-${version}.tgz`;
+    } else {
+      // Use direct server URL
+      const protocol = secure ? 'https' : 'http';
+      let host = 'localhost:3000';
+
+      if (req && req.get) {
+        host = req.get('host') || 'localhost:3000';
+      }
+
+      const baseUrl = this.config.baseUrl || `${protocol}://${host}`;
+      return `${baseUrl}/packages/${id}/${version}`;
+    }
   }
 
   applySorting(results, sort) {
@@ -1941,7 +1956,7 @@ this.router.get('/log', async (req, res) => {
     // Simplified HTML generation - you'd want to use a proper template engine
     const { name, dependson, canonicalPkg, canonicalUrl, fhirVersion, secure } = params;
 
-    const baseUrl = this.buildPackageUrl('', '', secure).replace('/packages/', '');
+    const baseUrl = this.buildPackageUrl('', '', secure, req).replace('/packages/', '');
 
     return `
     <!DOCTYPE html>
