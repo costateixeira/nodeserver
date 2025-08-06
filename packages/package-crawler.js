@@ -5,7 +5,7 @@
 //
 
 const axios = require('axios');
-const { XMLParser } = require('fast-xml-parser');
+const {XMLParser} = require('fast-xml-parser');
 const crypto = require('crypto');
 const tar = require('tar');
 const fs = require('fs');
@@ -29,28 +29,28 @@ class PackageCrawler {
       totalBytes: 0,
       errors: ''
     };
-    
+
     console.log('Running web crawler for packages...');
     console.log('Fetching master URL:', this.config.masterUrl);
-    
+
     try {
       // Fetch the master JSON file
       const masterResponse = await this.fetchJson(this.config.masterUrl);
-      
+
       if (!masterResponse.feeds || !Array.isArray(masterResponse.feeds)) {
         throw new Error('Invalid master JSON: missing feeds array');
       }
-      
+
       // Process package restrictions if available
       const packageRestrictions = masterResponse['package-restrictions'] || [];
-      
+
       // Process each feed
       for (const feedConfig of masterResponse.feeds) {
         if (!feedConfig.url) {
           console.log('Skipping feed with no URL:', feedConfig);
           continue;
         }
-        
+
         try {
           await this.updateTheFeed(
             this.fixUrl(feedConfig.url),
@@ -63,23 +63,23 @@ class PackageCrawler {
           // Continue with next feed even if this one fails
         }
       }
-      
+
       const runTime = Date.now() - startTime;
       this.crawlerLog.runTime = `${runTime}ms`;
       this.crawlerLog.endTime = new Date().toISOString();
       this.crawlerLog.totalBytes = this.totalBytes;
-      
+
       console.log(`Web crawler completed successfully in ${runTime}ms`);
       console.log(`Total bytes processed: ${this.totalBytes}`);
-      
+
       return this.crawlerLog;
-      
+
     } catch (error) {
       const runTime = Date.now() - startTime;
       this.crawlerLog.runTime = `${runTime}ms`;
       this.crawlerLog.fatalException = error.message;
       this.crawlerLog.endTime = new Date().toISOString();
-      
+
       console.error('Web crawler failed:', error);
       throw error;
     }
@@ -114,13 +114,13 @@ class PackageCrawler {
           'User-Agent': 'FHIR Package Crawler/1.0'
         }
       });
-      
+
       const parser = new XMLParser({
         ignoreAttributes: false,
         attributeNamePrefix: '@_',
         textNodeName: '#text'
       });
-      
+
       return parser.parse(response.data);
     } catch (error) {
       if (error.response && error.response.status === 429) {
@@ -139,7 +139,7 @@ class PackageCrawler {
           'User-Agent': 'FHIR Package Crawler/1.0'
         }
       });
-      
+
       this.totalBytes += response.data.byteLength;
       return Buffer.from(response.data);
     } catch (error) {
@@ -156,23 +156,23 @@ class PackageCrawler {
       items: []
     };
     this.crawlerLog.feeds.push(feedLog);
-    
+
     console.log('Processing feed:', url);
     const startTime = Date.now();
-    
+
     try {
       const xmlData = await this.fetchXml(url);
       feedLog.fetchTime = `${Date.now() - startTime}ms`;
-      
+
       // Navigate the RSS structure
       let items = [];
       if (xmlData.rss && xmlData.rss.channel) {
         const channel = xmlData.rss.channel;
         items = Array.isArray(channel.item) ? channel.item : [channel.item].filter(Boolean);
       }
-      
+
       console.log(`Found ${items.length} items in feed`);
-      
+
       for (let i = 0; i < items.length; i++) {
         try {
           await this.updateItem(url, items[i], i, packageRestrictions, feedLog);
@@ -189,12 +189,12 @@ class PackageCrawler {
           console.error(`Error processing item ${i} from ${url}:`, itemError.message);
         }
       }
-      
+
       // TODO: Send email if there were errors and email is provided
       if (this.errors && email && !feedLog.rateLimited) {
         console.log(`Would send error email to ${email} for feed ${url}`);
       }
-      
+
     } catch (error) {
       // Check if this is a 429 error on feed fetch
       if (error.message.includes('RATE_LIMITED')) {
@@ -204,11 +204,11 @@ class PackageCrawler {
         feedLog.failTime = `${Date.now() - startTime}ms`;
         return; // Skip this feed entirely
       }
-      
+
       feedLog.exception = error.message;
       feedLog.failTime = `${Date.now() - startTime}ms`;
       console.error(`Exception processing feed ${url}:`, error.message);
-      
+
       // TODO: Send email notification for non-rate-limit errors
       if (email) {
         console.log(`Would send exception email to ${email} for feed ${url}`);
@@ -221,7 +221,7 @@ class PackageCrawler {
       status: '??'
     };
     feedLog.items.push(itemLog);
-    
+
     try {
       // Extract GUID
       if (!item.guid || !item.guid['#text']) {
@@ -231,27 +231,27 @@ class PackageCrawler {
         itemLog.status = 'error';
         return;
       }
-      
+
       const guid = item.guid['#text'];
       itemLog.guid = guid;
-      
+
       // Extract title (package ID)
       const id = item.title;
       itemLog.id = id;
-      
+
       if (!id) {
         itemLog.error = 'no title/id provided';
         itemLog.status = 'error';
         return;
       }
-      
+
       // Check if not for publication
       if (item.notForPublication && item.notForPublication['#text'] === 'true') {
         itemLog.status = 'not for publication';
         itemLog.error = 'not for publication';
         return;
       }
-      
+
       // Check package restrictions (simplified for now)
       if (!this.isPackageAllowed(id, source, packageRestrictions)) {
         if (!source.includes('simplifier.net')) {
@@ -265,13 +265,13 @@ class PackageCrawler {
         }
         return;
       }
-      
+
       // Check if already processed
       if (await this.hasStored(guid)) {
         itemLog.status = 'Already Processed';
         return;
       }
-      
+
       // Parse publication date
       let pubDate;
       try {
@@ -282,7 +282,7 @@ class PackageCrawler {
         itemLog.status = 'error';
         return;
       }
-      
+
       // Extract URL and fetch package
       const url = this.fixUrl(item.link);
       if (!url) {
@@ -290,15 +290,15 @@ class PackageCrawler {
         itemLog.status = 'error';
         return;
       }
-      
+
       itemLog.url = url;
       console.log('Fetching package:', url);
-      
+
       const packageContent = await this.fetchUrl(url, 'application/tar+gzip');
       await this.store(source, url, guid, pubDate, packageContent, id, itemLog);
-      
+
       itemLog.status = 'Fetched';
-      
+
     } catch (error) {
       console.error(`Exception processing item ${itemLog.guid || index}:`, error.message);
       itemLog.status = 'Exception';
@@ -330,25 +330,25 @@ class PackageCrawler {
   parsePubDate(dateStr) {
     // Handle various RSS date formats
     let cleanDate = dateStr.toLowerCase().replace(/\s+/g, ' ').trim();
-    
+
     // Remove day of week if present
     if (cleanDate.includes(',')) {
       cleanDate = cleanDate.substring(cleanDate.indexOf(',') + 1).trim();
     } else if (/^(mon|tue|wed|thu|fri|sat|sun)/.test(cleanDate)) {
       cleanDate = cleanDate.substring(cleanDate.indexOf(' ') + 1).trim();
     }
-    
+
     // Pad single digit day
     if (cleanDate.length > 2 && cleanDate[1] === ' ' && /^\d$/.test(cleanDate[0])) {
       cleanDate = '0' + cleanDate;
     }
-    
+
     // Try to parse the date
     const date = new Date(cleanDate);
     if (isNaN(date.getTime())) {
       throw new Error(`Cannot parse date: ${dateStr}`);
     }
-    
+
     return date;
   }
 
@@ -356,42 +356,42 @@ class PackageCrawler {
     try {
       // Extract and parse the NPM package
       const npmPackage = await this.extractNpmPackage(packageBuffer, `${source}#${guid}`);
-      
-      const { id, version } = npmPackage;
-      
+
+      const {id, version} = npmPackage;
+
       if (`${id}#${version}` !== idver) {
         const warning = `Warning processing ${idver}: actually found ${id}#${version} in the package`;
         console.log(warning);
         itemLog.warning = warning;
       }
-      
+
       // Save to mirror if configured
       if (this.config.mirrorPath) {
         const filename = `${id}-${version}.tgz`;
         const filepath = path.join(this.config.mirrorPath, filename);
         fs.writeFileSync(filepath, packageBuffer);
       }
-      
+
       // Validate package data
       if (!this.isValidPackageId(id)) {
         throw new Error(`NPM Id "${id}" is not valid from ${source}`);
       }
-      
+
       if (!this.isValidSemVersion(version)) {
         throw new Error(`NPM Version "${version}" is not valid from ${source}`);
       }
-      
+
       let canonical = npmPackage.canonical || `http://simplifier.net/packages/${id}`;
       if (!this.isAbsoluteUrl(canonical)) {
         throw new Error(`NPM Canonical "${canonical}" is not valid from ${source}`);
       }
-      
+
       // Extract URLs from package (simplified)
       const urls = this.processPackageUrls(npmPackage);
-      
+
       // Commit to database
       await this.commit(packageBuffer, npmPackage, date, guid, id, version, canonical, urls);
-      
+
     } catch (error) {
       console.error(`Error storing package ${guid}:`, error.message);
       throw error;
@@ -402,30 +402,30 @@ class PackageCrawler {
     try {
       const files = {};
       const zlib = require('zlib');
-      const { Readable } = require('stream');
-      
+      const {Readable} = require('stream');
+
       // First decompress the gzip
       const decompressed = zlib.gunzipSync(packageBuffer);
-      
+
       // Parse tar manually without any file system operations
       let offset = 0;
-      
+
       while (offset < decompressed.length) {
         // Read tar header (512 bytes)
         if (offset + 512 > decompressed.length) break;
-        
+
         const header = decompressed.slice(offset, offset + 512);
-        
+
         // Check if this is the end (null header)
         if (header[0] === 0) break;
-        
+
         // Extract filename (first 100 bytes, null-terminated)
         let filename = '';
         for (let i = 0; i < 100; i++) {
           if (header[i] === 0) break;
           filename += String.fromCharCode(header[i]);
         }
-        
+
         // Extract file size (12 bytes starting at offset 124, octal)
         let sizeStr = '';
         for (let i = 124; i < 136; i++) {
@@ -433,32 +433,32 @@ class PackageCrawler {
           sizeStr += String.fromCharCode(header[i]);
         }
         const fileSize = parseInt(sizeStr, 8) || 0;
-        
+
         // Move past header
         offset += 512;
-        
+
         // Extract file content if we need this file
         if (fileSize > 0) {
           const cleanFilename = filename.replace(/^package\//, ''); // Remove package/ prefix
-          
+
           if (cleanFilename === 'package.json' || cleanFilename === '.index.json' || cleanFilename === 'ig.ini') {
             const fileContent = decompressed.slice(offset, offset + fileSize);
             files[cleanFilename] = fileContent.toString('utf8');
           }
         }
-        
+
         // Move to next file (files are padded to 512-byte boundaries)
         const paddedSize = Math.ceil(fileSize / 512) * 512;
         offset += paddedSize;
       }
-      
+
       // Parse package.json (required)
       if (!files['package.json']) {
         throw new Error('package.json not found in extracted package');
       }
-      
+
       const packageJson = JSON.parse(files['package.json']);
-      
+
       // Extract basic NPM fields
       const id = packageJson.name || '';
       const version = packageJson.version || '';
@@ -466,7 +466,7 @@ class PackageCrawler {
       const author = this.extractAuthor(packageJson.author);
       const license = packageJson.license || '';
       const homepage = packageJson.homepage || packageJson.url || '';
-      
+
       // Extract dependencies
       const dependencies = [];
       if (packageJson.dependencies) {
@@ -474,14 +474,14 @@ class PackageCrawler {
           dependencies.push(`${dep}@${ver}`);
         }
       }
-      
+
       // Extract FHIR-specific metadata
       let fhirVersion = '';
       let fhirVersionList = '';
       let canonical = '';
       let kind = 1; // Default to IG
       let notForPublication = false;
-      
+
       // Check for FHIR metadata in package.json
       if (packageJson.fhirVersions) {
         if (Array.isArray(packageJson.fhirVersions)) {
@@ -495,11 +495,11 @@ class PackageCrawler {
         fhirVersion = packageJson['fhir-version'];
         fhirVersionList = packageJson['fhir-version'];
       }
-      
+
       if (packageJson.canonical) {
         canonical = packageJson.canonical;
       }
-      
+
       if (packageJson.type === 'fhir.core') {
         kind = 0; // Core
       } else if (packageJson.type === 'fhir.template') {
@@ -507,22 +507,22 @@ class PackageCrawler {
       } else {
         kind = 1; // IG (Implementation Guide)
       }
-      
+
       if (packageJson.notForPublication === true) {
         notForPublication = true;
       }
-      
+
       // Parse .index.json if present
       if (files['.index.json']) {
         try {
           const indexJson = JSON.parse(files['.index.json']);
-          
+
           // Extract additional metadata from .index.json
           if (indexJson['fhir-version'] && !fhirVersion) {
             fhirVersion = indexJson['fhir-version'];
             fhirVersionList = indexJson['fhir-version'];
           }
-          
+
           if (indexJson.canonical && !canonical) {
             canonical = indexJson.canonical;
           }
@@ -530,16 +530,16 @@ class PackageCrawler {
           console.log(`Warning: Could not parse .index.json for ${id}: ${indexError.message}`);
         }
       }
-      
+
       // Parse ig.ini if present
       if (files['ig.ini']) {
         try {
           const iniData = this.parseIniFile(files['ig.ini']);
-          
+
           if (iniData.IG && iniData.IG.canonical && !canonical) {
             canonical = iniData.IG.canonical;
           }
-          
+
           if (iniData.IG && iniData.IG['fhir-version'] && !fhirVersion) {
             fhirVersion = iniData.IG['fhir-version'];
             fhirVersionList = iniData.IG['fhir-version'];
@@ -548,13 +548,13 @@ class PackageCrawler {
           console.log(`Warning: Could not parse ig.ini for ${id}: ${iniError.message}`);
         }
       }
-      
+
       // Default fhirVersion if not found
       if (!fhirVersion) {
         fhirVersion = '4.0.1'; // Default to R4
         fhirVersionList = '4.0.1';
       }
-      
+
       return {
         id,
         version,
@@ -569,7 +569,7 @@ class PackageCrawler {
         kind,
         notForPublication
       };
-      
+
     } catch (error) {
       throw new Error(`Failed to extract NPM package from ${source}: ${error.message}`);
     }
@@ -587,16 +587,16 @@ class PackageCrawler {
   parseIniFile(content) {
     const result = {};
     let currentSection = null;
-    
+
     const lines = content.split('\n');
     for (const line of lines) {
       const trimmed = line.trim();
-      
+
       // Skip comments and empty lines
       if (!trimmed || trimmed.startsWith('#') || trimmed.startsWith(';')) {
         continue;
       }
-      
+
       // Check for section header
       const sectionMatch = trimmed.match(/^\[([^\]]+)\]$/);
       if (sectionMatch) {
@@ -604,7 +604,7 @@ class PackageCrawler {
         result[currentSection] = {};
         continue;
       }
-      
+
       // Check for key=value pair
       const keyValueMatch = trimmed.match(/^([^=]+)=(.*)$/);
       if (keyValueMatch && currentSection) {
@@ -613,7 +613,7 @@ class PackageCrawler {
         result[currentSection][key] = value;
       }
     }
-    
+
     return result;
   }
 
@@ -657,19 +657,19 @@ class PackageCrawler {
           reject(err);
           return;
         }
-        
+
         const vkey = (row?.maxKey || 0) + 1;
         const hash = this.genHash(packageBuffer);
-        
+
         // Insert package version
         const insertVersionSql = `
-          INSERT INTO PackageVersions 
-          (PackageVersionKey, GUID, PubDate, Indexed, Id, Version, Kind, DownloadCount, 
-           Canonical, FhirVersions, UploadCount, Description, ManualToken, Hash, 
-           Author, License, HomePage, Content) 
-          VALUES (?, ?, ?, datetime('now'), ?, ?, ?, 0, ?, ?, 1, ?, '', ?, ?, ?, ?, ?)
+            INSERT INTO PackageVersions
+            (PackageVersionKey, GUID, PubDate, Indexed, Id, Version, Kind, DownloadCount,
+             Canonical, FhirVersions, UploadCount, Description, ManualToken, Hash,
+             Author, License, HomePage, Content)
+            VALUES (?, ?, ?, datetime('now'), ?, ?, ?, 0, ?, ?, 1, ?, '', ?, ?, ?, ?, ?)
         `;
-        
+
         this.db.run(insertVersionSql, [
           vkey, guid, date.toISOString(), id, version, npmPackage.kind,
           canonical, npmPackage.fhirVersionList, npmPackage.description,
@@ -680,7 +680,7 @@ class PackageCrawler {
             reject(err);
             return;
           }
-          
+
           // Insert FHIR versions, dependencies, and URLs
           this.insertRelatedData(vkey, npmPackage, urls).then(() => {
             // Handle package table (insert or update)
@@ -693,34 +693,34 @@ class PackageCrawler {
 
   async insertRelatedData(vkey, npmPackage, urls) {
     const promises = [];
-    
+
     // Insert FHIR versions
     if (npmPackage.fhirVersionList) {
       const fhirVersions = npmPackage.fhirVersionList.split(',');
       for (const fver of fhirVersions) {
         promises.push(new Promise((resolve, reject) => {
-          this.db.run('INSERT INTO PackageFHIRVersions (PackageVersionKey, Version) VALUES (?, ?)', 
+          this.db.run('INSERT INTO PackageFHIRVersions (PackageVersionKey, Version) VALUES (?, ?)',
             [vkey, fver.trim()], (err) => err ? reject(err) : resolve());
         }));
       }
     }
-    
+
     // Insert dependencies
     for (const dep of npmPackage.dependencies) {
       promises.push(new Promise((resolve, reject) => {
-        this.db.run('INSERT INTO PackageDependencies (PackageVersionKey, Dependency) VALUES (?, ?)', 
+        this.db.run('INSERT INTO PackageDependencies (PackageVersionKey, Dependency) VALUES (?, ?)',
           [vkey, dep], (err) => err ? reject(err) : resolve());
       }));
     }
-    
+
     // Insert URLs
     for (const url of urls) {
       promises.push(new Promise((resolve, reject) => {
-        this.db.run('INSERT INTO PackageURLs (PackageVersionKey, URL) VALUES (?, ?)', 
+        this.db.run('INSERT INTO PackageURLs (PackageVersionKey, URL) VALUES (?, ?)',
           [vkey, url], (err) => err ? reject(err) : resolve());
       }));
     }
-    
+
     return Promise.all(promises);
   }
 
@@ -732,7 +732,7 @@ class PackageCrawler {
           reject(err);
           return;
         }
-        
+
         if (!row?.pkey) {
           // Insert new package
           this.db.get('SELECT MAX(PackageKey) as maxKey FROM Packages', (err, maxRow) => {
@@ -740,26 +740,28 @@ class PackageCrawler {
               reject(err);
               return;
             }
-            
+
             const pkey = (maxRow?.maxKey || 0) + 1;
-            this.db.run('INSERT INTO Packages (PackageKey, Id, CurrentVersion, DownloadCount, Canonical) VALUES (?, ?, ?, 0, ?)', 
+            this.db.run('INSERT INTO Packages (PackageKey, Id, CurrentVersion, DownloadCount, Canonical) VALUES (?, ?, ?, 0, ?)',
               [pkey, id, vkey, canonical], (err) => err ? reject(err) : resolve());
           });
         } else {
           // Update existing package - check if this is the most recent version
           this.db.get(`
-            SELECT PackageVersionKey FROM PackageVersions 
-            WHERE Id = ? AND Version != 'current' 
-            ORDER BY PubDate DESC, Version DESC LIMIT 1
+              SELECT PackageVersionKey
+              FROM PackageVersions
+              WHERE Id = ?
+                AND Version != 'current'
+              ORDER BY PubDate DESC, Version DESC LIMIT 1
           `, [id], (err, latestRow) => {
             if (err) {
               reject(err);
               return;
             }
-            
+
             if (latestRow?.PackageVersionKey === vkey) {
               // This is the most recent version, update the package
-              this.db.run('UPDATE Packages SET Canonical = ?, CurrentVersion = ? WHERE Id = ?', 
+              this.db.run('UPDATE Packages SET Canonical = ?, CurrentVersion = ? WHERE Id = ?',
                 [canonical, vkey, id], (err) => err ? reject(err) : resolve());
             } else {
               resolve(); // Not the most recent, no update needed

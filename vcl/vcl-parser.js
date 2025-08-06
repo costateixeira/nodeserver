@@ -20,7 +20,7 @@ class VCLParseException extends Error {
 
 const TokenType = {
   DASH: 'DASH',
-  OPEN: 'OPEN', 
+  OPEN: 'OPEN',
   CLOSE: 'CLOSE',
   SEMI: 'SEMI',
   COMMA: 'COMMA',
@@ -176,45 +176,45 @@ class VCLLexer {
       const ch = this.input[this.pos];
 
       switch (ch) {
-        case '-': 
-          tokens.push(new Token(TokenType.DASH, '-', startPos)); 
-          this.pos++; 
+        case '-':
+          tokens.push(new Token(TokenType.DASH, '-', startPos));
+          this.pos++;
           break;
-        case '(': 
-          tokens.push(new Token(TokenType.OPEN, '(', startPos)); 
-          this.pos++; 
+        case '(':
+          tokens.push(new Token(TokenType.OPEN, '(', startPos));
+          this.pos++;
           break;
-        case ')': 
-          tokens.push(new Token(TokenType.CLOSE, ')', startPos)); 
-          this.pos++; 
+        case ')':
+          tokens.push(new Token(TokenType.CLOSE, ')', startPos));
+          this.pos++;
           break;
-        case ';': 
-          tokens.push(new Token(TokenType.SEMI, ';', startPos)); 
-          this.pos++; 
+        case ';':
+          tokens.push(new Token(TokenType.SEMI, ';', startPos));
+          this.pos++;
           break;
-        case ',': 
-          tokens.push(new Token(TokenType.COMMA, ',', startPos)); 
-          this.pos++; 
+        case ',':
+          tokens.push(new Token(TokenType.COMMA, ',', startPos));
+          this.pos++;
           break;
-        case '.': 
-          tokens.push(new Token(TokenType.DOT, '.', startPos)); 
-          this.pos++; 
+        case '.':
+          tokens.push(new Token(TokenType.DOT, '.', startPos));
+          this.pos++;
           break;
-        case '*': 
-          tokens.push(new Token(TokenType.STAR, '*', startPos)); 
-          this.pos++; 
+        case '*':
+          tokens.push(new Token(TokenType.STAR, '*', startPos));
+          this.pos++;
           break;
-        case '=': 
-          tokens.push(new Token(TokenType.EQ, '=', startPos)); 
-          this.pos++; 
+        case '=':
+          tokens.push(new Token(TokenType.EQ, '=', startPos));
+          this.pos++;
           break;
-        case '/': 
-          tokens.push(new Token(TokenType.REGEX, '/', startPos)); 
-          this.pos++; 
+        case '/':
+          tokens.push(new Token(TokenType.REGEX, '/', startPos));
+          this.pos++;
           break;
-        case '^': 
-          tokens.push(new Token(TokenType.IN, '^', startPos)); 
-          this.pos++; 
+        case '^':
+          tokens.push(new Token(TokenType.IN, '^', startPos));
+          this.pos++;
           break;
         case '>':
           if (this.peek() === '>') {
@@ -255,22 +255,22 @@ class VCLLexer {
             throw new VCLParseException(`Unexpected character: ${ch}`, this.pos);
           }
           break;
-        case '?': 
-          tokens.push(new Token(TokenType.EXISTS, '?', startPos)); 
-          this.pos++; 
+        case '?':
+          tokens.push(new Token(TokenType.EXISTS, '?', startPos));
+          this.pos++;
           break;
-        case '"': 
-          tokens.push(this.readQuotedValue(startPos)); 
+        case '"':
+          tokens.push(this.readQuotedValue(startPos));
           break;
         default:
           if (/[a-zA-Z]/.test(ch)) {
             const value = this.readIdentifierChars();
-            
+
             if (value.includes(':')) {
               // Read rest of URI
               const uriRest = this.readUriChars();
               let fullValue = value + uriRest;
-              
+
               // Check for version
               if (this.pos < this.input.length && this.input[this.pos] === '|') {
                 this.pos++;
@@ -306,7 +306,7 @@ class VCLParserClass {
     if (this.fhirFactory && typeof this.fhirFactory.createValueSet === 'function') {
       return this.fhirFactory.createValueSet();
     }
-    
+
     // Default FHIR ValueSet structure
     return {
       resourceType: 'ValueSet',
@@ -368,29 +368,29 @@ class VCLParserClass {
 
   isSimpleCodeList() {
     let lookahead = this.pos;
-    
+
     while (lookahead < this.tokens.length) {
       const token = this.tokens[lookahead];
-      
+
       if (token.type === TokenType.CLOSE) {
         return true;
       }
-      
+
       if (token.type === TokenType.OPEN && lookahead + 2 < this.tokens.length) {
-        if (this.tokens[lookahead + 1].type === TokenType.URI && 
-            this.tokens[lookahead + 2].type === TokenType.CLOSE) {
+        if (this.tokens[lookahead + 1].type === TokenType.URI &&
+          this.tokens[lookahead + 2].type === TokenType.CLOSE) {
           lookahead += 3;
           continue;
         }
       }
-      
+
       if (token.type === TokenType.OPEN || token.type === TokenType.DASH || this.isFilterOperator(token.type)) {
         return false;
       }
-      
+
       lookahead++;
     }
-    
+
     return true;
   }
 
@@ -493,7 +493,7 @@ class VCLParserClass {
       return;
     } else {
       const code = this.parseCode();
-      conceptSet.concept.push({ code });
+      conceptSet.concept.push({code});
     }
 
     while ([TokenType.SEMI, TokenType.COMMA].includes(this.current().type)) {
@@ -510,7 +510,7 @@ class VCLParserClass {
         this.parseIncludeVs(conceptSet);
       } else {
         const code = this.parseCode();
-        conceptSet.concept.push({ code });
+        conceptSet.concept.push({code});
       }
     }
   }
@@ -531,7 +531,7 @@ class VCLParserClass {
       if (this.isFilterOperator(this.current().type)) {
         this.parseFilter(conceptSet, code);
       } else {
-        conceptSet.concept.push({ code });
+        conceptSet.concept.push({code});
       }
     } else if (this.current().type === TokenType.IN) {
       this.parseIncludeVs(conceptSet);
@@ -622,7 +622,7 @@ class VCLParserClass {
         if (this.isFilterOperator(this.current().type)) {
           this.parseFilter(currentConceptSet, code);
         } else {
-          currentConceptSet.concept.push({ code });
+          currentConceptSet.concept.push({code});
         }
       } else {
         this.parseSubExpr(false);
@@ -641,7 +641,7 @@ class VCLParserClass {
         if (this.isFilterOperator(this.current().type)) {
           this.parseFilter(currentConceptSet, code);
         } else {
-          currentConceptSet.concept.push({ code });
+          currentConceptSet.concept.push({code});
         }
       } else {
         this.parseSubExpr(isExclusion);
@@ -761,11 +761,11 @@ function parseVCL(vclExpression, fhirFactory = null) {
 
   const parser = new VCLParserClass(tokens, fhirFactory);
   const result = parser.parse();
-  
+
   if (!result) {
     throw new VCLParseException('Parser returned null result');
   }
-  
+
   return result;
 }
 
@@ -779,17 +779,17 @@ function parseVCLAndSetId(vclExpression, fhirFactory = null) {
   const tokens = lexer.tokenize();
   const parser = new VCLParserClass(tokens, fhirFactory);
   const valueSet = parser.parse();
-  
+
   if (!valueSet) {
     throw new VCLParseException('Failed to create ValueSet');
   }
-  
+
   // Generate hash-based ID (similar to Java version)
   const jsonString = JSON.stringify(valueSet);
   if (!jsonString) {
     throw new VCLParseException('Failed to serialize ValueSet to JSON');
   }
-  
+
   // Create hash directly inline to avoid scoping issues
   let hash = 0;
   for (let i = 0; i < jsonString.length; i++) {
@@ -798,9 +798,9 @@ function parseVCLAndSetId(vclExpression, fhirFactory = null) {
     hash = hash & hash; // Convert to 32-bit integer
   }
   const hashCode = Math.abs(hash);
-  
+
   valueSet.url = `cid:${hashCode}`;
-  
+
   return valueSet;
 }
 
@@ -944,7 +944,7 @@ if (typeof module !== 'undefined' && module.exports) {
     // Export utility functions
     simpleHash
   };
-  
+
   // Also make classes available globally for debugging
   window.VCLLexer = VCLLexer;
   window.VCLParseException = VCLParseException;

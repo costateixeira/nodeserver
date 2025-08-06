@@ -5,7 +5,7 @@
 //
 
 const express = require('express');
-const { parseVCL, parseVCLAndSetId, validateVCLExpression, VCLParseException } = require('./vcl-parser.js');
+const {parseVCL, parseVCLAndSetId, validateVCLExpression, VCLParseException} = require('./vcl-parser.js');
 
 class VCLModule {
   constructor() {
@@ -22,19 +22,19 @@ class VCLModule {
   setupRoutes() {
     // VCL parsing endpoint
     this.router.get('/', (req, res) => {
-      var { vcl } = req.query;
-      
+      var {vcl} = req.query;
+
       // Validation
       if (!vcl) {
         return res.status(400).json({
           error: 'VCL expression is required as query parameter: ?vcl=<expression>'
         });
       }
-      
+
       if (vcl.startsWith('http://fhir.org/VCL/')) {
         vcl = vcl.substring(20);
       }
-      
+
       try {
         // Validate the VCL expression first
         if (!validateVCLExpression(vcl)) {
@@ -42,16 +42,16 @@ class VCLModule {
             error: 'Invalid VCL expression syntax'
           });
         }
-        
+
         // Parse the VCL expression and generate ValueSet with ID
         const valueSet = parseVCLAndSetId(vcl);
-        
+
         // Return the ValueSet as JSON
         res.json(valueSet);
-        
+
       } catch (error) {
         console.error('VCL parsing error:', error);
-        
+
         if (error instanceof VCLParseException) {
           return res.status(400).json({
             error: 'VCL parsing error',

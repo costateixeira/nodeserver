@@ -6,14 +6,14 @@
 
 /**
  * VHL Processing Module
- * 
+ *
  * This module handles the complex VHL (Verifiable Health Link) processing
  * when the vhl flag is set to true in an SHL entry.
  */
 
 /**
  * Process VHL response for SHL entries with vhl=true
- * 
+ *
  * @param {string} host - The host from the request (e.g., "localhost:3000")
  * @param {string} uuid - The SHL entry UUID
  * @param {object} standardResponse - The standard JSON response that would be returned
@@ -21,41 +21,41 @@
  */
 function processVHL(host, uuid, standardResponse) {
   // TODO: Implement your complex VHL processing logic here
-  
+
   // Example structure - modify as needed:
   const vhlResponse = {
-    "resourceType" : "Bundle",
-    "type" : "searchSet",
-    "link" : [{
-      "relation" : "self",
-      "url" : "http://"+host+"/shl/access/"+uuid
+    "resourceType": "Bundle",
+    "type": "searchSet",
+    "link": [{
+      "relation": "self",
+      "url": "http://" + host + "/shl/access/" + uuid
     }],
-    "entry" : []
+    "entry": []
   };
 
   for (const file of standardResponse.files) {
     var uuid = tail(file.location);
     var e = {
-      "fullUrl" : file.location,
-      "resource" : {
-        "resourceType" : "DocumentReference",
-        "id" : uuid,
-        "masterIdentifier" : {
-          "system" : "urn:ietf:rfc:3986",
-          "value" : "urn:uuid:"+uuid
+      "fullUrl": file.location,
+      "resource": {
+        "resourceType": "DocumentReference",
+        "id": uuid,
+        "masterIdentifier": {
+          "system": "urn:ietf:rfc:3986",
+          "value": "urn:uuid:" + uuid
         },
-        "content" : [{
-          "url" : file.location,
-          "contentType" : file.contentType
+        "content": [{
+          "url": file.location,
+          "contentType": file.contentType
         }]
       }
     }
     vhlResponse.entry.push(e);
   }
-  
+
   return vhlResponse;
-}          
-              
+}
+
 function tail(url) {
   if (url.includes("/")) {
     return url.substring(url.lastIndexOf("/") + 1);

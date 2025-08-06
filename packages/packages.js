@@ -90,10 +90,11 @@ class PackagesModule {
           `${ageInDays} days ago`
     };
   }
+
   async getDatabaseTableCounts() {
     return new Promise((resolve, reject) => {
       if (!this.db) {
-        resolve({ packages: 0, packageVersions: 0 });
+        resolve({packages: 0, packageVersions: 0});
         return;
       }
 
@@ -234,7 +235,7 @@ class PackagesModule {
       // Ensure directory exists
       const dbDir = path.dirname(dbPath);
       if (!fs.existsSync(dbDir)) {
-        fs.mkdirSync(dbDir, { recursive: true });
+        fs.mkdirSync(dbDir, {recursive: true});
       }
 
       const dbExists = fs.existsSync(dbPath);
@@ -262,63 +263,69 @@ class PackagesModule {
     return new Promise((resolve, reject) => {
       const tables = [
         // Packages table
-        `CREATE TABLE Packages (
-          PackageKey INTEGER PRIMARY KEY AUTOINCREMENT,
-          Id TEXT(64) NOT NULL,
-          Canonical TEXT(128) NOT NULL,
-          DownloadCount INTEGER NOT NULL,
-          Security INTEGER,
-          ManualToken TEXT(64),
-          CurrentVersion INTEGER NOT NULL
-        )`,
+        `CREATE TABLE Packages
+         (
+             PackageKey     INTEGER PRIMARY KEY AUTOINCREMENT,
+             Id             TEXT(64) NOT NULL,
+             Canonical      TEXT(128) NOT NULL,
+             DownloadCount  INTEGER NOT NULL,
+             Security       INTEGER,
+             ManualToken    TEXT(64),
+             CurrentVersion INTEGER NOT NULL
+         )`,
 
         // PackageVersions table
-        `CREATE TABLE PackageVersions (
-          PackageVersionKey INTEGER PRIMARY KEY AUTOINCREMENT,
-          GUID TEXT(128) NOT NULL,
-          PubDate DATETIME NOT NULL,
-          Indexed DATETIME NOT NULL,
-          Id TEXT(64) NOT NULL,
-          Version TEXT(64) NOT NULL,
-          Kind INTEGER NOT NULL,
-          UploadCount INTEGER,
-          DownloadCount INTEGER NOT NULL,
-          ManualToken TEXT(64),
-          Canonical TEXT(255) NOT NULL,
-          FhirVersions TEXT(255) NOT NULL,
-          Hash TEXT(128) NOT NULL,
-          Author TEXT(128) NOT NULL,
-          License TEXT(128) NOT NULL,
-          HomePage TEXT(128) NOT NULL,
-          Description BLOB,
-          Content BLOB NOT NULL
-        )`,
+        `CREATE TABLE PackageVersions
+         (
+             PackageVersionKey INTEGER PRIMARY KEY AUTOINCREMENT,
+             GUID              TEXT(128) NOT NULL,
+             PubDate           DATETIME NOT NULL,
+             Indexed           DATETIME NOT NULL,
+             Id                TEXT(64) NOT NULL,
+             Version           TEXT(64) NOT NULL,
+             Kind              INTEGER  NOT NULL,
+             UploadCount       INTEGER,
+             DownloadCount     INTEGER  NOT NULL,
+             ManualToken       TEXT(64),
+             Canonical         TEXT(255) NOT NULL,
+             FhirVersions      TEXT(255) NOT NULL,
+             Hash              TEXT(128) NOT NULL,
+             Author            TEXT(128) NOT NULL,
+             License           TEXT(128) NOT NULL,
+             HomePage          TEXT(128) NOT NULL,
+             Description       BLOB,
+             Content           BLOB     NOT NULL
+         )`,
 
         // PackageFHIRVersions table
-        `CREATE TABLE PackageFHIRVersions (
-          PackageVersionKey INTEGER NOT NULL,
-          Version TEXT(128) NOT NULL
-        )`,
+        `CREATE TABLE PackageFHIRVersions
+         (
+             PackageVersionKey INTEGER NOT NULL,
+             Version           TEXT(128) NOT NULL
+         )`,
 
         // PackageDependencies table
-        `CREATE TABLE PackageDependencies (
-          PackageVersionKey INTEGER NOT NULL,
-          Dependency TEXT(128) NOT NULL
-        )`,
+        `CREATE TABLE PackageDependencies
+         (
+             PackageVersionKey INTEGER NOT NULL,
+             Dependency        TEXT(128) NOT NULL
+         )`,
 
         // PackageURLs table
-        `CREATE TABLE PackageURLs (
-          PackageVersionKey INTEGER NOT NULL,
-          URL TEXT(128) NOT NULL
-        )`,
+        `CREATE TABLE PackageURLs
+         (
+             PackageVersionKey INTEGER NOT NULL,
+             URL               TEXT(128) NOT NULL
+         )`,
 
         // PackagePermissions table
-        `CREATE TABLE PackagePermissions (
-          PackagePermissionKey INTEGER PRIMARY KEY AUTOINCREMENT,
-          ManualToken TEXT(64) NOT NULL,
-          Email TEXT(128) NOT NULL,
-          Mask TEXT(64)
-        )`
+        `CREATE TABLE PackagePermissions
+         (
+             PackagePermissionKey INTEGER PRIMARY KEY AUTOINCREMENT,
+             ManualToken          TEXT(64) NOT NULL,
+             Email                TEXT(128) NOT NULL,
+             Mask                 TEXT(64)
+         )`
       ];
 
       const indexes = [
@@ -400,7 +407,7 @@ class PackagesModule {
       const mirrorPath = this.config.mirrorPath;
 
       if (!fs.existsSync(mirrorPath)) {
-        fs.mkdirSync(mirrorPath, { recursive: true });
+        fs.mkdirSync(mirrorPath, {recursive: true});
         console.log('Created mirror directory:', mirrorPath);
       } else {
         console.log('Mirror directory exists:', mirrorPath);
@@ -500,6 +507,7 @@ class PackagesModule {
       throw error;
     }
   }
+
   startInitialCrawler() {
     if (this.config.crawler.enabled) {
       console.log('Starting initial package crawler...');
@@ -523,12 +531,12 @@ class PackagesModule {
     // GET /packages/catalog - Search packages or get updates
     this.router.get('/catalog', async (req, res) => {
       try {
-        const { name, dependson, pkgcanonical, canonical, fhirversion, dependency, sort } = req.query;
+        const {name, dependson, pkgcanonical, canonical, fhirversion, dependency, sort} = req.query;
         // Handle search request
         await this.serveSearch(req, res);
       } catch (error) {
         console.error('Error in /packages/catalog:', error);
-        res.status(500).json({ error: 'Internal server error' });
+        res.status(500).json({error: 'Internal server error'});
       }
     });
 
@@ -540,131 +548,131 @@ class PackagesModule {
         await this.serveSearch(req, res);
       } catch (error) {
         console.error('Error in /packages/-/v1/search:', error);
-        res.status(500).json({ error: 'Internal server error' });
+        res.status(500).json({error: 'Internal server error'});
       }
     });
 
     // GET /packages/updates - Dedicated updates page (defaults to 10 days)
     this.router.get('/updates', async (req, res) => {
       try {
-        let { dateType, daysValue, dateValue } = req.query;
+        let {dateType, daysValue, dateValue} = req.query;
         let dt = dateType || 'relative';
         let days = daysValue || '10';
         let date = dateValue || new Date().toISOString().split('T')[0];
         await this.serveUpdates(req.secure, res, req, dt, days, date);
       } catch (error) {
         console.error('Error in /packages/updates:', error);
-        res.status(500).json({ error: 'Internal server error' });
+        res.status(500).json({error: 'Internal server error'});
       }
     });
 
-this.router.get('/log', async (req, res) => {
-  try {
-    const acceptsHtml = req.headers.accept && req.headers.accept.includes('text/html');
-    
-    let logData;
-    let summary;
-    let status;
-    
-    if (this.crawlerRunning) {
-      status = 'Crawler is currently running...';
-      logData = this.lastCrawlerLog || null;
-    } else if (this.lastCrawlerLog && this.lastCrawlerLog.feeds) {
-      status = 'Showing log from most recent crawler run';
-      logData = this.lastCrawlerLog;
-      
-      // Add summary statistics
-      summary = {
-        totalFeeds: this.lastCrawlerLog.feeds.length,
-        successfulFeeds: this.lastCrawlerLog.feeds.filter(f => !f.exception && !f.rateLimited).length,
-        failedFeeds: this.lastCrawlerLog.feeds.filter(f => f.exception && !f.rateLimited).length,
-        rateLimitedFeeds: this.lastCrawlerLog.feeds.filter(f => f.rateLimited).length,
-        totalItems: this.lastCrawlerLog.feeds.reduce((sum, f) => sum + (f.items ? f.items.length : 0), 0)
-      };
-    } else {
-      status = 'No crawler runs have completed yet';
-      logData = null;
-    }
+    this.router.get('/log', async (req, res) => {
+      try {
+        const acceptsHtml = req.headers.accept && req.headers.accept.includes('text/html');
 
-    if (acceptsHtml) {
-      const startTime = Date.now();
+        let logData;
+        let summary;
+        let status;
 
-      // Load template if not already loaded
-      if (!htmlServer.hasTemplate('packages')) {
-        const templatePath = path.join(__dirname, 'packages-template.html');
-        htmlServer.loadTemplate('packages', templatePath);
+        if (this.crawlerRunning) {
+          status = 'Crawler is currently running...';
+          logData = this.lastCrawlerLog || null;
+        } else if (this.lastCrawlerLog && this.lastCrawlerLog.feeds) {
+          status = 'Showing log from most recent crawler run';
+          logData = this.lastCrawlerLog;
+
+          // Add summary statistics
+          summary = {
+            totalFeeds: this.lastCrawlerLog.feeds.length,
+            successfulFeeds: this.lastCrawlerLog.feeds.filter(f => !f.exception && !f.rateLimited).length,
+            failedFeeds: this.lastCrawlerLog.feeds.filter(f => f.exception && !f.rateLimited).length,
+            rateLimitedFeeds: this.lastCrawlerLog.feeds.filter(f => f.rateLimited).length,
+            totalItems: this.lastCrawlerLog.feeds.reduce((sum, f) => sum + (f.items ? f.items.length : 0), 0)
+          };
+        } else {
+          status = 'No crawler runs have completed yet';
+          logData = null;
+        }
+
+        if (acceptsHtml) {
+          const startTime = Date.now();
+
+          // Load template if not already loaded
+          if (!htmlServer.hasTemplate('packages')) {
+            const templatePath = path.join(__dirname, 'packages-template.html');
+            htmlServer.loadTemplate('packages', templatePath);
+          }
+
+          const content = this.buildLogPageContent(status, logData, summary);
+          const stats = await this.gatherPackageStatistics();
+          stats.processingTime = Date.now() - startTime;
+
+          const html = htmlServer.renderPage('packages', 'Crawler Log', content, stats);
+          res.setHeader('Content-Type', 'text/html');
+          res.send(html);
+        } else {
+          // Return JSON response
+          const response = {
+            status: status,
+            crawlerRunning: this.crawlerRunning,
+            log: logData,
+            note: status
+          };
+
+          if (summary) {
+            response.summary = summary;
+          }
+
+          res.json(response);
+        }
+      } catch (error) {
+        console.error('Error in /packages/log:', error);
+        if (req.headers.accept && req.headers.accept.includes('text/html')) {
+          htmlServer.sendErrorResponse(res, 'packages', error);
+        } else {
+          res.status(500).json({error: 'Failed to get crawler log', message: error.message});
+        }
       }
-
-      const content = this.buildLogPageContent(status, logData, summary);
-      const stats = await this.gatherPackageStatistics();
-      stats.processingTime = Date.now() - startTime;
-
-      const html = htmlServer.renderPage('packages', 'Crawler Log', content, stats);
-      res.setHeader('Content-Type', 'text/html');
-      res.send(html);
-    } else {
-      // Return JSON response
-      const response = {
-        status: status,
-        crawlerRunning: this.crawlerRunning,
-        log: logData,
-        note: status
-      };
-      
-      if (summary) {
-        response.summary = summary;
-      }
-      
-      res.json(response);
-    }
-  } catch (error) {
-    console.error('Error in /packages/log:', error);
-    if (req.headers.accept && req.headers.accept.includes('text/html')) {
-      htmlServer.sendErrorResponse(res, 'packages', error);
-    } else {
-      res.status(500).json({ error: 'Failed to get crawler log', message: error.message });
-    }
-  }
-});
+    });
 
     // GET /packages/broken - Serve broken packages
     this.router.get('/broken', async (req, res) => {
       try {
-        const { filter } = req.query;
+        const {filter} = req.query;
         await this.serveBroken(req, res, filter);
       } catch (error) {
         console.error('Error in /packages/broken:', error);
-        res.status(500).json({ error: 'Internal server error' });
+        res.status(500).json({error: 'Internal server error'});
       }
     });
 
     // GET /packages/:id/:version - Download specific package version
     this.router.get('/:id/:version', async (req, res) => {
       try {
-        const { id, version } = req.params;
+        const {id, version} = req.params;
         await this.serveDownload(req.secure, id, version, res);
       } catch (error) {
         console.error('Error in /packages/:id/:version:', error);
-        res.status(500).json({ error: 'Internal server error' });
+        res.status(500).json({error: 'Internal server error'});
       }
     });
 
     // GET /packages/:page.html - Serve HTML page
     this.router.get('/:page.html', async (req, res) => {
       try {
-        const { page } = req.params;
+        const {page} = req.params;
         await this.servePage(`${page}.html`, req, res, req.secure);
       } catch (error) {
         console.error('Error in /packages/:page.html:', error);
-        res.status(500).json({ error: 'Internal server error' });
+        res.status(500).json({error: 'Internal server error'});
       }
     });
 
     // GET /packages/:id - Get package versions
     this.router.get('/:id([^/]+)', async (req, res) => {
       try {
-        const { id } = req.params;
-        const { sort } = req.query;
+        const {id} = req.params;
+        const {sort} = req.query;
 
         // Don't process routes that are handled elsewhere
         if (['catalog', 'log', 'broken', 'stats', 'status', 'search', 'updates'].includes(id) ||
@@ -675,22 +683,22 @@ this.router.get('/log', async (req, res) => {
         await this.serveVersions(id, sort, req.secure, req, res);
       } catch (error) {
         console.error('Error in /packages/:id:', error);
-        res.status(500).json({ error: 'Internal server error' });
+        res.status(500).json({error: 'Internal server error'});
       }
     });
 
     // Main packages endpoint (existing route)
     this.router.get('/', async (req, res) => {
       try {
-        const { name, dependson, pkgcanonical, canonical, fhirversion, dependency, sort } = req.query;
+        const {name, dependson, pkgcanonical, canonical, fhirversion, dependency, sort} = req.query;
         // Handle search request - same as /packages/catalog
         await this.serveSearch(req, res);
       } catch (error) {
         console.error('Error in /packages/:', error);
-        res.status(500).json({ error: 'Internal server error' });
+        res.status(500).json({error: 'Internal server error'});
       }
     });
-    
+
     // Module status endpoint (existing)
     this.router.get('/status', (req, res) => {
       const status = this.getStatus();
@@ -764,7 +772,7 @@ this.router.get('/log', async (req, res) => {
         if (req.headers.accept && req.headers.accept.includes('text/html')) {
           htmlServer.sendErrorResponse(res, 'packages', error);
         } else {
-          res.status(500).json({ error: 'Failed to generate stats', message: error.message });
+          res.status(500).json({error: 'Failed to generate stats', message: error.message});
         }
       }
     });
@@ -794,7 +802,7 @@ this.router.get('/log', async (req, res) => {
           htmlServer.sendErrorResponse(res, 'packages', error);
         }
       } else {
-        res.json({ message: 'Package search functionality coming soon' });
+        res.json({message: 'Package search functionality coming soon'});
       }
     });
 
@@ -952,7 +960,6 @@ this.router.get('/log', async (req, res) => {
     content += '</form>';
 
 
-
     // Summary info
     content += '<table class="grid">';
     content += `<tr><td>Updates Found:</td><td>${vars.count}</td></tr>`;
@@ -967,9 +974,9 @@ this.router.get('/log', async (req, res) => {
 
   async getPackageUpdatesSince(date) {
     return new Promise((resolve, reject) => {
-      const sql = `SELECT Id, Version, PubDate, FhirVersions, Kind, Canonical, Description 
-                   FROM PackageVersions 
-                   WHERE PubDate >= ? 
+      const sql = `SELECT Id, Version, PubDate, FhirVersions, Kind, Canonical, Description
+                   FROM PackageVersions
+                   WHERE PubDate >= ?
                    ORDER BY PubDate DESC`;
 
       this.db.all(sql, [date], (err, rows) => {
@@ -981,6 +988,7 @@ this.router.get('/log', async (req, res) => {
       });
     });
   }
+
   async serveDownload(secure, id, version, res) {
     try {
       // First try exact version match
@@ -1014,7 +1022,7 @@ this.router.get('/log', async (req, res) => {
 
     } catch (error) {
       console.error('Error in serveDownload:', error);
-      res.status(500).json({ error: 'Download failed', message: error.message });
+      res.status(500).json({error: 'Download failed', message: error.message});
     }
   }
 
@@ -1022,13 +1030,16 @@ this.router.get('/log', async (req, res) => {
     return new Promise((resolve, reject) => {
       let sql;
       if (exactMatch) {
-        sql = `SELECT PackageVersionKey, Content FROM PackageVersions 
-               WHERE Id = ? AND Version = ?`;
+        sql = `SELECT PackageVersionKey, Content
+               FROM PackageVersions
+               WHERE Id = ?
+                 AND Version = ?`;
       } else {
-        sql = `SELECT PackageVersionKey, Content FROM PackageVersions 
-               WHERE Id = ? AND Version LIKE ? 
-               ORDER BY PubDate DESC 
-               LIMIT 1`;
+        sql = `SELECT PackageVersionKey, Content
+               FROM PackageVersions
+               WHERE Id = ?
+                 AND Version LIKE ?
+               ORDER BY PubDate DESC LIMIT 1`;
       }
 
       const params = exactMatch
@@ -1121,7 +1132,7 @@ this.router.get('/log', async (req, res) => {
       const packageVersions = await this.getPackageVersions(id);
 
       if (packageVersions.length === 0) {
-        res.status(404).json({ error: `Package "${id}" not found` });
+        res.status(404).json({error: `Package "${id}" not found`});
         return;
       }
 
@@ -1140,16 +1151,26 @@ this.router.get('/log', async (req, res) => {
       }
     } catch (error) {
       console.error('Error in serveVersions:', error);
-      res.status(500).json({ error: 'Failed to get package versions', message: error.message });
+      res.status(500).json({error: 'Failed to get package versions', message: error.message});
     }
   }
 
   async getPackageVersions(id) {
     return new Promise((resolve, reject) => {
-      const sql = `SELECT PackageVersionKey, Version, PubDate, FhirVersions, Canonical, DownloadCount, 
-                          Kind, HomePage, Author, License, Hash, Description 
-                   FROM PackageVersions 
-                   WHERE Id = ? 
+      const sql = `SELECT PackageVersionKey,
+                          Version,
+                          PubDate,
+                          FhirVersions,
+                          Canonical,
+                          DownloadCount,
+                          Kind,
+                          HomePage,
+                          Author,
+                          License,
+                          Hash,
+                          Description
+                   FROM PackageVersions
+                   WHERE Id = ?
                    ORDER BY PubDate DESC`;  // Changed from ASC to DESC for most recent first
 
       this.db.all(sql, [id], (err, rows) => {
@@ -1167,8 +1188,8 @@ this.router.get('/log', async (req, res) => {
 
     return new Promise((resolve, reject) => {
       const placeholders = packageVersionKeys.map(() => '?').join(',');
-      const sql = `SELECT PackageVersionKey, Dependency 
-                   FROM PackageDependencies 
+      const sql = `SELECT PackageVersionKey, Dependency
+                   FROM PackageDependencies
                    WHERE PackageVersionKey IN (${placeholders})`;
 
       this.db.all(sql, packageVersionKeys, (err, rows) => {
@@ -1250,7 +1271,7 @@ this.router.get('/log', async (req, res) => {
       }
 
       if (pv.Author) {
-        versionObj.author = { name: pv.Author };
+        versionObj.author = {name: pv.Author};
       }
 
       if (description) {
@@ -1467,7 +1488,7 @@ this.router.get('/log', async (req, res) => {
         if (objWrapper) {
           // V1 API format with object wrapper
           responseData = {
-            objects: results.map(pkg => ({ package: pkg }))
+            objects: results.map(pkg => ({package: pkg}))
           };
         } else {
           responseData = results;
@@ -1478,7 +1499,7 @@ this.router.get('/log', async (req, res) => {
       }
     } catch (error) {
       console.error('Error in search:', error);
-      res.status(500).json({ error: 'Search failed', message: error.message });
+      res.status(500).json({error: 'Search failed', message: error.message});
     }
   }
 
@@ -1558,14 +1579,22 @@ this.router.get('/log', async (req, res) => {
           // Build SQL query based on versioned flag
           let sql;
           if (versioned) {
-            sql = `SELECT Id, Version, PubDate, FhirVersions, Kind, Canonical, Description 
-                   FROM PackageVersions 
-                   WHERE PackageVersions.PackageVersionKey > 0 ${filter} 
+            sql = `SELECT Id, Version, PubDate, FhirVersions, Kind, Canonical, Description
+                   FROM PackageVersions
+                   WHERE PackageVersions.PackageVersionKey > 0 ${filter}
                    ORDER BY PubDate`;
           } else {
-            sql = `SELECT Packages.Id, Version, PubDate, FhirVersions, Kind, PackageVersions.Canonical, Packages.DownloadCount, Description 
-                   FROM Packages, PackageVersions 
-                   WHERE Packages.CurrentVersion = PackageVersions.PackageVersionKey ${filter} 
+            sql = `SELECT Packages.Id,
+                          Version,
+                          PubDate,
+                          FhirVersions,
+                          Kind,
+                          PackageVersions.Canonical,
+                          Packages.DownloadCount,
+                          Description
+                   FROM Packages,
+                        PackageVersions
+                   WHERE Packages.CurrentVersion = PackageVersions.PackageVersionKey ${filter}
                    ORDER BY PubDate`;
           }
 
@@ -1722,11 +1751,11 @@ this.router.get('/log', async (req, res) => {
 
     // Build base URL for sorting with current search parameters
     const baseUrl = '/packages/catalog?' + new URLSearchParams({
-      ...(searchParams.name && { name: searchParams.name }),
-      ...(searchParams.dependson && { dependson: searchParams.dependson }),
-      ...(searchParams.canonicalPkg && { pkgcanonical: searchParams.canonicalPkg }),
-      ...(searchParams.canonicalUrl && { canonical: searchParams.canonicalUrl }),
-      ...(searchParams.fhirVersion && { fhirversion: searchParams.fhirVersion })
+      ...(searchParams.name && {name: searchParams.name}),
+      ...(searchParams.dependson && {dependson: searchParams.dependson}),
+      ...(searchParams.canonicalPkg && {pkgcanonical: searchParams.canonicalPkg}),
+      ...(searchParams.canonicalUrl && {canonical: searchParams.canonicalUrl}),
+      ...(searchParams.fhirVersion && {fhirversion: searchParams.fhirVersion})
     }).toString();
 
     const currentSort = searchParams.sort || '';
@@ -1954,7 +1983,7 @@ this.router.get('/log', async (req, res) => {
 
   generateSearchHtml(req, results, params) {
     // Simplified HTML generation - you'd want to use a proper template engine
-    const { name, dependson, canonicalPkg, canonicalUrl, fhirVersion, secure } = params;
+    const {name, dependson, canonicalPkg, canonicalUrl, fhirVersion, secure} = params;
 
     const baseUrl = this.buildPackageUrl('', '', secure, req).replace('/packages/', '');
 
@@ -2105,9 +2134,10 @@ this.router.get('/log', async (req, res) => {
 
   async findBrokenDependencies(validPackages, filter) {
     return new Promise((resolve, reject) => {
-      const sql = `SELECT PackageVersions.Id || '#' || PackageVersions.Version as Source, 
-                          PackageDependencies.Dependency 
-                   FROM PackageDependencies, PackageVersions 
+      const sql = `SELECT PackageVersions.Id || '#' || PackageVersions.Version as Source,
+                          PackageDependencies.Dependency
+                   FROM PackageDependencies,
+                        PackageVersions
                    WHERE PackageDependencies.PackageVersionKey = PackageVersions.PackageVersionKey`;
 
       this.db.all(sql, [], (err, rows) => {
@@ -2271,107 +2301,107 @@ this.router.get('/log', async (req, res) => {
     return content;
   }
 
-buildLogPageContent(status, logData, summary) {
-  let content = '<div class="row mb-4">';
-  content += '<div class="col-12">';
-  content += `<div class="alert ${this.crawlerRunning ? 'alert-info' : 'alert-secondary'}">${this.escapeHtml(status)}</div>`;
-  content += '</div>';
-  content += '</div>';
-
-  if (this.crawlerRunning) {
-    content += '<div class="row mb-4">';
+  buildLogPageContent(status, logData, summary) {
+    let content = '<div class="row mb-4">';
     content += '<div class="col-12">';
-    content += '<div class="spinner-border text-primary" role="status">';
-    content += '<span class="sr-only">Loading...</span>';
-    content += '</div>';
-    content += ' <strong>Refresh this page in a few minutes to see updated status.</strong>';
+    content += `<div class="alert ${this.crawlerRunning ? 'alert-info' : 'alert-secondary'}">${this.escapeHtml(status)}</div>`;
     content += '</div>';
     content += '</div>';
-  }
 
-  if (summary || logData) {
-    content += '<table class="table table-sm">';
-    
+    if (this.crawlerRunning) {
+      content += '<div class="row mb-4">';
+      content += '<div class="col-12">';
+      content += '<div class="spinner-border text-primary" role="status">';
+      content += '<span class="sr-only">Loading...</span>';
+      content += '</div>';
+      content += ' <strong>Refresh this page in a few minutes to see updated status.</strong>';
+      content += '</div>';
+      content += '</div>';
+    }
+
+    if (summary || logData) {
+      content += '<table class="table table-sm">';
+
+      if (logData) {
+        if (logData.startTime) {
+          content += `<tr><td>Start Time:</td><td>${new Date(logData.startTime).toLocaleString()}</td></tr>`;
+        }
+        if (logData.endTime) {
+          content += `<tr><td>End Time:</td><td>${new Date(logData.endTime).toLocaleString()}</td></tr>`;
+        }
+        if (logData.runTime) {
+          content += `<tr><td>Duration:</td><td>${logData.runTime}</td></tr>`;
+        }
+        if (logData.totalBytes) {
+          content += `<tr><td>Total Bytes:</td><td>${logData.totalBytes.toLocaleString()}</td></tr>`;
+        }
+      }
+
+      if (summary) {
+        content += `<tr><td>Total Feeds:</td><td>${summary.totalFeeds}</td></tr>`;
+        content += `<tr><td>Successful Feeds:</td><td class="text-success">${summary.successfulFeeds}</td></tr>`;
+        content += `<tr><td>Failed Feeds:</td><td class="text-danger">${summary.failedFeeds}</td></tr>`;
+        content += `<tr><td>Rate Limited Feeds:</td><td class="text-warning">${summary.rateLimitedFeeds}</td></tr>`;
+        content += `<tr><td>Total Items Processed:</td><td>${summary.totalItems}</td></tr>`;
+      }
+
+      content += '</table>';
+    }
+
     if (logData) {
-      if (logData.startTime) {
-        content += `<tr><td>Start Time:</td><td>${new Date(logData.startTime).toLocaleString()}</td></tr>`;
+      content += '<h3>Crawler Log</h3>';
+      content += '<pre style="background-color: #f8f9fa; padding: 15px; border-radius: 5px; font-family: monospace; white-space: pre-wrap;">';
+      content += this.formatCrawlerLog(logData);
+      content += '</pre>';
+    } else if (!this.crawlerRunning) {
+      content += '<div class="alert alert-info">';
+      content += '<h4>No Log Data Available</h4>';
+      content += '<p>The crawler hasn\'t run yet or the log data is not available.</p>';
+      if (this.config.crawler.enabled) {
+        content += '<p><button onclick="triggerCrawl()" class="btn btn-primary">Start Manual Crawl</button></p>';
       }
-      if (logData.endTime) {
-        content += `<tr><td>End Time:</td><td>${new Date(logData.endTime).toLocaleString()}</td></tr>`;
-      }
-      if (logData.runTime) {
-        content += `<tr><td>Duration:</td><td>${logData.runTime}</td></tr>`;
-      }
-      if (logData.totalBytes) {
-        content += `<tr><td>Total Bytes:</td><td>${logData.totalBytes.toLocaleString()}</td></tr>`;
-      }
+      content += '</div>';
     }
-    
-    if (summary) {
-      content += `<tr><td>Total Feeds:</td><td>${summary.totalFeeds}</td></tr>`;
-      content += `<tr><td>Successful Feeds:</td><td class="text-success">${summary.successfulFeeds}</td></tr>`;
-      content += `<tr><td>Failed Feeds:</td><td class="text-danger">${summary.failedFeeds}</td></tr>`;
-      content += `<tr><td>Rate Limited Feeds:</td><td class="text-warning">${summary.rateLimitedFeeds}</td></tr>`;
-      content += `<tr><td>Total Items Processed:</td><td>${summary.totalItems}</td></tr>`;
-    }
-    
-    content += '</table>';
-  }
 
-  if (logData) {
-    content += '<h3>Crawler Log</h3>';
-    content += '<pre style="background-color: #f8f9fa; padding: 15px; border-radius: 5px; font-family: monospace; white-space: pre-wrap;">';
-    content += this.formatCrawlerLog(logData);
-    content += '</pre>';
-  } else if (!this.crawlerRunning) {
-    content += '<div class="alert alert-info">';
-    content += '<h4>No Log Data Available</h4>';
-    content += '<p>The crawler hasn\'t run yet or the log data is not available.</p>';
-    if (this.config.crawler.enabled) {
-      content += '<p><button onclick="triggerCrawl()" class="btn btn-primary">Start Manual Crawl</button></p>';
-    }
-    content += '</div>';
+    return content;
   }
-
-  return content;
-}
 
 // Add this new method to format the crawler log as readable text
-formatCrawlerLog(logData) {
-  let output = '';
-  
-  if (logData.fatalException) {
-    output += `FATAL ERROR: ${logData.fatalException}\n\n`;
-  }
-  
-  if (logData.feeds && logData.feeds.length > 0) {
-    for (const feed of logData.feeds) {
-      if (feed.exception || feed.rateLimited) {
-        // Feed itself had an error
-        const error = feed.rateLimited ? feed.rateLimitMessage : feed.exception;
-        output += `Feed: ${feed.url}: ${error}\n`;
-      } else {
-        // Feed was successful
-        output += `Feed: ${feed.url}: ok\n`;
-        
-        // Show any item errors
-        if (feed.items && feed.items.length > 0) {
-          for (const item of feed.items) {
-            if (item.error && item.status !== 'Already Processed') {
-              const guid = item.guid || 'unknown';
-              output += `  error: ${guid}: ${item.error}\n`;
+  formatCrawlerLog(logData) {
+    let output = '';
+
+    if (logData.fatalException) {
+      output += `FATAL ERROR: ${logData.fatalException}\n\n`;
+    }
+
+    if (logData.feeds && logData.feeds.length > 0) {
+      for (const feed of logData.feeds) {
+        if (feed.exception || feed.rateLimited) {
+          // Feed itself had an error
+          const error = feed.rateLimited ? feed.rateLimitMessage : feed.exception;
+          output += `Feed: ${feed.url}: ${error}\n`;
+        } else {
+          // Feed was successful
+          output += `Feed: ${feed.url}: ok\n`;
+
+          // Show any item errors
+          if (feed.items && feed.items.length > 0) {
+            for (const item of feed.items) {
+              if (item.error && item.status !== 'Already Processed') {
+                const guid = item.guid || 'unknown';
+                output += `  error: ${guid}: ${item.error}\n`;
+              }
             }
           }
         }
+        output += '\n';
       }
-      output += '\n';
+    } else {
+      output += 'No feeds processed.\n';
     }
-  } else {
-    output += 'No feeds processed.\n';
+
+    return this.escapeHtml(output);
   }
-  
-  return this.escapeHtml(output);
-}
 
   getStatus() {
     return {
@@ -2393,6 +2423,7 @@ formatCrawlerLog(logData) {
       }
     };
   }
+
   async buildStatsPageContent() {
     const dbCounts = await this.getDatabaseTableCounts();
     const dbAge = this.getDatabaseAgeInfo();
