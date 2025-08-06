@@ -2,6 +2,8 @@
  * Test cases for CodeSystem class
  * These tests can be run with Jest, Mocha, or any similar testing framework
  */
+const CodeSystem = require('../../tx/library/codesystem');
+const CodeSystemXML = require('../../tx/library/codesystem-xml');
 
 describe('CodeSystem', () => {
   // Test data
@@ -740,7 +742,7 @@ describe('CodeSystem', () => {
 </CodeSystem>`;
 
     // Mock CodeSystemXML since we can't actually import it in tests
-    const MockCodeSystemXML = {
+    const CodeSystemXML = {
       fromXML: (xmlString, version) => {
         // Simulate XML to JSON conversion
         const isR3 = xmlString.includes('r3-xml-test');
@@ -870,15 +872,15 @@ describe('CodeSystem', () => {
     };
 
     test('should validate FHIR CodeSystem XML', () => {
-      expect(MockCodeSystemXML.isValidCodeSystemXML(r5CodeSystemXML)).toBe(true);
-      expect(MockCodeSystemXML.isValidCodeSystemXML(r3CodeSystemXML)).toBe(true);
+      expect(CodeSystemXML.isValidCodeSystemXML(r5CodeSystemXML)).toBe(true);
+      expect(CodeSystemXML.isValidCodeSystemXML(r3CodeSystemXML)).toBe(true);
 
       const invalidXML = '<Patient><name>Not a CodeSystem</name></Patient>';
-      expect(MockCodeSystemXML.isValidCodeSystemXML(invalidXML)).toBe(false);
+      expect(CodeSystemXML.isValidCodeSystemXML(invalidXML)).toBe(false);
     });
 
     test('should load CodeSystem from R5 XML', () => {
-      const cs = MockCodeSystemXML.fromXML(r5CodeSystemXML, 'R5');
+      const cs = CodeSystemXML.fromXML(r5CodeSystemXML, 'R5');
 
       expect(cs.getFHIRVersion()).toBe('R5');
       expect(cs.jsonObj.url).toBe('http://example.org/fhir/CodeSystem/xml-test');
@@ -902,7 +904,7 @@ describe('CodeSystem', () => {
     });
 
     test('should load CodeSystem from R3 XML with identifier conversion', () => {
-      const cs = MockCodeSystemXML.fromXML(r3CodeSystemXML, 'R3');
+      const cs = CodeSystemXML.fromXML(r3CodeSystemXML, 'R3');
 
       expect(cs.getFHIRVersion()).toBe('R3');
       expect(cs.hasCode('test-concept')).toBe(true);
@@ -914,8 +916,8 @@ describe('CodeSystem', () => {
     });
 
     test('should convert CodeSystem to R5 XML', () => {
-      const cs = MockCodeSystemXML.fromXML(r5CodeSystemXML, 'R5');
-      const xmlOutput = MockCodeSystemXML.toXMLString(cs, 'R5');
+      const cs = CodeSystemXML.fromXML(r5CodeSystemXML, 'R5');
+      const xmlOutput = CodeSystemXML.toXMLString(cs, 'R5');
 
       expect(xmlOutput).toContain('<CodeSystem xmlns="http://hl7.org/fhir">');
       expect(xmlOutput).toContain('<url value="http://example.org/fhir/CodeSystem/xml-test"/>');
@@ -928,8 +930,8 @@ describe('CodeSystem', () => {
     });
 
     test('should convert CodeSystem to R4 XML without R5 elements', () => {
-      const cs = MockCodeSystemXML.fromXML(r5CodeSystemXML, 'R5');
-      const xmlOutput = MockCodeSystemXML.toXMLString(cs, 'R4');
+      const cs = CodeSystemXML.fromXML(r5CodeSystemXML, 'R5');
+      const xmlOutput = CodeSystemXML.toXMLString(cs, 'R4');
 
       expect(xmlOutput).toContain('<CodeSystem xmlns="http://hl7.org/fhir">');
       expect(xmlOutput).not.toContain('versionAlgorithmString');
@@ -943,8 +945,8 @@ describe('CodeSystem', () => {
     });
 
     test('should convert CodeSystem to R3 XML with single identifier', () => {
-      const cs = MockCodeSystemXML.fromXML(r5CodeSystemXML, 'R5');
-      const xmlOutput = MockCodeSystemXML.toXMLString(cs, 'R3');
+      const cs = CodeSystemXML.fromXML(r5CodeSystemXML, 'R5');
+      const xmlOutput = CodeSystemXML.toXMLString(cs, 'R3');
 
       expect(xmlOutput).toContain('<CodeSystem xmlns="http://hl7.org/fhir">');
       expect(xmlOutput).not.toContain('versionAlgorithmString');
@@ -957,7 +959,7 @@ describe('CodeSystem', () => {
     });
 
     test('should handle nested concepts in XML', () => {
-      const cs = MockCodeSystemXML.fromXML(r5CodeSystemXML, 'R5');
+      const cs = CodeSystemXML.fromXML(r5CodeSystemXML, 'R5');
 
       // Check that nested concepts are properly parsed
       expect(cs.hasCode('parent')).toBe(true);
@@ -972,7 +974,7 @@ describe('CodeSystem', () => {
     });
 
     test('should handle filter operators array correctly', () => {
-      const cs = MockCodeSystemXML.fromXML(r5CodeSystemXML, 'R5');
+      const cs = CodeSystemXML.fromXML(r5CodeSystemXML, 'R5');
 
       // Check that operators are properly parsed as array
       expect(cs.jsonObj.filter).toHaveLength(1);
@@ -982,44 +984,14 @@ describe('CodeSystem', () => {
 
     test('should round-trip conversion preserve data', () => {
       // R5: XML -> CodeSystem -> XML
-      const cs = MockCodeSystemXML.fromXML(r5CodeSystemXML, 'R5');
-      const xmlOutput = MockCodeSystemXML.toXMLString(cs, 'R5');
-      const cs2 = MockCodeSystemXML.fromXML(xmlOutput, 'R5');
+      const cs = CodeSystemXML.fromXML(r5CodeSystemXML, 'R5');
+      const xmlOutput = CodeSystemXML.toXMLString(cs, 'R5');
+      const cs2 = CodeSystemXML.fromXML(xmlOutput, 'R5');
 
       expect(cs2.jsonObj.url).toBe(cs.jsonObj.url);
       expect(cs2.jsonObj.name).toBe(cs.jsonObj.name);
       expect(cs2.getAllCodes()).toEqual(cs.getAllCodes());
       expect(cs2.jsonObj.versionAlgorithmString).toBe(cs.jsonObj.versionAlgorithmString);
-    });
-
-    test('should handle cross-version XML conversion', () => {
-      // Load R3 XML, output as R4 XML
-      const cs = MockCodeSystemXML.fromXML(r3CodeSystemXML, 'R3');
-      const r4XML = MockCodeSystemXML.toXMLString(cs, 'R4');
-
-      expect(r4XML).toContain('<CodeSystem xmlns="http://hl7.org/fhir">');
-      expect(r4XML).toContain('<identifier>'); // Should still have identifier
-
-      // Load the R4 XML back
-      const cs2 = MockCodeSystemXML.fromXML(r4XML, 'R4');
-      expect(cs2.hasCode('test-concept')).toBe(true);
-      expect(cs2.getFHIRVersion()).toBe('R4');
-    });
-
-    test('should handle empty or minimal CodeSystems', () => {
-      const minimalXML = `<?xml version="1.0" encoding="UTF-8"?>
-<CodeSystem xmlns="http://hl7.org/fhir">
-  <url value="http://example.org/minimal"/>
-  <name value="Minimal"/>
-  <status value="draft"/>
-</CodeSystem>`;
-
-      const cs = MockCodeSystemXML.fromXML(minimalXML, 'R5');
-      expect(cs.jsonObj.url).toBe('http://example.org/minimal');
-      expect(cs.getAllCodes()).toEqual([]);
-
-      const xmlOutput = MockCodeSystemXML.toXMLString(cs, 'R4');
-      expect(xmlOutput).toContain('<name value="Minimal"/>');
     });
   });
 
@@ -1058,5 +1030,220 @@ describe('CodeSystem', () => {
       expect(concept).toBeDefined();
       expect(lookupTime).toBeLessThan(10); // Should be very fast with Map lookup
     });
+  });
+});
+
+describe('CodeSystem XML Support', () => {
+  // Sample FHIR XML data for testing
+  const r5CodeSystemXML = `<?xml version="1.0" encoding="UTF-8"?>
+<CodeSystem xmlns="http://hl7.org/fhir">
+  <url value="http://example.org/fhir/CodeSystem/xml-test"/>
+  <identifier>
+    <system value="http://example.org/identifiers"/>
+    <value value="xml-test-1"/>
+  </identifier>
+  <identifier>
+    <system value="http://example.org/identifiers"/>
+    <value value="xml-test-2"/>
+  </identifier>
+  <version value="1.0.0"/>
+  <versionAlgorithmString value="semver"/>
+  <name value="XMLTestCodeSystem"/>
+  <title value="XML Test Code System"/>
+  <status value="active"/>
+  <filter>
+    <code value="concept"/>
+    <operator value="="/>
+    <operator value="is-a"/>
+    <operator value="generalizes"/>
+    <operator value="regex"/>
+    <value value="A string value"/>
+  </filter>
+  <concept>
+    <code value="parent"/>
+    <display value="Parent Concept"/>
+    <concept>
+      <code value="child1"/>
+      <display value="Child 1"/>
+    </concept>
+    <concept>
+      <code value="child2"/>
+      <display value="Child 2"/>
+    </concept>
+  </concept>
+  <concept>
+    <code value="standalone"/>
+    <display value="Standalone Concept"/>
+  </concept>
+</CodeSystem>`;
+
+  const r3CodeSystemXML = `<?xml version="1.0" encoding="UTF-8"?>
+<CodeSystem xmlns="http://hl7.org/fhir">
+  <url value="http://example.org/fhir/CodeSystem/r3-xml-test"/>
+  <identifier>
+    <system value="http://example.org/identifiers"/>
+    <value value="r3-identifier"/>
+  </identifier>
+  <name value="R3XMLTestCodeSystem"/>
+  <status value="active"/>
+  <concept>
+    <code value="test-concept"/>
+    <display value="Test Concept"/>
+  </concept>
+</CodeSystem>`;
+
+  test('should validate FHIR CodeSystem XML', () => {
+    expect(CodeSystemXML.isValidCodeSystemXML(r5CodeSystemXML)).toBe(true);
+    expect(CodeSystemXML.isValidCodeSystemXML(r3CodeSystemXML)).toBe(true);
+
+    const invalidXML = '<Patient><name>Not a CodeSystem</name></Patient>';
+    expect(CodeSystemXML.isValidCodeSystemXML(invalidXML)).toBe(false);
+  });
+
+  test('should load CodeSystem from R5 XML', () => {
+    const cs = CodeSystemXML.fromXML(r5CodeSystemXML, 'R5');
+
+    expect(cs.getFHIRVersion()).toBe('R5');
+    expect(cs.jsonObj.url).toBe('http://example.org/fhir/CodeSystem/xml-test');
+    expect(cs.jsonObj.name).toBe('XMLTestCodeSystem');
+    expect(cs.jsonObj.versionAlgorithmString).toBe('semver');
+
+    // Check identifier array
+    expect(Array.isArray(cs.jsonObj.identifier)).toBe(true);
+    expect(cs.jsonObj.identifier.length).toBe(2);
+    expect(cs.jsonObj.identifier[0].value).toBe('xml-test-1');
+
+    // Check filter operator array
+    expect(cs.jsonObj.filter[0].operator).toContain('generalizes');
+    expect(cs.jsonObj.filter[0].operator).toContain('=');
+
+    // Check concept hierarchy
+    expect(cs.hasCode('parent')).toBe(true);
+    expect(cs.hasCode('child1')).toBe(true);
+    expect(cs.getChildren('parent')).toContain('child1');
+    expect(cs.getChildren('parent')).toContain('child2');
+  });
+
+  test('should load CodeSystem from R3 XML with identifier conversion', () => {
+    const cs = CodeSystemXML.fromXML(r3CodeSystemXML, 'R3');
+
+    expect(cs.getFHIRVersion()).toBe('R3');
+    expect(cs.hasCode('test-concept')).toBe(true);
+
+    // Should have converted single identifier to array internally
+    expect(Array.isArray(cs.jsonObj.identifier)).toBe(true);
+    expect(cs.jsonObj.identifier.length).toBe(1);
+    expect(cs.jsonObj.identifier[0].value).toBe('r3-identifier');
+  });
+
+  test('should convert CodeSystem to R5 XML', () => {
+    const cs = CodeSystemXML.fromXML(r5CodeSystemXML, 'R5');
+    const xmlOutput = CodeSystemXML.toXMLString(cs, 'R5');
+
+    expect(xmlOutput).toContain('<CodeSystem xmlns="http://hl7.org/fhir">');
+    expect(xmlOutput).toContain('<url value="http://example.org/fhir/CodeSystem/xml-test"/>');
+    expect(xmlOutput).toContain('<versionAlgorithmString value="semver"/>');
+    expect(xmlOutput).toContain('<operator value="generalizes"/>');
+
+    // Should have multiple identifier elements
+    const identifierMatches = xmlOutput.match(/<identifier>/g);
+    expect(identifierMatches).toHaveLength(2);
+  });
+
+  test('should convert CodeSystem to R4 XML without R5 elements', () => {
+    const cs = CodeSystemXML.fromXML(r5CodeSystemXML, 'R5');
+    const xmlOutput = CodeSystemXML.toXMLString(cs, 'R4');
+
+    expect(xmlOutput).toContain('<CodeSystem xmlns="http://hl7.org/fhir">');
+    expect(xmlOutput).not.toContain('versionAlgorithmString');
+    expect(xmlOutput).not.toContain('<operator value="generalizes"/>');
+    expect(xmlOutput).toContain('<operator value="="/>');
+    expect(xmlOutput).toContain('<operator value="is-a"/>');
+
+    // Should still have multiple identifier elements in R4
+    const identifierMatches = xmlOutput.match(/<identifier>/g);
+    expect(identifierMatches).toHaveLength(2);
+  });
+
+  test('should convert CodeSystem to R3 XML with single identifier', () => {
+    const cs = CodeSystemXML.fromXML(r5CodeSystemXML, 'R5');
+    const xmlOutput = CodeSystemXML.toXMLString(cs, 'R3');
+
+    expect(xmlOutput).toContain('<CodeSystem xmlns="http://hl7.org/fhir">');
+    expect(xmlOutput).not.toContain('versionAlgorithmString');
+    expect(xmlOutput).not.toContain('<operator value="generalizes"/>');
+
+    // Should have only one identifier element in R3
+    const identifierMatches = xmlOutput.match(/<identifier>/g);
+    expect(identifierMatches).toHaveLength(1);
+    expect(xmlOutput).toContain('<value value="xml-test-1"/>'); // First identifier
+  });
+
+  test('should handle nested concepts in XML', () => {
+    const cs = CodeSystemXML.fromXML(r5CodeSystemXML, 'R5');
+
+    // Check that nested concepts are properly parsed
+    expect(cs.hasCode('parent')).toBe(true);
+    expect(cs.hasCode('child1')).toBe(true);
+    expect(cs.hasCode('child2')).toBe(true);
+    expect(cs.hasCode('standalone')).toBe(true);
+
+    // Check hierarchy relationships
+    expect(cs.getChildren('parent')).toContain('child1');
+    expect(cs.getChildren('parent')).toContain('child2');
+    expect(cs.getParents('child1')).toContain('parent');
+    expect(cs.getRootConcepts()).toContain('parent');
+    expect(cs.getRootConcepts()).toContain('standalone');
+  });
+
+  test('should handle filter operators array correctly', () => {
+    const cs = CodeSystemXML.fromXML(r5CodeSystemXML, 'R5');
+
+    // Check that operators are properly parsed as array
+    expect(cs.jsonObj.filter).toHaveLength(1);
+    expect(Array.isArray(cs.jsonObj.filter[0].operator)).toBe(true);
+    expect(cs.jsonObj.filter[0].operator).toEqual(['=', 'is-a', 'generalizes', 'regex']);
+  });
+
+  test('should round-trip conversion preserve data', () => {
+    // R5: XML -> CodeSystem -> XML
+    const cs = CodeSystemXML.fromXML(r5CodeSystemXML, 'R5');
+    const xmlOutput = CodeSystemXML.toXMLString(cs, 'R5');
+    const cs2 = CodeSystemXML.fromXML(xmlOutput, 'R5');
+
+    expect(cs2.jsonObj.url).toBe(cs.jsonObj.url);
+    expect(cs2.jsonObj.name).toBe(cs.jsonObj.name);
+    expect(cs2.getAllCodes()).toEqual(cs.getAllCodes());
+    expect(cs2.jsonObj.versionAlgorithmString).toBe(cs.jsonObj.versionAlgorithmString);
+  });
+
+  test('should handle cross-version XML conversion', () => {
+    // Load R3 XML, output as R4 XML
+    const cs = CodeSystemXML.fromXML(r3CodeSystemXML, 'R3');
+    const r4XML = CodeSystemXML.toXMLString(cs, 'R4');
+
+    expect(r4XML).toContain('<CodeSystem xmlns="http://hl7.org/fhir">');
+    expect(r4XML).toContain('<identifier>'); // Should still have identifier
+
+    // Load the R4 XML back
+    const cs2 = CodeSystemXML.fromXML(r4XML, 'R4');
+    expect(cs2.hasCode('test-concept')).toBe(true);
+    expect(cs2.getFHIRVersion()).toBe('R4');
+  });
+
+  test('should handle empty or minimal CodeSystems', () => {
+    const minimalXML = `<?xml version="1.0" encoding="UTF-8"?>
+<CodeSystem xmlns="http://hl7.org/fhir">
+  <url value="http://example.org/minimal"/>
+  <name value="Minimal"/>
+  <status value="draft"/>
+</CodeSystem>`;
+
+    const cs = CodeSystemXML.fromXML(minimalXML, 'R5');
+    expect(cs.jsonObj.url).toBe('http://example.org/minimal');
+    expect(cs.getAllCodes()).toEqual([]);
+
+    const xmlOutput = CodeSystemXML.toXMLString(cs, 'R4');
+    expect(xmlOutput).toContain('<name value="Minimal"/>');
   });
 });

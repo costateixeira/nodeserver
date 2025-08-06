@@ -1,1062 +1,572 @@
 /**
- * Test cases for CodeSystem class
- * These tests can be run with Jest, Mocha, or any similar testing framework
+ * XML support for FHIR CodeSystem resources
+ * Handles conversion between FHIR XML format and CodeSystem objects
  */
 
-describe('CodeSystem', () => {
-  // Test data
-  const validCodeSystem = {
-    "resourceType": "CodeSystem",
-    "url": "http://example.org/fhir/CodeSystem/test",
-    "version": "1.0.0",
-    "name": "TestCodeSystem",
-    "title": "Test Code System",
-    "status": "active",
-    "concept": [
-      {
-        "code": "root1",
-        "display": "Root Concept 1",
-        "definition": "First root concept"
+// Import the XMLParser and XMLBuilder from fast-xml-parser
+const { XMLParser, XMLBuilder } = require('fast-xml-parser');
+const CodeSystem = require('./codesystem');
+
+/**
+ * XML support for FHIR CodeSystem resources
+ * @class
+ */
+class CodeSystemXML {
+
+  /**
+   * FHIR CodeSystem elements that should be arrays in JSON
+   * @type {Set<string>}
+   * @private
+   */
+  static _arrayElements = new Set([
+    'identifier',      // R4+: array of identifiers
+    'contact',         // Array of contact details
+    'useContext',      // Array of usage contexts
+    'jurisdiction',    // Array of jurisdictions
+    'concept',         // Array of concept definitions
+    'filter',          // Array of filters
+    'operator',        // Array of filter operators (within filter)
+    'property',        // Array of property definitions
+    'designation',     // Array of designations (within concepts)
+    'extension',       // Array of extensions
+    'modifierExtension' // Array of modifier extensions
+  ]);
+
+  /**
+   * Creates CodeSystem from FHIR XML string
+   * @param {string} xmlString - FHIR XML representation of CodeSystem
+   * @param {string} [version='R5'] - FHIR version ('R3', 'R4', or 'R5')
+   * @returns {CodeSystem} New CodeSystem instance
+   */
+  static fromXML(xmlString, version = 'R5') {
+    // Parse XML to JSON using FHIR-aware configuration
+    const jsonObj = this._xmlToJson(xmlString);
+
+    // Use existing CodeSystem constructor with version conversion
+    return new CodeSystem(jsonObj, version);
+  }
+
+  /**
+   * Converts CodeSystem to FHIR XML string
+   * @param {CodeSystem} codeSystem - CodeSystem instance
+   * @param {string} [version='R5'] - Target FHIR version ('R3', 'R4', or 'R5')
+   * @returns {string} FHIR XML string
+   */
+  static toXMLString(codeSystem, version = 'R5') {
+    // Get JSON in target version using existing version conversion
+    const jsonString = codeSystem.toJSONString(version);
+    let jsonObj = JSON.parse(jsonString);
+
+    // Special handling for R3 format (identifier needs to be a single object)
+    if (version === 'R3' && jsonObj.identifier && !Array.isArray(jsonObj.identifier)) {
+      // Already converted to R3 format with single identifier
+    } else if (version === 'R3' && jsonObj.identifier && Array.isArray(jsonObj.identifier) && jsonObj.identifier.length > 0) {
+      // Need to ensure identifier is a single object for R3 XML
+      jsonObj.identifier = jsonObj.identifier[0];
+    }
+
+    // Convert JSON to FHIR XML format
+    return this._jsonToXml(jsonObj, version);
+  }
+
+  /**
+   * Converts FHIR XML to JSON object
+   * @param {string} xmlString - FHIR XML string
+   * @returns {Object} JSON representation
+   * @private
+   */
+  static _xmlToJson(xmlString) {
+    // Fast-xml-parser configuration for FHIR
+    const parserOptions = {
+      ignoreAttributes: false,
+      attributeNamePrefix: '@_',
+      attributesGroupName: false,
+      textNodeName: '#text',
+      isArray: (name, path, isLeaf, isAttribute) => {
+        // These elements should always be arrays even if there's only one
+        return this._arrayElements.has(name);
       },
-      {
-        "code": "root2",
-        "display": "Root Concept 2",
-        "definition": "Second root concept"
-      },
-      {
-        "code": "child1",
-        "display": "Child 1",
-        "property": [
-          {
-            "code": "parent",
-            "valueCode": "root1"
-          }
-        ]
-      },
-      {
-        "code": "child2",
-        "display": "Child 2",
-        "property": [
-          {
-            "code": "parent",
-            "valueCode": "root1"
-          },
-          {
-            "code": "parent",
-            "valueCode": "root2"
-          }
-        ]
-      },
-      {
-        "code": "grandchild1",
-        "display": "Grandchild 1",
-        "property": [
-          {
-            "code": "parent",
-            "valueCode": "child1"
-          }
-        ]
+      parseAttributeValue: true,
+      parseTagValue: false,
+      trimValues: true,
+      cdataPropName: '__cdata',
+      numberParseOptions: {
+        leadingZeros: false,
+        hex: true,
+        skipLike: /^[-+]?0\d+/
       }
-    ]
-  };
+    };
 
-  const nestedCodeSystem = {
-    "resourceType": "CodeSystem",
-    "url": "http://example.org/fhir/CodeSystem/nested",
-    "name": "NestedCodeSystem",
-    "status": "active",
-    "concept": [
-      {
-        "code": "animals",
-        "display": "Animals",
-        "concept": [
-          {
-            "code": "mammals",
-            "display": "Mammals",
-            "concept": [
-              {
-                "code": "dogs",
-                "display": "Dogs"
-              },
-              {
-                "code": "cats",
-                "display": "Cats"
-              }
-            ]
-          },
-          {
-            "code": "birds",
-            "display": "Birds"
-          }
-        ]
+    const parser = new XMLParser(parserOptions);
+    const parsed = parser.parse(xmlString);
+
+    // Get the CodeSystem element
+    const codeSystem = parsed.CodeSystem;
+    if (!codeSystem) {
+      throw new Error('Invalid XML: Missing CodeSystem element');
+    }
+
+    // Convert to FHIR JSON format
+    return this._convertXmlToFhirJson(codeSystem);
+  }
+
+  /**
+   * Converts XML parser output to FHIR JSON format
+   * @param {Object} xmlObj - XML parser output
+   * @returns {Object} FHIR JSON object
+   * @private
+   */
+  static _convertXmlToFhirJson(xmlObj) {
+    const result = { resourceType: 'CodeSystem' };
+
+    // Process each property
+    for (const [key, value] of Object.entries(xmlObj)) {
+      // Skip attributes and namespace
+      if (key === '@_xmlns' || key.startsWith('@_')) continue;
+
+      if (key === 'identifier') {
+        // Handle identifier array
+        result.identifier = this._processIdentifiers(value);
+      } else if (key === 'filter') {
+        // Handle filter array
+        result.filter = this._processFilters(value);
+      } else if (key === 'concept') {
+        // Handle concept array
+        result.concept = this._processConcepts(value);
+      } else if (typeof value === 'object' && value !== null && value['@_value'] !== undefined) {
+        // Handle primitive with value attribute
+        result[key] = value['@_value'];
+      } else if (typeof value === 'object' && !Array.isArray(value)) {
+        // Handle complex objects
+        result[key] = this._processComplexObject(value);
+      } else {
+        // Default handling
+        result[key] = value;
       }
-    ]
-  };
+    }
 
-  const emptyCodeSystem = {
-    "resourceType": "CodeSystem",
-    "url": "http://example.org/fhir/CodeSystem/empty",
-    "name": "EmptyCodeSystem",
-    "status": "active"
-  };
+    return result;
+  }
 
-  describe('Constructor and Validation', () => {
-    test('should create CodeSystem with valid data', () => {
-      const cs = new CodeSystem(validCodeSystem);
-      expect(cs.jsonObj).toEqual(validCodeSystem);
+  /**
+   * Process identifier elements from XML
+   * @param {Object|Array} identifiers - XML parser output for identifiers
+   * @returns {Array} Array of identifier objects
+   * @private
+   */
+  static _processIdentifiers(identifiers) {
+    // Ensure we have an array
+    const idArray = Array.isArray(identifiers) ? identifiers : [identifiers];
+
+    return idArray.map(id => {
+      const result = {};
+
+      // Process system
+      if (id.system && id.system['@_value']) {
+        result.system = id.system['@_value'];
+      }
+
+      // Process value
+      if (id.value && id.value['@_value']) {
+        result.value = id.value['@_value'];
+      }
+
+      return result;
     });
+  }
 
-    test('should create CodeSystem from JSON string', () => {
-      const cs = CodeSystem.fromJSON(JSON.stringify(validCodeSystem));
-      expect(cs.jsonObj).toEqual(validCodeSystem);
+  /**
+   * Process filter elements from XML
+   * @param {Object|Array} filters - XML parser output for filters
+   * @returns {Array} Array of filter objects
+   * @private
+   */
+  static _processFilters(filters) {
+    // Ensure we have an array
+    const filterArray = Array.isArray(filters) ? filters : [filters];
+
+    return filterArray.map(filter => {
+      const result = {};
+
+      // Process code
+      if (filter.code && filter.code['@_value']) {
+        result.code = filter.code['@_value'];
+      }
+
+      // Process operators
+      if (filter.operator) {
+        const operators = Array.isArray(filter.operator) ? filter.operator : [filter.operator];
+        result.operator = operators.map(op => op['@_value']);
+      }
+
+      // Process value
+      if (filter.value && filter.value['@_value']) {
+        result.value = filter.value['@_value'];
+      }
+
+      return result;
     });
+  }
 
-    test('should throw error for null input', () => {
-      expect(() => new CodeSystem(null)).toThrow('Invalid CodeSystem: expected object');
+  /**
+   * Process concept elements from XML
+   * @param {Object|Array} concepts - XML parser output for concepts
+   * @returns {Array} Array of concept objects
+   * @private
+   */
+  static _processConcepts(concepts) {
+    // Ensure we have an array
+    const conceptArray = Array.isArray(concepts) ? concepts : [concepts];
+
+    return conceptArray.map(concept => {
+      const result = {};
+
+      // Process code
+      if (concept.code && concept.code['@_value']) {
+        result.code = concept.code['@_value'];
+      }
+
+      // Process display
+      if (concept.display && concept.display['@_value']) {
+        result.display = concept.display['@_value'];
+      }
+
+      // Process nested concepts
+      if (concept.concept) {
+        result.concept = this._processConcepts(concept.concept);
+      }
+
+      // Process properties
+      if (concept.property) {
+        result.property = this._processProperties(concept.property);
+      }
+
+      return result;
     });
+  }
 
-    test('should throw error for non-object input', () => {
-      expect(() => new CodeSystem("not an object")).toThrow('Invalid CodeSystem: expected object');
+  /**
+   * Process property elements from XML
+   * @param {Object|Array} properties - XML parser output for properties
+   * @returns {Array} Array of property objects
+   * @private
+   */
+  static _processProperties(properties) {
+    // Ensure we have an array
+    const propArray = Array.isArray(properties) ? properties : [properties];
+
+    return propArray.map(prop => {
+      const result = {};
+
+      // Process code
+      if (prop.code && prop.code['@_value']) {
+        result.code = prop.code['@_value'];
+      }
+
+      // Process valueCode
+      if (prop.valueCode && prop.valueCode['@_value']) {
+        result.valueCode = prop.valueCode['@_value'];
+      }
+
+      return result;
     });
+  }
 
-    test('should throw error for wrong resourceType', () => {
-      const invalid = { ...validCodeSystem, resourceType: "ValueSet" };
-      expect(() => new CodeSystem(invalid)).toThrow('Invalid CodeSystem: resourceType must be "CodeSystem"');
-    });
+  /**
+   * Process complex object from XML
+   * @param {Object} obj - XML parser output for complex object
+   * @returns {Object} Processed object
+   * @private
+   */
+  static _processComplexObject(obj) {
+    const result = {};
 
-    test('should throw error for missing url', () => {
-      const invalid = { ...validCodeSystem };
-      delete invalid.url;
-      expect(() => new CodeSystem(invalid)).toThrow('Invalid CodeSystem: url is required');
-    });
+    for (const [key, value] of Object.entries(obj)) {
+      if (key.startsWith('@_')) continue;
 
-    test('should throw error for missing name', () => {
-      const invalid = { ...validCodeSystem };
-      delete invalid.name;
-      expect(() => new CodeSystem(invalid)).toThrow('Invalid CodeSystem: name is required');
-    });
+      if (typeof value === 'object' && value !== null && value['@_value'] !== undefined) {
+        result[key] = value['@_value'];
+      } else if (typeof value === 'object' && !Array.isArray(value)) {
+        result[key] = this._processComplexObject(value);
+      } else {
+        result[key] = value;
+      }
+    }
 
-    test('should throw error for missing status', () => {
-      const invalid = { ...validCodeSystem };
-      delete invalid.status;
-      expect(() => new CodeSystem(invalid)).toThrow('Invalid CodeSystem: status is required');
-    });
+    return result;
+  }
 
-    test('should throw error for invalid status', () => {
-      const invalid = { ...validCodeSystem, status: "invalid" };
-      expect(() => new CodeSystem(invalid)).toThrow('Invalid CodeSystem: status must be one of');
-    });
+  /**
+   * Converts JSON object to FHIR XML
+   * @param {Object} jsonObj - JSON representation
+   * @param {string} version - FHIR version for XML namespace
+   * @returns {string} FHIR XML string
+   * @private
+   */
+  static _jsonToXml(jsonObj, version = 'R5') {
+    // Generate XML manually to have full control over the format
+    let xml = '<?xml version="1.0" encoding="UTF-8"?>\n';
+    xml += `<CodeSystem xmlns="${this._getFhirNamespace(version)}">\n`;
 
-    test('should throw error for non-array concept', () => {
-      const invalid = { ...validCodeSystem, concept: "not an array" };
-      expect(() => new CodeSystem(invalid)).toThrow('Invalid CodeSystem: concept must be an array');
-    });
+    // Add each property as XML elements
+    xml += this._generateXmlElements(jsonObj, 2); // 2 spaces indentation
 
-    test('should throw error for concept without code', () => {
-      const invalid = {
-        ...validCodeSystem,
-        concept: [{ display: "No Code" }]
-      };
-      expect(() => new CodeSystem(invalid)).toThrow('Invalid CodeSystem: concept[0].code is required');
-    });
+    xml += '</CodeSystem>';
+    return xml;
+  }
 
-    test('should accept empty CodeSystem', () => {
-      const cs = new CodeSystem(emptyCodeSystem);
-      expect(cs.getAllCodes()).toEqual([]);
-    });
-  });
+  /**
+   * Recursively generates XML elements from JSON
+   * @param {Object} obj - JSON object to convert
+   * @param {number} indent - Number of spaces for indentation
+   * @returns {string} XML elements
+   * @private
+   */
+  static _generateXmlElements(obj, indent) {
+    if (!obj || typeof obj !== 'object') return '';
 
-  describe('Basic Concept Lookup', () => {
-    let cs;
+    const spaces = ' '.repeat(indent);
+    let xml = '';
 
-    beforeEach(() => {
-      cs = new CodeSystem(validCodeSystem);
-    });
+    // Iterate through all properties
+    for (const [key, value] of Object.entries(obj)) {
+      // Skip resourceType as it's represented by the root element
+      if (key === 'resourceType') continue;
 
-    test('should find concept by code', () => {
-      const concept = cs.getConceptByCode("root1");
-      expect(concept).toBeDefined();
-      expect(concept.code).toBe("root1");
-      expect(concept.display).toBe("Root Concept 1");
-    });
-
-    test('should return undefined for non-existent code', () => {
-      const concept = cs.getConceptByCode("nonexistent");
-      expect(concept).toBeUndefined();
-    });
-
-    test('should find concept by display', () => {
-      const concept = cs.getConceptByDisplay("Child 1");
-      expect(concept).toBeDefined();
-      expect(concept.code).toBe("child1");
-    });
-
-    test('should return undefined for non-existent display', () => {
-      const concept = cs.getConceptByDisplay("Non-existent Display");
-      expect(concept).toBeUndefined();
-    });
-
-    test('should check if code exists', () => {
-      expect(cs.hasCode("root1")).toBe(true);
-      expect(cs.hasCode("nonexistent")).toBe(false);
-    });
-
-    test('should get all codes', () => {
-      const allCodes = cs.getAllCodes();
-      expect(allCodes).toContain("root1");
-      expect(allCodes).toContain("child1");
-      expect(allCodes).toContain("grandchild1");
-      expect(allCodes.length).toBe(5);
-    });
-
-    test('should get all concepts', () => {
-      const allConcepts = cs.getAllConcepts();
-      expect(allConcepts.length).toBe(5);
-      expect(allConcepts.some(c => c.code === "root1")).toBe(true);
-    });
-  });
-
-  describe('Hierarchy - Property-based', () => {
-    let cs;
-
-    beforeEach(() => {
-      cs = new CodeSystem(validCodeSystem);
-    });
-
-    test('should get children of parent', () => {
-      const children = cs.getChildren("root1");
-      expect(children).toContain("child1");
-      expect(children).toContain("child2");
-      expect(children.length).toBe(2);
-    });
-
-    test('should get parents of child', () => {
-      const parents = cs.getParents("child2");
-      expect(parents).toContain("root1");
-      expect(parents).toContain("root2");
-      expect(parents.length).toBe(2);
-    });
-
-    test('should return empty array for non-existent relationships', () => {
-      expect(cs.getChildren("nonexistent")).toEqual([]);
-      expect(cs.getParents("nonexistent")).toEqual([]);
-      expect(cs.getChildren("grandchild1")).toEqual([]);
-      expect(cs.getParents("root1")).toEqual([]);
-    });
-
-    test('should get descendants', () => {
-      const descendants = cs.getDescendants("root1");
-      expect(descendants).toContain("child1");
-      expect(descendants).toContain("child2");
-      expect(descendants).toContain("grandchild1");
-      expect(descendants.length).toBe(3);
-    });
-
-    test('should get ancestors', () => {
-      const ancestors = cs.getAncestors("grandchild1");
-      expect(ancestors).toContain("child1");
-      expect(ancestors).toContain("root1");
-      expect(ancestors.length).toBe(2);
-    });
-
-    test('should check descendant relationship', () => {
-      expect(cs.isDescendantOf("grandchild1", "root1")).toBe(true);
-      expect(cs.isDescendantOf("child1", "root1")).toBe(true);
-      expect(cs.isDescendantOf("root1", "grandchild1")).toBe(false);
-      expect(cs.isDescendantOf("child1", "root2")).toBe(false);
-    });
-
-    test('should get root concepts', () => {
-      const roots = cs.getRootConcepts();
-      expect(roots).toContain("root1");
-      expect(roots).toContain("root2");
-      expect(roots.length).toBe(2);
-    });
-
-    test('should get leaf concepts', () => {
-      const leaves = cs.getLeafConcepts();
-      expect(leaves).toContain("grandchild1");
-      expect(leaves).toContain("child2");
-      expect(leaves.length).toBe(2);
-    });
-  });
-
-  describe('Hierarchy - Nested Structure', () => {
-    let cs;
-
-    beforeEach(() => {
-      cs = new CodeSystem(nestedCodeSystem);
-    });
-
-    test('should build hierarchy from nested structure', () => {
-      const children = cs.getChildren("animals");
-      expect(children).toContain("mammals");
-      expect(children).toContain("birds");
-    });
-
-    test('should handle multi-level nesting', () => {
-      const children = cs.getChildren("mammals");
-      expect(children).toContain("dogs");
-      expect(children).toContain("cats");
-    });
-
-    test('should get correct parents in nested structure', () => {
-      const parents = cs.getParents("dogs");
-      expect(parents).toContain("mammals");
-      expect(parents.length).toBe(1);
-    });
-
-    test('should get all descendants in nested structure', () => {
-      const descendants = cs.getDescendants("animals");
-      expect(descendants).toContain("mammals");
-      expect(descendants).toContain("birds");
-      expect(descendants).toContain("dogs");
-      expect(descendants).toContain("cats");
-      expect(descendants.length).toBe(4);
-    });
-
-    test('should get all ancestors in nested structure', () => {
-      const ancestors = cs.getAncestors("dogs");
-      expect(ancestors).toContain("mammals");
-      expect(ancestors).toContain("animals");
-      expect(ancestors.length).toBe(2);
-    });
-  });
-
-  describe('Edge Cases', () => {
-    test('should handle CodeSystem with no concepts', () => {
-      const cs = new CodeSystem(emptyCodeSystem);
-      expect(cs.getAllCodes()).toEqual([]);
-      expect(cs.getRootConcepts()).toEqual([]);
-      expect(cs.getLeafConcepts()).toEqual([]);
-      expect(cs.getChildren("anything")).toEqual([]);
-    });
-
-    test('should handle concepts with no display', () => {
-      const csData = {
-        ...validCodeSystem,
-        concept: [
-          {
-            "code": "no-display"
+      if (Array.isArray(value)) {
+        // Handle arrays by creating multiple elements with the same name
+        for (const item of value) {
+          if (typeof item === 'object') {
+            // Complex object array element
+            xml += `${spaces}<${key}>\n`;
+            xml += this._generateXmlElements(item, indent + 2);
+            xml += `${spaces}</${key}>\n`;
+          } else {
+            // Simple value array element
+            xml += `${spaces}<${key} value="${this._escapeXml(item)}"/>\n`;
           }
-        ]
-      };
-      const cs = new CodeSystem(csData);
-      expect(cs.hasCode("no-display")).toBe(true);
-      expect(cs.getConceptByDisplay("no-display")).toBeUndefined();
-    });
-
-    test('should handle concepts with empty property arrays', () => {
-      const csData = {
-        ...validCodeSystem,
-        concept: [
-          {
-            "code": "empty-props",
-            "property": []
-          }
-        ]
-      };
-      const cs = new CodeSystem(csData);
-      expect(cs.getParents("empty-props")).toEqual([]);
-      expect(cs.getChildren("empty-props")).toEqual([]);
-    });
-
-    test('should handle circular references without infinite loops', () => {
-      const csData = {
-        "resourceType": "CodeSystem",
-        "url": "http://example.org/circular",
-        "name": "CircularTest",
-        "status": "active",
-        "concept": [
-          {
-            "code": "a",
-            "property": [{ "code": "parent", "valueCode": "b" }]
-          },
-          {
-            "code": "b",
-            "property": [{ "code": "parent", "valueCode": "a" }]
-          }
-        ]
-      };
-
-      const cs = new CodeSystem(csData);
-      // Should not cause infinite loops
-      const ancestorsA = cs.getAncestors("a");
-      const ancestorsB = cs.getAncestors("b");
-
-      expect(ancestorsA).toContain("b");
-      expect(ancestorsB).toContain("a");
-      expect(ancestorsA.length).toBe(1);
-      expect(ancestorsB.length).toBe(1);
-    });
-  });
-
-  describe('Utility Methods', () => {
-    let cs;
-
-    beforeEach(() => {
-      cs = new CodeSystem(validCodeSystem);
-    });
-
-    test('should convert to JSON string', () => {
-      const jsonString = cs.toJSONString();
-      const parsed = JSON.parse(jsonString);
-      expect(parsed).toEqual(validCodeSystem);
-    });
-
-    test('should get system info', () => {
-      const info = cs.getInfo();
-      expect(info.resourceType).toBe("CodeSystem");
-      expect(info.url).toBe("http://example.org/fhir/CodeSystem/test");
-      expect(info.name).toBe("TestCodeSystem");
-      expect(info.status).toBe("active");
-      expect(info.conceptCount).toBe(5);
-      expect(info.rootConceptCount).toBe(2);
-      expect(info.leafConceptCount).toBe(2);
-    });
-
-    test('should handle missing optional fields in info', () => {
-      const minimal = {
-        "resourceType": "CodeSystem",
-        "url": "http://example.org/minimal",
-        "name": "Minimal",
-        "status": "draft"
-      };
-      const cs = new CodeSystem(minimal);
-      const info = cs.getInfo();
-      expect(info.version).toBeUndefined();
-      expect(info.title).toBeUndefined();
-      expect(info.conceptCount).toBe(0);
-    });
-  });
-
-  describe('FHIR Version Conversion', () => {
-    const r5CodeSystemWithFilter = {
-      "resourceType": "CodeSystem",
-      "url": "http://example.org/fhir/CodeSystem/version-test",
-      "name": "VersionTestCodeSystem",
-      "status": "active",
-      "versionAlgorithmString": "semver",
-      "identifier": [
-        {
-          "system": "http://example.org/identifiers",
-          "value": "test-identifier-1"
-        },
-        {
-          "system": "http://example.org/identifiers",
-          "value": "test-identifier-2"
         }
-      ],
-      "filter": [
-        {
-          "code": "concept",
-          "operator": ["=", "is-a", "generalizes", "regex"],
-          "value": "A string value"
-        }
-      ],
-      "concept": [
-        {
-          "code": "test1",
-          "display": "Test 1"
-        }
-      ]
-    };
+      } else if (typeof value === 'object' && value !== null) {
+        // Handle complex object
+        xml += `${spaces}<${key}>\n`;
+        xml += this._generateXmlElements(value, indent + 2);
+        xml += `${spaces}</${key}>\n`;
+      } else if (value !== undefined && value !== null) {
+        // Handle primitive values
+        xml += `${spaces}<${key} value="${this._escapeXml(value)}"/>\n`;
+      }
+    }
 
-    const r3CodeSystemWithSingleIdentifier = {
-      "resourceType": "CodeSystem",
-      "url": "http://example.org/fhir/CodeSystem/r3-test",
-      "name": "R3TestCodeSystem",
-      "status": "active",
-      "identifier": {
-        "system": "http://example.org/identifiers",
-        "value": "r3-identifier"
-      },
-      "concept": [
-        {
-          "code": "test1",
-          "display": "Test 1"
-        }
-      ]
-    };
+    return xml;
+  }
 
-    const r4CodeSystem = {
-      "resourceType": "CodeSystem",
-      "url": "http://example.org/fhir/CodeSystem/r4-test",
-      "name": "R4TestCodeSystem",
-      "status": "active",
-      "identifier": [
-        {
-          "system": "http://example.org/identifiers",
-          "value": "r4-identifier"
-        }
-      ],
-      "concept": [
-        {
-          "code": "test1",
-          "display": "Test 1"
-        }
-      ]
-    };
+  /**
+   * Escapes special characters in XML
+   * @param {string|number|boolean} value - Value to escape
+   * @returns {string} Escaped XML string
+   * @private
+   */
+  static _escapeXml(value) {
+    if (value === undefined || value === null) return '';
 
-    test('should load R5 CodeSystem without conversion', () => {
-      const cs = new CodeSystem(r5CodeSystemWithFilter, 'R5');
-      expect(cs.getFHIRVersion()).toBe('R5');
-      expect(cs.jsonObj.versionAlgorithmString).toBe('semver');
-      expect(Array.isArray(cs.jsonObj.identifier)).toBe(true);
-      expect(cs.jsonObj.identifier.length).toBe(2);
-    });
+    const str = String(value);
+    return str
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&apos;');
+  }
 
-    test('should load R3 CodeSystem and convert identifier to array', () => {
-      const cs = new CodeSystem(r3CodeSystemWithSingleIdentifier, 'R3');
-      expect(cs.getFHIRVersion()).toBe('R3');
-      expect(cs.hasCode('test1')).toBe(true);
+  /**
+   * Determines if an XML element should be converted to an array in JSON
+   * @param {string} tagName - XML element name
+   * @param {string} jPath - JSON path context
+   * @returns {boolean} True if should be array
+   * @private
+   */
+  static _shouldBeArray(tagName, jPath) {
+    // Check if this is a known FHIR array element
+    if (this._arrayElements.has(tagName)) {
+      return true;
+    }
 
-      // After conversion, identifier should be an array
-      expect(Array.isArray(cs.jsonObj.identifier)).toBe(true);
-      expect(cs.jsonObj.identifier.length).toBe(1);
-      expect(cs.jsonObj.identifier[0].value).toBe('r3-identifier');
-    });
+    // Special cases based on context
+    if (tagName === 'concept' && jPath.includes('concept')) {
+      // Nested concepts are arrays
+      return true;
+    }
 
-    test('should load R4 CodeSystem and maintain identifier array', () => {
-      const cs = new CodeSystem(r4CodeSystem, 'R4');
-      expect(cs.getFHIRVersion()).toBe('R4');
-      expect(cs.hasCode('test1')).toBe(true);
+    if (tagName === 'property' && jPath.includes('concept')) {
+      // Properties within concepts are arrays
+      return true;
+    }
 
-      // Identifier should remain as array
-      expect(Array.isArray(cs.jsonObj.identifier)).toBe(true);
-      expect(cs.jsonObj.identifier.length).toBe(1);
-      expect(cs.jsonObj.identifier[0].value).toBe('r4-identifier');
-    });
+    if (tagName === 'operator' && jPath.includes('filter')) {
+      // Operators within filters are arrays
+      return true;
+    }
 
-    test('should output R5 format by default', () => {
-      const cs = new CodeSystem(r5CodeSystemWithFilter, 'R5');
-      const output = cs.toJSONString();
-      const parsed = JSON.parse(output);
-      expect(parsed.versionAlgorithmString).toBe('semver');
-      expect(parsed.filter[0].operator).toContain('generalizes');
-      expect(Array.isArray(parsed.identifier)).toBe(true);
-      expect(parsed.identifier.length).toBe(2);
-    });
+    return false;
+  }
 
-    test('should convert R5 to R4 format on output', () => {
-      const cs = new CodeSystem(r5CodeSystemWithFilter, 'R5');
-      const output = cs.toJSONString('R4');
-      const parsed = JSON.parse(output);
+  /**
+   * Processes FHIR-specific JSON structure after XML parsing
+   * @param {Object} obj - Parsed object from XML
+   * @returns {Object} FHIR-compliant JSON object
+   * @private
+   */
+  static _processFhirStructure(obj) {
+    if (!obj || typeof obj !== 'object') {
+      return obj;
+    }
 
-      // R5-specific elements should be removed
-      expect(parsed.versionAlgorithmString).toBeUndefined();
+    const processed = {};
 
-      // Identifier should remain as array in R4
-      expect(Array.isArray(parsed.identifier)).toBe(true);
-      expect(parsed.identifier.length).toBe(2);
+    for (const [key, value] of Object.entries(obj)) {
+      if (key.startsWith('@')) {
+        // Skip XML attributes that aren't FHIR data
+        continue;
+      }
 
-      // R5-only filter operators should be removed
-      expect(parsed.filter[0].operator).not.toContain('generalizes');
-      expect(parsed.filter[0].operator).toContain('=');
-      expect(parsed.filter[0].operator).toContain('is-a');
-    });
-
-    test('should convert R5 to R3 format on output with single identifier', () => {
-      const cs = new CodeSystem(r5CodeSystemWithFilter, 'R5');
-      const output = cs.toJSONString('R3');
-      const parsed = JSON.parse(output);
-
-      // R5-specific elements should be removed
-      expect(parsed.versionAlgorithmString).toBeUndefined();
-
-      // Identifier should be converted back to single object
-      expect(Array.isArray(parsed.identifier)).toBe(false);
-      expect(typeof parsed.identifier).toBe('object');
-      expect(parsed.identifier.value).toBe('test-identifier-1'); // First one
-
-      // Only R3-compatible operators should remain
-      expect(parsed.filter[0].operator).not.toContain('generalizes');
-      expect(parsed.filter[0].operator).toContain('=');
-      expect(parsed.filter[0].operator).toContain('is-a');
-    });
-
-    test('should handle R3 CodeSystem with no identifier', () => {
-      const r3NoIdentifier = { ...r3CodeSystemWithSingleIdentifier };
-      delete r3NoIdentifier.identifier;
-
-      const cs = new CodeSystem(r3NoIdentifier, 'R3');
-      expect(cs.jsonObj.identifier).toBeUndefined();
-
-      const r3Output = cs.toJSONString('R3');
-      const parsed = JSON.parse(r3Output);
-      expect(parsed.identifier).toBeUndefined();
-    });
-
-    test('should handle R5 to R3 conversion with empty identifier array', () => {
-      const r5EmptyIdentifier = {
-        ...r5CodeSystemWithFilter,
-        identifier: []
-      };
-
-      const cs = new CodeSystem(r5EmptyIdentifier, 'R5');
-      const r3Output = cs.toJSONString('R3');
-      const parsed = JSON.parse(r3Output);
-
-      // Empty array should be removed in R3
-      expect(parsed.identifier).toBeUndefined();
-    });
-
-    test('should handle CodeSystem without filters', () => {
-      const simpleR5 = {
-        ...r5CodeSystemWithFilter,
-        versionAlgorithmString: "semver"
-      };
-      delete simpleR5.filter;
-
-      const cs = new CodeSystem(simpleR5, 'R5');
-      const r4Output = cs.toJSONString('R4');
-      const r3Output = cs.toJSONString('R3');
-
-      const r4Parsed = JSON.parse(r4Output);
-      const r3Parsed = JSON.parse(r3Output);
-
-      expect(r4Parsed.versionAlgorithmString).toBeUndefined();
-      expect(r3Parsed.versionAlgorithmString).toBeUndefined();
-
-      // Check identifier conversion
-      expect(Array.isArray(r4Parsed.identifier)).toBe(true);
-      expect(Array.isArray(r3Parsed.identifier)).toBe(false);
-    });
-
-    test('should include FHIR version in getInfo', () => {
-      const cs = new CodeSystem(r4CodeSystem, 'R4');
-      const info = cs.getInfo();
-      expect(info.fhirVersion).toBe('R4');
-    });
-
-    test('should handle fromJSON with version parameter', () => {
-      const cs = CodeSystem.fromJSON(JSON.stringify(r3CodeSystemWithSingleIdentifier), 'R3');
-      expect(cs.getFHIRVersion()).toBe('R3');
-      expect(cs.hasCode('test1')).toBe(true);
-
-      // Should have converted identifier to array internally
-      expect(Array.isArray(cs.jsonObj.identifier)).toBe(true);
-    });
-
-    test('should throw error for unsupported version', () => {
-      expect(() => new CodeSystem(r4CodeSystem, 'R6')).toThrow('Unsupported FHIR version: R6');
-
-      const cs = new CodeSystem(r4CodeSystem, 'R4');
-      expect(() => cs.toJSONString('R6')).toThrow('Unsupported target FHIR version: R6');
-    });
-
-    test('should preserve original object when converting for output', () => {
-      const cs = new CodeSystem(r5CodeSystemWithFilter, 'R5');
-
-      // Generate R4 and R3 output
-      cs.toJSONString('R4');
-      cs.toJSONString('R3');
-
-      // Original should still have R5 elements and array identifier
-      expect(cs.jsonObj.versionAlgorithmString).toBe('semver');
-      expect(cs.jsonObj.filter[0].operator).toContain('generalizes');
-      expect(Array.isArray(cs.jsonObj.identifier)).toBe(true);
-      expect(cs.jsonObj.identifier.length).toBe(2);
-    });
-
-    test('should handle empty filter operators array', () => {
-      const codeSystemWithEmptyFilter = {
-        ...r5CodeSystemWithFilter,
-        filter: [
-          {
-            "code": "concept",
-            "operator": ["generalizes"], // Only R5 operator
-            "value": "A string value"
-          }
-        ]
-      };
-
-      const cs = new CodeSystem(codeSystemWithEmptyFilter, 'R5');
-      const r4Output = cs.toJSONString('R4');
-      const parsed = JSON.parse(r4Output);
-
-      // Filter should be removed if no valid operators remain
-      expect(parsed.filter).toEqual([]);
-    });
-  });
-
-  describe('XML Support', () => {
-    // Sample FHIR XML data for testing
-    const r5CodeSystemXML = `<?xml version="1.0" encoding="UTF-8"?>
-<CodeSystem xmlns="http://hl7.org/fhir">
-  <url value="http://example.org/fhir/CodeSystem/xml-test"/>
-  <identifier>
-    <system value="http://example.org/identifiers"/>
-    <value value="xml-test-1"/>
-  </identifier>
-  <identifier>
-    <system value="http://example.org/identifiers"/>
-    <value value="xml-test-2"/>
-  </identifier>
-  <version value="1.0.0"/>
-  <versionAlgorithmString value="semver"/>
-  <name value="XMLTestCodeSystem"/>
-  <title value="XML Test Code System"/>
-  <status value="active"/>
-  <filter>
-    <code value="concept"/>
-    <operator value="="/>
-    <operator value="is-a"/>
-    <operator value="generalizes"/>
-    <operator value="regex"/>
-    <value value="A string value"/>
-  </filter>
-  <concept>
-    <code value="parent"/>
-    <display value="Parent Concept"/>
-    <concept>
-      <code value="child1"/>
-      <display value="Child 1"/>
-    </concept>
-    <concept>
-      <code value="child2"/>
-      <display value="Child 2"/>
-    </concept>
-  </concept>
-  <concept>
-    <code value="standalone"/>
-    <display value="Standalone Concept"/>
-  </concept>
-</CodeSystem>`;
-
-    const r3CodeSystemXML = `<?xml version="1.0" encoding="UTF-8"?>
-<CodeSystem xmlns="http://hl7.org/fhir">
-  <url value="http://example.org/fhir/CodeSystem/r3-xml-test"/>
-  <identifier>
-    <system value="http://example.org/identifiers"/>
-    <value value="r3-identifier"/>
-  </identifier>
-  <name value="R3XMLTestCodeSystem"/>
-  <status value="active"/>
-  <concept>
-    <code value="test-concept"/>
-    <display value="Test Concept"/>
-  </concept>
-</CodeSystem>`;
-
-    // Mock CodeSystemXML since we can't actually import it in tests
-    const MockCodeSystemXML = {
-      fromXML: (xmlString, version) => {
-        // Simulate XML to JSON conversion
-        const isR3 = xmlString.includes('r3-xml-test');
-        const hasVersionAlgorithm = xmlString.includes('versionAlgorithmString');
-
-        let jsonObj;
-        if (isR3) {
-          jsonObj = {
-            resourceType: "CodeSystem",
-            url: "http://example.org/fhir/CodeSystem/r3-xml-test",
-            identifier: {
-              system: "http://example.org/identifiers",
-              value: "r3-identifier"
-            },
-            name: "R3XMLTestCodeSystem",
-            status: "active",
-            concept: [
-              {
-                code: "test-concept",
-                display: "Test Concept"
-              }
-            ]
-          };
+      if (Array.isArray(value)) {
+        // Process array elements
+        processed[key] = value.map(item => this._processFhirStructure(item));
+      } else if (typeof value === 'object' && value !== null) {
+        // Handle FHIR primitive types with 'value' attribute
+        if (value.value !== undefined && Object.keys(value).length === 1) {
+          // This is a FHIR primitive - extract the value
+          processed[key] = value.value;
         } else {
-          jsonObj = {
-            resourceType: "CodeSystem",
-            url: "http://example.org/fhir/CodeSystem/xml-test",
-            identifier: [
-              {
-                system: "http://example.org/identifiers",
-                value: "xml-test-1"
-              },
-              {
-                system: "http://example.org/identifiers",
-                value: "xml-test-2"
-              }
-            ],
-            version: "1.0.0",
-            versionAlgorithmString: hasVersionAlgorithm ? "semver" : undefined,
-            name: "XMLTestCodeSystem",
-            title: "XML Test Code System",
-            status: "active",
-            filter: [
-              {
-                code: "concept",
-                operator: ["=", "is-a", "generalizes", "regex"],
-                value: "A string value"
-              }
-            ],
-            concept: [
-              {
-                code: "parent",
-                display: "Parent Concept",
-                concept: [
-                  {
-                    code: "child1",
-                    display: "Child 1"
-                  },
-                  {
-                    code: "child2",
-                    display: "Child 2"
-                  }
-                ]
-              },
-              {
-                code: "standalone",
-                display: "Standalone Concept"
-              }
-            ]
-          };
+          // Complex object - recurse
+          processed[key] = this._processFhirStructure(value);
         }
-
-        return new CodeSystem(jsonObj, version);
-      },
-
-      toXMLString: (codeSystem, version) => {
-        const json = JSON.parse(codeSystem.toJSONString(version));
-
-        // Simulate JSON to XML conversion
-        let xml = `<?xml version="1.0" encoding="UTF-8"?>\n<CodeSystem xmlns="http://hl7.org/fhir">\n`;
-        xml += `  <url value="${json.url}"/>\n`;
-
-        if (version === 'R3' && json.identifier && !Array.isArray(json.identifier)) {
-          // R3 single identifier
-          xml += `  <identifier>\n`;
-          xml += `    <system value="${json.identifier.system}"/>\n`;
-          xml += `    <value value="${json.identifier.value}"/>\n`;
-          xml += `  </identifier>\n`;
-        } else if (json.identifier && Array.isArray(json.identifier)) {
-          // R4/R5 multiple identifiers
-          json.identifier.forEach(id => {
-            xml += `  <identifier>\n`;
-            xml += `    <system value="${id.system}"/>\n`;
-            xml += `    <value value="${id.value}"/>\n`;
-            xml += `  </identifier>\n`;
-          });
-        }
-
-        if (json.versionAlgorithmString && version === 'R5') {
-          xml += `  <versionAlgorithmString value="${json.versionAlgorithmString}"/>\n`;
-        }
-
-        xml += `  <name value="${json.name}"/>\n`;
-        xml += `  <status value="${json.status}"/>\n`;
-
-        if (json.filter && json.filter.length > 0) {
-          json.filter.forEach(filter => {
-            xml += `  <filter>\n`;
-            xml += `    <code value="${filter.code}"/>\n`;
-            filter.operator.forEach(op => {
-              xml += `    <operator value="${op}"/>\n`;
-            });
-            xml += `    <value value="${filter.value}"/>\n`;
-            xml += `  </filter>\n`;
-          });
-        }
-
-        xml += `</CodeSystem>`;
-        return xml;
-      },
-
-      isValidCodeSystemXML: (xmlString) => {
-        return xmlString.includes('<CodeSystem') &&
-          xmlString.includes('http://hl7.org/fhir') &&
-          xmlString.includes('</CodeSystem>');
+      } else {
+        // Simple value
+        processed[key] = value;
       }
+    }
+
+    // Add resourceType if missing
+    if (!processed.resourceType) {
+      processed.resourceType = 'CodeSystem';
+    }
+
+    return processed;
+  }
+
+  /**
+   * Prepares JSON object for XML conversion (handles FHIR primitives)
+   * @param {Object} obj - JSON object
+   * @returns {Object} XML-ready object
+   * @private
+   */
+  static _prepareForXml(obj) {
+    if (!obj || typeof obj !== 'object') {
+      return obj;
+    }
+
+    if (Array.isArray(obj)) {
+      return obj.map(item => this._prepareForXml(item));
+    }
+
+    const prepared = {};
+
+    for (const [key, value] of Object.entries(obj)) {
+      // Skip resourceType
+      if (key === 'resourceType') continue;
+
+      if (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') {
+        // FHIR primitive - wrap in object with 'value' attribute for XML
+        prepared[key] = { '@value': value.toString() };
+      } else if (Array.isArray(value)) {
+        // Handle arrays - create multiple elements with the same name
+        if (value.length > 0) {
+          prepared[key] = value.map(item => this._prepareForXml(item));
+        }
+      } else if (typeof value === 'object' && value !== null) {
+        // Complex object - recurse
+        prepared[key] = this._prepareForXml(value);
+      } else if (value !== undefined && value !== null) {
+        prepared[key] = value;
+      }
+    }
+
+    return prepared;
+  }
+
+  /**
+   * Gets FHIR namespace for XML based on version
+   * @param {string} version - FHIR version
+   * @returns {string} FHIR namespace URL
+   * @private
+   */
+  static _getFhirNamespace(version) {
+    const namespaces = {
+      'R3': 'http://hl7.org/fhir',
+      'R4': 'http://hl7.org/fhir',
+      'R5': 'http://hl7.org/fhir'
+    };
+    return namespaces[version] || namespaces['R5'];
+  }
+
+  /**
+   * Gets the element name for array items in XML
+   * @param {string} arrayName - Array property name
+   * @returns {string} Element name for array items
+   * @private
+   */
+  static _getArrayElementName(arrayName) {
+    // Most FHIR arrays use singular element names
+    const singularMap = {
+      'identifiers': 'identifier',
+      'contacts': 'contact',
+      'useContexts': 'useContext',
+      'jurisdictions': 'jurisdiction',
+      'concepts': 'concept',
+      'filters': 'filter',
+      'operators': 'operator',
+      'properties': 'property',
+      'designations': 'designation',
+      'extensions': 'extension',
+      'modifierExtensions': 'modifierExtension'
     };
 
-    test('should validate FHIR CodeSystem XML', () => {
-      expect(MockCodeSystemXML.isValidCodeSystemXML(r5CodeSystemXML)).toBe(true);
-      expect(MockCodeSystemXML.isValidCodeSystemXML(r3CodeSystemXML)).toBe(true);
+    return singularMap[arrayName] || arrayName.replace(/s$/, '');
+  }
 
-      const invalidXML = '<Patient><name>Not a CodeSystem</name></Patient>';
-      expect(MockCodeSystemXML.isValidCodeSystemXML(invalidXML)).toBe(false);
-    });
+  /**
+   * Validates that XML string is a FHIR CodeSystem
+   * @param {string} xmlString - XML string to validate
+   * @returns {boolean} True if valid FHIR CodeSystem XML
+   */
+  static isValidCodeSystemXML(xmlString) {
+    try {
+      // Basic check for CodeSystem root element and namespace
+      return xmlString.includes('<CodeSystem') &&
+        xmlString.includes('http://hl7.org/fhir') &&
+        xmlString.includes('</CodeSystem>');
+    } catch (error) {
+      return false;
+    }
+  }
 
-    test('should load CodeSystem from R5 XML', () => {
-      const cs = MockCodeSystemXML.fromXML(r5CodeSystemXML, 'R5');
+  /**
+   * Gets XML parser/builder library info for debugging
+   * @returns {Object} Library information
+   */
+  static getLibraryInfo() {
+    return {
+      library: 'fast-xml-parser',
+      features: [
+        'High performance XML parsing',
+        'Configurable array detection',
+        'FHIR attribute handling',
+        'Namespace support',
+        'Bidirectional conversion'
+      ]
+    };
+  }
+}
 
-      expect(cs.getFHIRVersion()).toBe('R5');
-      expect(cs.jsonObj.url).toBe('http://example.org/fhir/CodeSystem/xml-test');
-      expect(cs.jsonObj.name).toBe('XMLTestCodeSystem');
-      expect(cs.jsonObj.versionAlgorithmString).toBe('semver');
-
-      // Check identifier array
-      expect(Array.isArray(cs.jsonObj.identifier)).toBe(true);
-      expect(cs.jsonObj.identifier.length).toBe(2);
-      expect(cs.jsonObj.identifier[0].value).toBe('xml-test-1');
-
-      // Check filter operator array
-      expect(cs.jsonObj.filter[0].operator).toContain('generalizes');
-      expect(cs.jsonObj.filter[0].operator).toContain('=');
-
-      // Check concept hierarchy
-      expect(cs.hasCode('parent')).toBe(true);
-      expect(cs.hasCode('child1')).toBe(true);
-      expect(cs.getChildren('parent')).toContain('child1');
-      expect(cs.getChildren('parent')).toContain('child2');
-    });
-
-    test('should load CodeSystem from R3 XML with identifier conversion', () => {
-      const cs = MockCodeSystemXML.fromXML(r3CodeSystemXML, 'R3');
-
-      expect(cs.getFHIRVersion()).toBe('R3');
-      expect(cs.hasCode('test-concept')).toBe(true);
-
-      // Should have converted single identifier to array internally
-      expect(Array.isArray(cs.jsonObj.identifier)).toBe(true);
-      expect(cs.jsonObj.identifier.length).toBe(1);
-      expect(cs.jsonObj.identifier[0].value).toBe('r3-identifier');
-    });
-
-    test('should convert CodeSystem to R5 XML', () => {
-      const cs = MockCodeSystemXML.fromXML(r5CodeSystemXML, 'R5');
-      const xmlOutput = MockCodeSystemXML.toXMLString(cs, 'R5');
-
-      expect(xmlOutput).toContain('<CodeSystem xmlns="http://hl7.org/fhir">');
-      expect(xmlOutput).toContain('<url value="http://example.org/fhir/CodeSystem/xml-test"/>');
-      expect(xmlOutput).toContain('<versionAlgorithmString value="semver"/>');
-      expect(xmlOutput).toContain('<operator value="generalizes"/>');
-
-      // Should have multiple identifier elements
-      const identifierMatches = xmlOutput.match(/<identifier>/g);
-      expect(identifierMatches).toHaveLength(2);
-    });
-
-    test('should convert CodeSystem to R4 XML without R5 elements', () => {
-      const cs = MockCodeSystemXML.fromXML(r5CodeSystemXML, 'R5');
-      const xmlOutput = MockCodeSystemXML.toXMLString(cs, 'R4');
-
-      expect(xmlOutput).toContain('<CodeSystem xmlns="http://hl7.org/fhir">');
-      expect(xmlOutput).not.toContain('versionAlgorithmString');
-      expect(xmlOutput).not.toContain('<operator value="generalizes"/>');
-      expect(xmlOutput).toContain('<operator value="="/>');
-      expect(xmlOutput).toContain('<operator value="is-a"/>');
-
-      // Should still have multiple identifier elements in R4
-      const identifierMatches = xmlOutput.match(/<identifier>/g);
-      expect(identifierMatches).toHaveLength(2);
-    });
-
-    test('should convert CodeSystem to R3 XML with single identifier', () => {
-      const cs = MockCodeSystemXML.fromXML(r5CodeSystemXML, 'R5');
-      const xmlOutput = MockCodeSystemXML.toXMLString(cs, 'R3');
-
-      expect(xmlOutput).toContain('<CodeSystem xmlns="http://hl7.org/fhir">');
-      expect(xmlOutput).not.toContain('versionAlgorithmString');
-      expect(xmlOutput).not.toContain('<operator value="generalizes"/>');
-
-      // Should have only one identifier element in R3
-      const identifierMatches = xmlOutput.match(/<identifier>/g);
-      expect(identifierMatches).toHaveLength(1);
-      expect(xmlOutput).toContain('<value value="xml-test-1"/>'); // First identifier
-    });
-
-    test('should handle nested concepts in XML', () => {
-      const cs = MockCodeSystemXML.fromXML(r5CodeSystemXML, 'R5');
-
-      // Check that nested concepts are properly parsed
-      expect(cs.hasCode('parent')).toBe(true);
-      expect(cs.hasCode('child1')).toBe(true);
-      expect(cs.hasCode('child2')).toBe(true);
-      expect(cs.hasCode('standalone')).toBe(true);
-
-      // Check hierarchy relationships
-      expect(cs.getChildren('parent')).toEqual(['child1', 'child2']);
-      expect(cs.getParents('child1')).toEqual(['parent']);
-      expect(cs.getRootConcepts()).toEqual(['parent', 'standalone']);
-    });
-
-    test('should handle filter operators array correctly', () => {
-      const cs = MockCodeSystemXML.fromXML(r5CodeSystemXML, 'R5');
-
-      // Check that operators are properly parsed as array
-      expect(cs.jsonObj.filter).toHaveLength(1);
-      expect(Array.isArray(cs.jsonObj.filter[0].operator)).toBe(true);
-      expect(cs.jsonObj.filter[0].operator).toEqual(['=', 'is-a', 'generalizes', 'regex']);
-    });
-
-    test('should round-trip conversion preserve data', () => {
-      // R5: XML -> CodeSystem -> XML
-      const cs = MockCodeSystemXML.fromXML(r5CodeSystemXML, 'R5');
-      const xmlOutput = MockCodeSystemXML.toXMLString(cs, 'R5');
-      const cs2 = MockCodeSystemXML.fromXML(xmlOutput, 'R5');
-
-      expect(cs2.jsonObj.url).toBe(cs.jsonObj.url);
-      expect(cs2.jsonObj.name).toBe(cs.jsonObj.name);
-      expect(cs2.getAllCodes()).toEqual(cs.getAllCodes());
-      expect(cs2.jsonObj.versionAlgorithmString).toBe(cs.jsonObj.versionAlgorithmString);
-    });
-
-    test('should handle cross-version XML conversion', () => {
-      // Load R3 XML, output as R4 XML
-      const cs = MockCodeSystemXML.fromXML(r3CodeSystemXML, 'R3');
-      const r4XML = MockCodeSystemXML.toXMLString(cs, 'R4');
-
-      expect(r4XML).toContain('<CodeSystem xmlns="http://hl7.org/fhir">');
-      expect(r4XML).toContain('<identifier>'); // Should still have identifier
-
-      // Load the R4 XML back
-      const cs2 = MockCodeSystemXML.fromXML(r4XML, 'R4');
-      expect(cs2.hasCode('test-concept')).toBe(true);
-      expect(cs2.getFHIRVersion()).toBe('R4');
-    });
-
-    test('should handle empty or minimal CodeSystems', () => {
-      const minimalXML = `<?xml version="1.0" encoding="UTF-8"?>
-<CodeSystem xmlns="http://hl7.org/fhir">
-  <url value="http://example.org/minimal"/>
-  <name value="Minimal"/>
-  <status value="draft"/>
-</CodeSystem>`;
-
-      const cs = MockCodeSystemXML.fromXML(minimalXML, 'R5');
-      expect(cs.jsonObj.url).toBe('http://example.org/minimal');
-      expect(cs.getAllCodes()).toEqual([]);
-
-      const xmlOutput = MockCodeSystemXML.toXMLString(cs, 'R4');
-      expect(xmlOutput).toContain('<name value="Minimal"/>');
-    });
-  });
-
-  describe('Performance and Memory', () => {
-    test('should handle large code systems efficiently', () => {
-      // Create a large code system
-      const largeConcepts = [];
-      for (let i = 0; i < 1000; i++) {
-        largeConcepts.push({
-          code: `code-${i}`,
-          display: `Display ${i}`,
-          property: i > 0 ? [{ code: "parent", valueCode: `code-${i-1}` }] : []
-        });
-      }
-
-      const largeCS = {
-        "resourceType": "CodeSystem",
-        "url": "http://example.org/large",
-        "name": "LargeCodeSystem",
-        "status": "active",
-        "concept": largeConcepts
-      };
-
-      const start = performance.now();
-      const cs = new CodeSystem(largeCS);
-      const constructTime = performance.now() - start;
-
-      // Construction should be reasonably fast (less than 1 second)
-      expect(constructTime).toBeLessThan(1000);
-
-      // Lookups should be fast
-      const lookupStart = performance.now();
-      const concept = cs.getConceptByCode("code-500");
-      const lookupTime = performance.now() - lookupStart;
-
-      expect(concept).toBeDefined();
-      expect(lookupTime).toBeLessThan(10); // Should be very fast with Map lookup
-    });
-  });
-});
+module.exports = CodeSystemXML;

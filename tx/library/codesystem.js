@@ -281,11 +281,13 @@ class CodeSystem {
       throw new Error(`Invalid CodeSystem: status must be one of ${validStatuses.join(', ')}, got "${this.jsonObj.status}"`);
     }
 
-    // Validate identifier - should be array in R4/R5, but we accept both formats after conversion
+    // Validate identifier - could be object (R3) or array (R4/R5)
     if (this.jsonObj.identifier) {
+      // Convert single identifier object to array if needed (for R3)
       if (!Array.isArray(this.jsonObj.identifier)) {
-        throw new Error('Invalid CodeSystem: identifier should be an array (converted from R3 format)');
+        this.jsonObj.identifier = [this.jsonObj.identifier];
       }
+
       // Validate each identifier in the array
       this.jsonObj.identifier.forEach((identifier, index) => {
         if (!identifier || typeof identifier !== 'object') {
@@ -499,6 +501,7 @@ class CodeSystem {
    */
   getAncestors(code) {
     const ancestors = new Set();
+    const visited = new Set([code]); // Track visited codes to handle circular references
     const toProcess = [code];
 
     while (toProcess.length > 0) {
@@ -506,7 +509,8 @@ class CodeSystem {
       const parents = this.getParents(current);
 
       parents.forEach(parent => {
-        if (!ancestors.has(parent)) {
+        if (!visited.has(parent)) {
+          visited.add(parent);
           ancestors.add(parent);
           toProcess.push(parent);
         }
@@ -590,3 +594,5 @@ class CodeSystem {
     };
   }
 }
+
+module.exports = CodeSystem;
