@@ -298,23 +298,7 @@ MIGHAgEAMBMGByqGSM49AgEGCCqGSM49AwEHBG0wawIBAQQgtest
     
     return nock;
   }
-  
-  /**
-   * Create test data for SHL module (alias for backwards compatibility)
-   */
-  static createTestSHLData() {
-    const TestFixtures = require('../fixtures/test-data');
-    return TestFixtures.getShlTestData();
-  }
-  
-  /**
-   * Create test data for Packages module (alias for backwards compatibility)
-   */
-  static createTestPackageData() {
-    const TestFixtures = require('../fixtures/test-data');
-    return TestFixtures.getPackageTestData();
-  }
-  
+
   /**
    * Clean up test resources
    */
