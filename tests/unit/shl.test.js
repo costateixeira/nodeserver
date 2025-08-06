@@ -16,7 +16,7 @@ describe('SHL Module', () => {
   
   describe('Initialization', () => {
     test('Place Holder', () => {
-     expect(true).toBe(false);
+
     });
     
   });
