@@ -5,30 +5,59 @@
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
-    "dev": "nodemon server.js"
+    "dev": "nodemon server.js",
+    "test": "jest",
+    "test:watch": "jest --watch",
+    "test:coverage": "jest --coverage",
+    "test:ci": "jest --ci --coverage --watchAll=false --reporters=default --reporters=jest-junit",
+    "test:shl": "jest --testPathPattern=shl",
+    "test:vcl": "jest --testPathPattern=vcl",
+    "test:xig": "jest --testPathPattern=xig",
+    "test:packages": "jest --testPathPattern=packages",
+    "test:integration": "jest --testPathPattern=integration",
+    "test:unit": "jest --testPathPattern=unit",
+    "lint": "eslint . --ext .js --ignore-path .gitignore",
   },
   "dependencies": {
+    "axios": "^1.6.0",
     "base45": "^3.0.0",
     "cbor": "^9.0.1",
     "cors": "^2.8.5",
     "express": "^4.18.2",
-    "node-cron": "^3.0.2",
+    "fast-xml-parser": "^4.3.2",
+    "fhir-validator-wrapper": "1.0.0",
+    "node-cron": "^3.0.3",
     "pako": "^2.1.0",
-    "sqlite3": "^5.1.6",
-    "fhir-validator-wrapper" : "1.0.0",
-    "axios": "^1.6.0",
-    "fast-xml-parser": "^4.3.0",
-    "tar": "^6.2.0"
+    "sqlite3": "^5.1.7",
+    "tar": "^6.2.0",
+    "winston": "^3.11.0"
   },
   "devDependencies": {
-    "nodemon": "^3.0.1"
+    "@types/jest": "^29.5.8",
+    "eslint": "^8.55.0",
+    "jest": "^29.7.0",
+    "jest-environment-node": "^29.7.0",
+    "jest-junit": "^16.0.0",
+    "mock-fs": "^5.2.0",
+    "nock": "^13.4.0",
+    "nodemon": "^3.0.1",
+    "supertest": "^6.3.3",
+    "tmp": "^0.2.1"
+  },
+  "jest-junit": {
+    "outputDirectory": "./test-results",
+    "outputName": "junit.xml",
+    "classNameTemplate": "{classname}",
+    "titleTemplate": "{title}",
+    "ancestorSeparator": " › "
   },
   "keywords": [
-    "nodejs",
-    "express",
-    "sqlite",
+    "fhir",
+    "shc",
     "shl",
-    "smart-health-link"
+    "xig",
+    "smart-health-link",
+    "smart-health-card"
   ],
   "author": "",
   "license": "MIT"

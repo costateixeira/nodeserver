@@ -18,3 +18,5 @@ validator_cli.jar
 xig/xig-download.log
 
 .idea/codeStyles/
+
+logs/
