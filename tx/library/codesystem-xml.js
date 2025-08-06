@@ -542,10 +542,11 @@ class CodeSystemXML {
    */
   static isValidCodeSystemXML(xmlString) {
     try {
-      // Basic check for CodeSystem root element and namespace
-      return xmlString.includes('<CodeSystem') &&
-        xmlString.includes('http://hl7.org/fhir') &&
-        xmlString.includes('</CodeSystem>');
+      // More precise check using regular expressions
+      const rootElementRegex = /<CodeSystem\s+[^>]*xmlns\s*=\s*["']http:\/\/hl7\.org\/fhir["'][^>]*>/;
+      const closingTagRegex = /<\/CodeSystem>/;
+
+      return rootElementRegex.test(xmlString) && closingTagRegex.test(xmlString);
     } catch (error) {
       return false;
     }
