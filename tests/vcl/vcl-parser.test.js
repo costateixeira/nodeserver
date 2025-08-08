@@ -284,10 +284,48 @@ describe('VCL Parser', () => {
     expect(vs.compose.include.length).toBe(1);
   });
 
-  test('Nested filters should throw exception', () => {
-    expect(() => {
-      parseVCL('has_ingredient^(has_tradename=2201670)');
-    }).toThrow(VCLParseException);
+  test('"Of" operator with code', () => {
+    const vs = parseVCL('panadol.contains');
+
+    expect(vs).not.toBeNull();
+    expect(vs.compose.include.length).toBe(1);
+    const include = vs.compose.include[0];
+    expect(include.filter.length).toBe(1); // Should have 1 filter
+    
+    // Check the filters
+    const filter = include.filter[0];
+    expect(filter.property).toBe('contains');
+    expect(filter.value).toBe('panadol');
+    expect(filter._op.extension.length).toBe(1);
+  });
+
+  test('"Of" operator with code list', () => {
+    const vs = parseVCL('{panadol,herons}.contains');
+
+    expect(vs).not.toBeNull();
+    expect(vs.compose.include.length).toBe(1);
+    const include = vs.compose.include[0];
+    expect(include.filter.length).toBe(1); // Should have 1 filter
+    
+    // Check the filters
+    const filter = include.filter[0];
+    expect(filter.property).toBe('contains');
+    expect(filter.value).toBe('panadol,herons');
+    expect(filter._op.extension.length).toBe(1);
+  });
+
+  test('Nested filters', () => {
+    const vs = parseVCL('(http://example.com/CodeSystem/a)has_ingredient^{has_tradename=2201670}');
+
+    expect(vs).not.toBeNull();
+    expect(vs.compose.include.length).toBe(1);
+    const include = vs.compose.include[0];
+    expect(include.filter.length).toBe(1); // Should have 1 filter
+
+    // Check the filter
+    expect(include.filter[0].property).toBe('has_ingredient');
+    expect(include.filter[0].op).toBe('in');
+    expect(include.filter[0].value.replaceAll('%3A',':').replaceAll('%2F','/')).toBe('http://fhir.org/VCL?v1=%28http://example.com/CodeSystem/a%29%28has_tradename%3D2201670%29');
   });
 
   test('Multiple filters with commas', () => {

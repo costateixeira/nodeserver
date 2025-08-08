@@ -22,6 +22,8 @@ const TokenType = {
   DASH: 'DASH',
   OPEN: 'OPEN',
   CLOSE: 'CLOSE',
+  LCRLY: 'LCRLY',
+  RCRLY: 'RCRLY',
   SEMI: 'SEMI',
   COMMA: 'COMMA',
   DOT: 'DOT',
@@ -73,6 +75,10 @@ class VCLLexer {
   constructor(input) {
     this.input = input.trim();
     this.pos = 0;
+  }
+
+  current() {
+    return this.pos < this.input.length ? this.input[this.pos] : '\0';
   }
 
   peek(offset = 0) {
@@ -188,6 +194,14 @@ class VCLLexer {
           tokens.push(new Token(TokenType.CLOSE, ')', startPos));
           this.pos++;
           break;
+        case '{':
+          tokens.push(new Token(TokenType.LCRLY, '{', startPos));
+          this.pos++;
+          break;
+        case '}':
+          tokens.push(new Token(TokenType.RCRLY, '}', startPos));
+          this.pos++;
+          break;
         case ';':
           tokens.push(new Token(TokenType.SEMI, ';', startPos));
           this.pos++;
@@ -264,12 +278,13 @@ class VCLLexer {
           break;
         default:
           if (/[a-zA-Z]/.test(ch)) {
-            const value = this.readIdentifierChars();
+            const value = this.readCodeChars();
 
-            if (value.includes(':')) {
+            if (this.current() === ':') {
+              this.pos++;
               // Read rest of URI
               const uriRest = this.readUriChars();
-              let fullValue = value + uriRest;
+              let fullValue = value + ':' + uriRest;
 
               // Check for version
               if (this.pos < this.input.length && this.input[this.pos] === '|') {
@@ -426,6 +441,13 @@ class VCLParserClass {
     return list.length > 0 ? list[list.length - 1] : this.createConceptSet('', isExclusion);
   }
 
+  toImplicitVcl(system, expression) {
+    return 'http://fhir.org/VCL?v1='
+      + encodeURIComponent(`(${system})(${expression})`)
+        .replace(/\(/g, '%28')
+        .replace(/\)/g, '%29'); // need to encode parentheses for VCL as well
+  }
+
   parseExpr() {
     this.parseSubExpr(false);
 
@@ -518,7 +540,9 @@ class VCLParserClass {
   parseSimpleExpr(systemUri, isExclusion) {
     const conceptSet = this.createConceptSet(systemUri, isExclusion);
 
-    if (this.current().type === TokenType.STAR) {
+    if (this.peek().type === TokenType.DOT) {
+      this.parseOf(systemUri, conceptSet);
+    } else if (this.current().type === TokenType.STAR) {
       this.consume(TokenType.STAR);
       conceptSet.filter.push({
         property: 'concept',
@@ -526,18 +550,82 @@ class VCLParserClass {
         value: 'true'
       });
     } else if ([TokenType.SCODE, TokenType.QUOTED_VALUE].includes(this.current().type)) {
-      const code = this.parseCode();
-
-      if (this.isFilterOperator(this.current().type)) {
-        this.parseFilter(conceptSet, code);
+      if (this.current().type === TokenType.SCODE && this.current().value.includes('.')) {
+        this.parseOf(systemUri, conceptSet);
       } else {
-        conceptSet.concept.push({code});
+        const code = this.parseCode();
+
+        if (this.isFilterOperator(this.current().type)) {
+          this.parseFilter(conceptSet, code);
+        } else {
+          conceptSet.concept.push({ code });
+        }
       }
     } else if (this.current().type === TokenType.IN) {
       this.parseIncludeVs(conceptSet);
     } else {
-      throw new VCLParseException('Expected code, filter, or include', this.current().position);
+      this.parseOf(systemUri, conceptSet);
     }
+  }
+
+  parseOf(systemUri, conceptSet) {
+    let isVcl = false;
+    const sb = [];
+
+    switch (this.current().type) {
+      case TokenType.LCRLY: {
+        // codeList or filterList
+        this.consume(TokenType.LCRLY);
+        if (this.peek().type === TokenType.COMMA) {
+          sb.push(this.parseCode());
+          while (this.current().type === TokenType.COMMA) {
+            this.consume(TokenType.COMMA);
+            sb.push(this.parseCode());
+          }
+        } else {
+          isVcl = true;
+          this.parseFilterList(sb);
+        }
+        this.consume(TokenType.RCRLY);
+        break;
+      }
+      case TokenType.STAR: {
+        sb.push(this.current().value);
+        this.consume(TokenType.STAR);
+        break;
+      }
+      case TokenType.URI: {
+        sb.push(this.current().value);
+        this.consume(TokenType.URI);
+        break;
+      }
+      case TokenType.SCODE:
+      case TokenType.QUOTED_VALUE: {
+        sb.push(this.current().value);
+        this.parseCode();
+        break;
+      }
+      default:
+        throw new VCLParseException("Expected code, codeList, STAR, URI or filterList", this.current().position);
+    }
+
+    this.consume(TokenType.DOT);
+
+    const property = this.parseCode();
+    const implicitVcl = isVcl ? this.toImplicitVcl(systemUri, sb.join(',')) : sb.join(',');
+
+    conceptSet.filter.push({
+      property: property,
+      op: FilterOperator.EQUAL, // FIXME: Is this really the value to use?
+      _op: {
+        extension: [{
+          // WARNING: pre-adopting an extension that may change in before R6
+          url: 'http://hl7.org/fhir/6.0/StructureDefinition/extension-ValueSet.compose.include.filter.op',
+          valueString: 'of'
+        }]
+      },
+      value: implicitVcl,
+    });
   }
 
   parseExprWithinParentheses(isExclusion) {
@@ -583,7 +671,7 @@ class VCLParserClass {
         break;
       case TokenType.IN:
       case TokenType.NOT_IN:
-        filter.value = this.parseFilterValue();
+        filter.value = this.parseFilterValue(conceptSet.system);
         break;
       default:
         throw new VCLParseException(`Unexpected filter operator: ${op}`, this.current().position);
@@ -713,24 +801,53 @@ class VCLParserClass {
     return obj;
   }
 
-  parseFilterValue() {
-    if (this.current().type === TokenType.OPEN) {
-      this.consume(TokenType.OPEN);
+  parseFilterValue(systemUri) {
+    if (this.current().type === TokenType.LCRLY) {
+      this.consume(TokenType.LCRLY);
       const codes = [this.parseCode()];
 
-      while (this.current().type === TokenType.COMMA) {
-        this.consume(TokenType.COMMA);
-        codes.push(this.parseCode());
-      }
+      if (this.isFilterOperator(this.current().type)) {
+        this.parseFilterList(codes);
+        this.consume(TokenType.RCRLY);
+        return this.toImplicitVcl(systemUri, codes.join(''));
+      } else {
+        while (this.current().type === TokenType.COMMA) {
+          this.consume(TokenType.COMMA);
+          codes.push(this.parseCode());
+        }
 
-      this.consume(TokenType.CLOSE);
-      return codes.join(',');
+        this.consume(TokenType.RCRLY);
+        return codes.join(',');
+      }
     } else if (this.current().type === TokenType.URI) {
       const uri = this.current().value;
       this.consume(TokenType.URI);
       return uri;
     } else {
       return this.parseCode();
+    }
+  }
+
+  parseFilterList(terms) {
+    let depth = 1;
+    while (depth > 0) {
+      const tokenType = this.current().type;
+
+      switch (tokenType) {
+        case TokenType.LCRLY:
+          depth++;
+          break;
+        case TokenType.RCRLY:
+          depth--;
+          break;
+        default:
+        // do nothing
+      }
+
+      if (depth > 0) {
+        terms.push(this.current().value);
+        this.consume(tokenType);
+      }
     }
   }
 
@@ -959,7 +1076,7 @@ const valueSet = parseVCL('(http://snomed.info/sct) 123456789; 987654321');
 const valueSet2 = parseVCL('(http://snomed.info/sct) 123456789 << 64572001');
 
 // With version and exclusions
-const valueSet3 = parseVCL('(http://snomed.info/sct|20210131) * - 123456789');
+const valueSet3 = parseVCL('(http://snomed-alike.info/sct|20210131) * - 123456789');
 
 // With auto-generated ID
 const valueSet4 = parseVCLAndSetId('(http://snomed.info/sct) 123456789');
