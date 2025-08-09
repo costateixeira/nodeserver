@@ -36,7 +36,229 @@ class SHLModule {
     this.router = express.Router();
     this.cleanupJob = null;
     this.fhirValidator = null;
+    this.setupSecurityMiddleware();
     this.setupRoutes();
+  }
+
+  setupSecurityMiddleware() {
+    // Security headers middleware
+    this.router.use((req, res, next) => {
+      res.setHeader('X-Content-Type-Options', 'nosniff');
+      res.setHeader('X-Frame-Options', 'DENY');
+      res.setHeader('X-XSS-Protection', '1; mode=block');
+      res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
+      res.setHeader('Content-Security-Policy', [
+        "default-src 'self'",
+        "script-src 'self' 'unsafe-inline'",
+        "style-src 'self' 'unsafe-inline'",
+        "img-src 'self' data: https:",
+        "font-src 'self'",
+        "connect-src 'self'",
+        "frame-ancestors 'none'"
+      ].join('; '));
+      res.removeHeader('X-Powered-By');
+      next();
+    });
+  }
+
+  // Parameter validation middleware
+  validateQueryParams(allowedParams = {}) {
+    return (req, res, next) => {
+      try {
+        const normalized = {};
+        
+        for (const [key, value] of Object.entries(req.query)) {
+          if (Array.isArray(value)) {
+            return res.status(400).json({ 
+              error: 'Parameter pollution detected',
+              parameter: key 
+            });
+          }
+          
+          if (allowedParams[key]) {
+            const config = allowedParams[key];
+            
+            if (value !== undefined) {
+              if (typeof value !== 'string') {
+                return res.status(400).json({ 
+                  error: `Parameter ${key} must be a string` 
+                });
+              }
+              
+              if (value.length > (config.maxLength || 255)) {
+                return res.status(400).json({ 
+                  error: `Parameter ${key} too long (max ${config.maxLength || 255})` 
+                });
+              }
+              
+              if (config.pattern && !config.pattern.test(value)) {
+                return res.status(400).json({ 
+                  error: `Parameter ${key} has invalid format` 
+                });
+              }
+              
+              normalized[key] = value;
+            } else if (config.required) {
+              return res.status(400).json({ 
+                error: `Parameter ${key} is required` 
+              });
+            } else {
+              normalized[key] = config.default || '';
+            }
+          } else if (value !== undefined) {
+            return res.status(400).json({ 
+              error: `Unknown parameter: ${key}` 
+            });
+          }
+        }
+        
+        for (const [key, config] of Object.entries(allowedParams)) {
+          if (normalized[key] === undefined && !config.required) {
+            normalized[key] = config.default || '';
+          }
+        }
+        
+        req.query = normalized;
+        next();
+      } catch (error) {
+        shlLog.error('Parameter validation error:', error);
+        res.status(500).json({ error: 'Parameter validation failed' });
+      }
+    };
+  }
+
+  // Body validation middleware
+  validateJsonBody(requiredFields = [], optionalFields = []) {
+    return (req, res, next) => {
+      try {
+        if (!req.body || typeof req.body !== 'object') {
+          return res.status(400).json({ error: 'Request body must be JSON object' });
+        }
+
+        // Check for required fields
+        for (const field of requiredFields) {
+          if (req.body[field] === undefined || req.body[field] === null) {
+            return res.status(400).json({ error: `Missing required field: ${field}` });
+          }
+        }
+
+        // Validate known fields
+        const allowedFields = [...requiredFields, ...optionalFields];
+        for (const [key, value] of Object.entries(req.body)) {
+          if (!allowedFields.includes(key)) {
+            return res.status(400).json({ error: `Unknown field: ${key}` });
+          }
+
+          // Basic type validation
+          if (key === 'vhl' && typeof value !== 'boolean') {
+            return res.status(400).json({ error: 'vhl must be boolean' });
+          }
+          
+          if ((key === 'password' || key === 'pword') && typeof value !== 'string') {
+            return res.status(400).json({ error: `${key} must be string` });
+          }
+          
+          if (key === 'days') {
+            const daysNum = typeof value === 'string' ? parseInt(value, 10) : value;
+            if (isNaN(daysNum) || daysNum < 1 || daysNum > 365) {
+              return res.status(400).json({ error: 'days must be between 1 and 365' });
+            }
+            req.body[key] = daysNum; // Normalize to number
+          }
+          
+          if (key === 'files' && !Array.isArray(value)) {
+            return res.status(400).json({ error: 'files must be array' });
+          }
+
+          // String length limits
+          if (typeof value === 'string') {
+            const maxLengths = {
+              password: 100,
+              pword: 100,
+              uuid: 50,
+              url: 2000,
+              packageId: 100,
+              version: 50,
+              recipient: 100,
+              embeddedLengthMax: 10
+            };
+            
+            if (maxLengths[key] && value.length > maxLengths[key]) {
+              return res.status(400).json({ 
+                error: `${key} too long (max ${maxLengths[key]})` 
+              });
+            }
+          }
+        }
+
+        next();
+      } catch (error) {
+        shlLog.error('Body validation error:', error);
+        res.status(500).json({ error: 'Request validation failed' });
+      }
+    };
+  }
+
+  // Secure comparison function
+  secureCompare(a, b) {
+    if (typeof a !== 'string' || typeof b !== 'string') {
+      return false;
+    }
+    
+    if (a.length !== b.length) {
+      // Still do a comparison to prevent timing attacks
+      crypto.timingSafeEqual(Buffer.from(a), Buffer.from(a));
+      return false;
+    }
+    
+    try {
+      return crypto.timingSafeEqual(Buffer.from(a), Buffer.from(b));
+    } catch (error) {
+      return false;
+    }
+  }
+
+  // Enhanced HTML escaping
+  escapeHtml(str) {
+    if (!str || typeof str !== 'string') return '';
+    
+    const escapeMap = {
+      '&': '&amp;',
+      '<': '&lt;',
+      '>': '&gt;',
+      '"': '&quot;',
+      "'": '&#x27;',
+      '/': '&#x2F;',
+      '`': '&#x60;',
+      '=': '&#x3D;'
+    };
+    
+    return str.replace(/[&<>"'`=\/]/g, (match) => escapeMap[match]);
+  }
+
+  // URL validation
+  validateExternalUrl(url) {
+    try {
+      const parsed = new URL(url);
+      
+      if (!['http:', 'https:'].includes(parsed.protocol)) {
+        throw new Error(`Protocol ${parsed.protocol} not allowed`);
+      }
+      
+      // Block private IP ranges
+      const hostname = parsed.hostname;
+      if (hostname === 'localhost' || 
+          hostname === '127.0.0.1' ||
+          hostname.startsWith('10.') ||
+          hostname.startsWith('192.168.') ||
+          /^172\.(1[6-9]|2[0-9]|3[01])\./.test(hostname)) {
+        throw new Error('Private IP addresses not allowed');
+      }
+      
+      return parsed;
+    } catch (error) {
+      throw new Error(`Invalid URL: ${error.message}`);
+    }
   }
 
   async initialize(config) {
@@ -58,7 +280,8 @@ class SHLModule {
 
   async initializeDatabase() {
     return new Promise((resolve, reject) => {
-      const dbPath = path.join(__dirname, this.config.database);
+      const dbPath = path.resolve(__dirname, this.config.database);
+
       this.db = new sqlite3.Database(dbPath, (err) => {
         if (err) {
           shlLog.error('Error opening SHL SQLite database at "'+dbPath+'":', err.message);
@@ -185,8 +408,14 @@ class SHLModule {
 
   loadCertificates() {
     try {
-      const certPath = path.join(__dirname, this.config.certificates.certFile);
-      const keyPath = path.join(__dirname, this.config.certificates.keyFile);
+      const certPath = path.resolve(__dirname, this.config.certificates.certFile);
+      const keyPath = path.resolve(__dirname, this.config.certificates.keyFile);
+      
+      // Validate paths to prevent directory traversal
+      if (!certPath.startsWith(path.resolve(__dirname)) || 
+          !keyPath.startsWith(path.resolve(__dirname))) {
+        throw new Error('Certificate paths outside allowed directory');
+      }
       
       const certPem = fs.readFileSync(certPath, 'utf8');
       const keyPem = fs.readFileSync(keyPath, 'utf8');
@@ -326,9 +555,17 @@ class SHLModule {
   }
 
   setupRoutes() {
+    // Validation parameter configs
+    const validationParams = {
+      profiles: { maxLength: 500, pattern: /^[a-zA-Z0-9.:/_,-]*$/ },
+      resourceIdRule: { maxLength: 50, pattern: /^[a-zA-Z0-9_-]*$/ },
+      anyExtensionsAllowed: { maxLength: 10, pattern: /^(true|false)?$/ },
+      bpWarnings: { maxLength: 50, pattern: /^[a-zA-Z0-9_-]*$/ },
+      displayOption: { maxLength: 50, pattern: /^[a-zA-Z0-9_-]*$/ }
+    };
+
     // FHIR Validation endpoint
-    this.router.post('/validate', async (req, res) => {
-      shlLog.info("validate! (1)");
+    this.router.post('/validate', this.validateQueryParams(validationParams), async (req, res) => {
       if (!this.fhirValidator || !this.fhirValidator.isRunning()) {
         return res.status(503).json({
           resourceType: 'OperationOutcome',
@@ -401,7 +638,7 @@ class SHLModule {
     });
 
     // Load additional IG endpoint
-    this.router.post('/validate/loadig', async (req, res) => {
+    this.router.post('/validate/loadig', this.validateJsonBody(['packageId', 'version']), async (req, res) => {
       if (!this.fhirValidator || !this.fhirValidator.isRunning()) {
         return res.status(503).json({
           resourceType: 'OperationOutcome',
@@ -443,7 +680,7 @@ class SHLModule {
     });
 
     // SHL create endpoint
-    this.router.post('/create', (req, res) => {
+    this.router.post('/create', this.validateJsonBody(['vhl', 'password', 'days']), (req, res) => {
       const { vhl, password, days } = req.body;
       
       if (typeof vhl !== 'boolean' || !password) {
@@ -483,7 +720,7 @@ class SHLModule {
       
       this.db.run(insertSql, [uuid, vhl, expiryDateString, newPassword], function(err) {
         if (err) {
-          return res.status(500).json({ error: 'Failed to create SHL entry: ' + err });
+          return res.status(500).json({ error: 'Failed to create SHL entry: ' + err.message });
         }
         
         const host = req.get('host') || 'localhost:3000';
@@ -497,7 +734,7 @@ class SHLModule {
     });
 
     // SHL upload endpoint
-    this.router.post('/upload', (req, res) => {
+    this.router.post('/upload', this.validateJsonBody(['uuid', 'pword', 'files']), (req, res) => {
       const { uuid, pword, files } = req.body;
       
       if (!uuid || !pword || !Array.isArray(files)) {
@@ -648,11 +885,16 @@ class SHLModule {
 
     // SHL access endpoint - supports both GET and POST
     this.router.get('/access/:uuid', handleSHLAccess);
-    this.router.post('/access/:uuid', handleSHLAccess);
+    this.router.post('/access/:uuid', this.validateJsonBody(['recipient'], ['embeddedLengthMax']), handleSHLAccess);
 
     // SHL file endpoint - serves individual files
     this.router.get('/file/:fileId', (req, res) => {
       const { fileId } = req.params;
+      
+      // Validate fileId format
+      if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(fileId)) {
+        return res.status(400).json({ error: 'Invalid file ID format' });
+      }
       
       const clientIP = req.ip || req.connection.remoteAddress || req.socket.remoteAddress || 
         (req.connection.socket ? req.connection.socket.remoteAddress : null) ||
@@ -695,7 +937,7 @@ class SHLModule {
     });
 
     // SHL sign endpoint
-    this.router.post('/sign', async (req, res) => {
+    this.router.post('/sign', this.validateJsonBody(['url']), async (req, res) => {
       const { url } = req.body;
       
       if (!url || typeof url !== 'string') {
@@ -705,6 +947,9 @@ class SHLModule {
       }
       
       try {
+        // Validate URL
+        this.validateExternalUrl(url);
+        
         const { certPem, keyPem } = this.loadCertificates();
         const { kid } = this.config.certificates;
         const { issuer } = this.config.vhl;
@@ -785,7 +1030,7 @@ class SHLModule {
       } catch (error) {
         shlLog.error('SHL sign error:', error);
         res.status(500).json({
-          error: 'Failed to sign URL'
+          error: 'Failed to sign URL: ' + error.message
         });
       }
     });

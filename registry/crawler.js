@@ -619,7 +619,7 @@ class RegistryCrawler {
    * @param {string} level - Filter by log level
    * @returns {Array} Array of log entries
    */
-  getLogs(limit = 100, level = null)
+  getLogs(limit = 100)
   {
     if (!this.logs) {
       return [];
@@ -627,9 +627,6 @@ class RegistryCrawler {
 
     // Filter by level if specified
     let filteredLogs = this.logs;
-    if (level) {
-      filteredLogs = this.logs.filter(entry => entry.level === level);
-    }
 
     // Get the latest entries up to the limit
     return filteredLogs.slice(-limit);

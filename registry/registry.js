@@ -931,6 +931,27 @@ class RegistryModule {
     this.logger.info('Registry module shut down');
   }
 
+
+  /**
+   * Validate a URL string for safety
+   * @param {string} url - URL to validate
+   * @param {Array} allowedProtocols - Array of allowed protocols (default: ['http:', 'https:'])
+   * @returns {boolean} True if URL is valid and safe
+   */
+  _isValidUrl(url, allowedProtocols = ['http:', 'https:']) {
+    if (!url || typeof url !== 'string') {
+      return false;
+    }
+
+    try {
+      const urlObj = new URL(url);
+      return allowedProtocols.includes(urlObj.protocol);
+    } catch (e) {
+      // URL parsing failed
+      return false;
+    }
+  }
+
   /**
    * Handle resolve endpoint for browser users
    * Serves a form when accessed directly from a browser
@@ -1250,7 +1271,7 @@ class RegistryModule {
       const limit = isNaN(requestedLimit) ? 100 : Math.min(requestedLimit, 1000);
 
       // Get logs from crawler
-      const logs = this.crawler.getLogs(limit, level);
+      const logs = this.crawler.getLogs(limit);
 
       // Determine response format based on Accept header
       const acceptsHtml = req.headers.accept && req.headers.accept.includes('text/html');

@@ -51,6 +51,462 @@ const cacheEmitter = new EventEmitter();
 // Cache loading lock to prevent concurrent loads
 let cacheLoadInProgress = false;
 
+// Security Middleware Setup
+function setupSecurityMiddleware() {
+  // Security headers middleware
+  router.use((req, res, next) => {
+    res.setHeader('X-Content-Type-Options', 'nosniff');
+    res.setHeader('X-Frame-Options', 'DENY');
+    res.setHeader('X-XSS-Protection', '1; mode=block');
+    res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
+    res.setHeader('Content-Security-Policy', [
+      "default-src 'self'",
+      "script-src 'self' 'unsafe-inline'",
+      "style-src 'self' 'unsafe-inline'",
+      "img-src 'self' data: https:",
+      "font-src 'self'",
+      "connect-src 'self'",
+      "frame-ancestors 'none'"
+    ].join('; '));
+    res.removeHeader('X-Powered-By');
+    next();
+  });
+
+}
+
+// Parameter validation middleware
+function validateQueryParams(allowedParams = {}) {
+  return (req, res, next) => {
+    try {
+      const normalized = {};
+      
+      // Check for parameter pollution (arrays) and validate
+      for (const [key, value] of Object.entries(req.query)) {
+        if (Array.isArray(value)) {
+          return res.status(400).json({ 
+            error: 'Parameter pollution detected',
+            parameter: key 
+          });
+        }
+        
+        if (allowedParams[key]) {
+          const config = allowedParams[key];
+          
+          if (value !== undefined) {
+            if (typeof value !== 'string') {
+              return res.status(400).json({ 
+                error: `Parameter ${key} must be a string` 
+              });
+            }
+            
+            if (value.length > (config.maxLength || 255)) {
+              return res.status(400).json({ 
+                error: `Parameter ${key} too long (max ${config.maxLength || 255})` 
+              });
+            }
+            
+            if (config.pattern && !config.pattern.test(value)) {
+              return res.status(400).json({ 
+                error: `Parameter ${key} has invalid format` 
+              });
+            }
+            
+            normalized[key] = value;
+          } else if (config.required) {
+            return res.status(400).json({ 
+              error: `Parameter ${key} is required` 
+            });
+          } else {
+            normalized[key] = config.default || '';
+          }
+        } else if (value !== undefined) {
+          return res.status(400).json({ 
+            error: `Unknown parameter: ${key}` 
+          });
+        }
+      }
+      
+      // Set default values for missing optional parameters
+      for (const [key, config] of Object.entries(allowedParams)) {
+        if (normalized[key] === undefined && !config.required) {
+          normalized[key] = config.default || '';
+        }
+      }
+      
+      req.query = normalized;
+      next();
+    } catch (error) {
+      xigLog.error('Parameter validation error:', error);
+      res.status(500).json({ error: 'Parameter validation failed' });
+    }
+  };
+}
+
+// Enhanced HTML escaping
+function escapeHtml(text) {
+  if (typeof text !== 'string') {
+    return String(text);
+  }
+  
+  const map = {
+    '&': '&amp;',
+    '<': '&lt;',
+    '>': '&gt;',
+    '"': '&quot;',
+    "'": '&#x27;',
+    '/': '&#x2F;',
+    '`': '&#x60;',
+    '=': '&#x3D;'
+  };
+  
+  return text.replace(/[&<>"'`=\/]/g, function(m) { return map[m]; });
+}
+
+// URL validation for external requests
+function validateExternalUrl(url) {
+  try {
+    const parsed = new URL(url);
+    
+    // Only allow http and https
+    if (!['http:', 'https:'].includes(parsed.protocol)) {
+      throw new Error(`Protocol ${parsed.protocol} not allowed`);
+    }
+    
+    // Block private IP ranges
+    const hostname = parsed.hostname;
+    if (hostname === 'localhost' || 
+        hostname === '127.0.0.1' ||
+        hostname.startsWith('10.') ||
+        hostname.startsWith('192.168.') ||
+        /^172\.(1[6-9]|2[0-9]|3[01])\./.test(hostname)) {
+      throw new Error('Private IP addresses not allowed');
+    }
+    
+    return parsed;
+  } catch (error) {
+    throw new Error(`Invalid URL: ${error.message}`);
+  }
+}
+
+// Secure SQL query building with parameterized queries
+function buildSecureResourceQuery(queryParams, offset = 0, limit = 50) {
+  const { realm, auth, ver, type, rt, text } = queryParams;
+  
+  let baseQuery = `
+    SELECT 
+      ResourceKey, ResourceType, Type, Kind, Description, PackageKey,
+      Realm, Authority, R2, R2B, R3, R4, R4B, R5, R6,
+      Id, Url, Version, Status, Date, Name, Title, Content,
+      Supplements, Details, FMM, WG, StandardsStatus, Web
+    FROM Resources
+    WHERE 1=1
+  `;
+  
+  const conditions = [];
+  const params = [];
+  
+  // Realm filter
+  if (realm && realm !== '') {
+    conditions.push('AND realm = ?');
+    params.push(realm);
+  }
+  
+  // Authority filter
+  if (auth && auth !== '') {
+    conditions.push('AND authority = ?');
+    params.push(auth);
+  }
+  
+  // Version filter
+  if (ver) {
+    switch (ver) {
+      case 'R2':
+        conditions.push('AND R2 = 1');
+        break;
+      case 'R2B':
+        conditions.push('AND R2B = 1');
+        break;
+      case 'R3':
+        conditions.push('AND R3 = 1');
+        break;
+      case 'R4':
+        conditions.push('AND R4 = 1');
+        break;
+      case 'R4B':
+        conditions.push('AND R4B = 1');
+        break;
+      case 'R5':
+        conditions.push('AND R5 = 1');
+        break;
+      case 'R6':
+        conditions.push('AND R6 = 1');
+        break;
+    }
+  }
+  
+  // Type-specific filters
+  switch (type) {
+    case 'cs': // CodeSystem
+      conditions.push("AND ResourceType = 'CodeSystem'");
+      break;
+      
+    case 'rp': // Resource Profiles
+      conditions.push("AND ResourceType = 'StructureDefinition' AND kind = 'resource'");
+      if (rt && rt !== '' && hasCachedValue('profileResources', rt)) {
+        conditions.push('AND Type = ?');
+        params.push(rt);
+      }
+      break;
+      
+    case 'dp': // Datatype Profiles
+      conditions.push("AND ResourceType = 'StructureDefinition' AND (kind = 'complex-type' OR kind = 'primitive-type')");
+      if (rt && rt !== '' && hasCachedValue('profileTypes', rt)) {
+        conditions.push('AND Type = ?');
+        params.push(rt);
+      }
+      break;
+      
+    case 'lm': // Logical Models
+      conditions.push("AND ResourceType = 'StructureDefinition' AND kind = 'logical'");
+      break;
+      
+    case 'ext': // Extensions
+      conditions.push("AND ResourceType = 'StructureDefinition' AND Type = 'Extension'");
+      if (rt && rt !== '' && hasCachedValue('extensionContexts', rt)) {
+        conditions.push('AND ResourceKey IN (SELECT ResourceKey FROM Categories WHERE Mode = 2 AND Code = ?)');
+        params.push(rt);
+      }
+      break;
+      
+    case 'vs': // ValueSets
+      conditions.push("AND ResourceType = 'ValueSet'");
+      if (rt && rt !== '' && hasTerminologySource(rt)) {
+        conditions.push('AND ResourceKey IN (SELECT ResourceKey FROM Categories WHERE Mode = 1 AND Code = ?)');
+        params.push(rt);
+      }
+      break;
+      
+    case 'cm': // ConceptMaps
+      conditions.push("AND ResourceType = 'ConceptMap'");
+      if (rt && rt !== '' && hasTerminologySource(rt)) {
+        conditions.push('AND ResourceKey IN (SELECT ResourceKey FROM Categories WHERE Mode = 1 AND Code = ?)');
+        params.push(rt);
+      }
+      break;
+      
+    default:
+      // No specific type selected
+      if (rt && rt !== '' && hasCachedValue('resourceTypes', rt)) {
+        conditions.push('AND ResourceType = ?');
+        params.push(rt);
+      }
+      break;
+  }
+  
+  // Text search filter
+  if (text && text !== '') {
+    if (type === 'cs') {
+      conditions.push(`AND (ResourceKey IN (SELECT ResourceKey FROM ResourceFTS WHERE Description MATCH ? OR Narrative MATCH ?) 
+                      OR ResourceKey IN (SELECT ResourceKey FROM CodeSystemFTS WHERE Display MATCH ? OR Definition MATCH ?))`);
+      params.push(text, text, text, text);
+    } else {
+      conditions.push('AND ResourceKey IN (SELECT ResourceKey FROM ResourceFTS WHERE Description MATCH ? OR Narrative MATCH ?)');
+      params.push(text, text);
+    }
+  }
+  
+  // Build final query
+  const fullQuery = baseQuery + ' ' + conditions.join(' ') + ' ORDER BY ResourceType, Type, Description LIMIT ? OFFSET ?';
+  params.push(limit, offset);
+  
+  return { query: fullQuery, params };
+}
+
+function buildSecureResourceCountQuery(queryParams) {
+  const { realm, auth, ver, type, rt, text } = queryParams;
+  
+  let baseQuery = 'SELECT COUNT(*) as total FROM Resources WHERE 1=1';
+  const conditions = [];
+  const params = [];
+  
+  // Same conditions as main query but for counting
+  if (realm && realm !== '') {
+    conditions.push('AND realm = ?');
+    params.push(realm);
+  }
+  
+  if (auth && auth !== '') {
+    conditions.push('AND authority = ?');
+    params.push(auth);
+  }
+  
+  if (ver) {
+    switch (ver) {
+      case 'R2': conditions.push('AND R2 = 1'); break;
+      case 'R2B': conditions.push('AND R2B = 1'); break;
+      case 'R3': conditions.push('AND R3 = 1'); break;
+      case 'R4': conditions.push('AND R4 = 1'); break;
+      case 'R4B': conditions.push('AND R4B = 1'); break;
+      case 'R5': conditions.push('AND R5 = 1'); break;
+      case 'R6': conditions.push('AND R6 = 1'); break;
+    }
+  }
+  
+  switch (type) {
+    case 'cs':
+      conditions.push("AND ResourceType = 'CodeSystem'");
+      break;
+    case 'rp':
+      conditions.push("AND ResourceType = 'StructureDefinition' AND kind = 'resource'");
+      if (rt && rt !== '' && hasCachedValue('profileResources', rt)) {
+        conditions.push('AND Type = ?');
+        params.push(rt);
+      }
+      break;
+    case 'dp':
+      conditions.push("AND ResourceType = 'StructureDefinition' AND (kind = 'complex-type' OR kind = 'primitive-type')");
+      if (rt && rt !== '' && hasCachedValue('profileTypes', rt)) {
+        conditions.push('AND Type = ?');
+        params.push(rt);
+      }
+      break;
+    case 'lm':
+      conditions.push("AND ResourceType = 'StructureDefinition' AND kind = 'logical'");
+      break;
+    case 'ext':
+      conditions.push("AND ResourceType = 'StructureDefinition' AND Type = 'Extension'");
+      if (rt && rt !== '' && hasCachedValue('extensionContexts', rt)) {
+        conditions.push('AND ResourceKey IN (SELECT ResourceKey FROM Categories WHERE Mode = 2 AND Code = ?)');
+        params.push(rt);
+      }
+      break;
+    case 'vs':
+      conditions.push("AND ResourceType = 'ValueSet'");
+      if (rt && rt !== '' && hasTerminologySource(rt)) {
+        conditions.push('AND ResourceKey IN (SELECT ResourceKey FROM Categories WHERE Mode = 1 AND Code = ?)');
+        params.push(rt);
+      }
+      break;
+    case 'cm':
+      conditions.push("AND ResourceType = 'ConceptMap'");
+      if (rt && rt !== '' && hasTerminologySource(rt)) {
+        conditions.push('AND ResourceKey IN (SELECT ResourceKey FROM Categories WHERE Mode = 1 AND Code = ?)');
+        params.push(rt);
+      }
+      break;
+    default:
+      if (rt && rt !== '' && hasCachedValue('resourceTypes', rt)) {
+        conditions.push('AND ResourceType = ?');
+        params.push(rt);
+      }
+      break;
+  }
+  
+  if (text && text !== '') {
+    if (type === 'cs') {
+      conditions.push(`AND (ResourceKey IN (SELECT ResourceKey FROM ResourceFTS WHERE Description MATCH ? OR Narrative MATCH ?) 
+                      OR ResourceKey IN (SELECT ResourceKey FROM CodeSystemFTS WHERE Display MATCH ? OR Definition MATCH ?))`);
+      params.push(text, text, text, text);
+    } else {
+      conditions.push('AND ResourceKey IN (SELECT ResourceKey FROM ResourceFTS WHERE Description MATCH ? OR Narrative MATCH ?)');
+      params.push(text, text);
+    }
+  }
+  
+  const fullQuery = baseQuery + ' ' + conditions.join(' ');
+  return { query: fullQuery, params };
+}
+
+// Safe file download function
+function downloadFile(url, destination, maxRedirects = 5) {
+  return new Promise((resolve, reject) => {
+    xigLog.info(`Starting download from ${url}`);
+    
+    function attemptDownload(currentUrl, redirectCount = 0) {
+      if (redirectCount > maxRedirects) {
+        reject(new Error(`Too many redirects (${maxRedirects})`));
+        return;
+      }
+      
+      try {
+        const validatedUrl = validateExternalUrl(currentUrl);
+        const protocol = validatedUrl.protocol === 'https:' ? https : http;
+        
+        const request = protocol.get(validatedUrl, (response) => {
+          // Handle redirects
+          if (response.statusCode >= 300 && response.statusCode < 400 && response.headers.location) {
+            let redirectUrl = response.headers.location;
+            if (!redirectUrl.startsWith('http')) {
+              const urlObj = new URL(currentUrl);
+              if (redirectUrl.startsWith('/')) {
+                redirectUrl = `${urlObj.protocol}//${urlObj.host}${redirectUrl}`;
+              } else {
+                redirectUrl = `${urlObj.protocol}//${urlObj.host}${urlObj.pathname}/${redirectUrl}`;
+              }
+            }
+            
+            attemptDownload(redirectUrl, redirectCount + 1);
+            return;
+          }
+          
+          if (response.statusCode !== 200) {
+            reject(new Error(`Download failed with status code: ${response.statusCode}`));
+            return;
+          }
+          
+          // Check content length
+          const contentLength = parseInt(response.headers['content-length'] || '0');
+          const maxSize = 100 * 1024 * 1024; // 100MB limit
+          if (contentLength > maxSize) {
+            reject(new Error('File too large'));
+            return;
+          }
+          
+          const fileStream = fs.createWriteStream(destination);
+          let downloadedBytes = 0;
+          
+          response.on('data', (chunk) => {
+            downloadedBytes += chunk.length;
+            if (downloadedBytes > maxSize) {
+              request.destroy();
+              fs.unlink(destination, () => {}); // Clean up
+              reject(new Error('File too large'));
+              return;
+            }
+          });
+          
+          response.pipe(fileStream);
+          
+          fileStream.on('finish', () => {
+            fileStream.close();
+            xigLog.info(`Download completed successfully. Downloaded ${downloadedBytes} bytes to ${destination}`);
+            resolve();
+          });
+          
+          fileStream.on('error', (err) => {
+            fs.unlink(destination, () => {}); // Delete partial file
+            reject(err);
+          });
+        });
+        
+        request.on('error', (err) => {
+          reject(err);
+        });
+        
+        request.setTimeout(300000, () => { // 5 minutes timeout
+          request.destroy();
+          reject(new Error('Download timeout'));
+        });
+        
+      } catch (error) {
+        reject(error);
+      }
+    }
+    
+    attemptDownload(url);
+  });
+}
+
 // Template Functions
 
 function loadTemplate() {
@@ -63,23 +519,6 @@ function loadTemplate() {
   } catch (error) {
     xigLog.error(`Failed to load HTML template: ${error.message}`);
   }
-}
-
-// HTML escape function for safety
-function escapeHtml(text) {
-  if (typeof text !== 'string') {
-    return String(text);
-  }
-  
-  const map = {
-    '&': '&amp;',
-    '<': '&lt;',
-    '>': '&gt;',
-    '"': '&quot;',
-    "'": '&#39;'
-  };
-  
-  return text.replace(/[&<>"']/g, function(m) { return map[m]; });
 }
 
 function renderPage(title, content, options = {}) {
@@ -524,9 +963,9 @@ async function buildResourceTable(queryParams, resourceCount, offset = 0) {
     parts.push('</tr>');
     
     // Get resource data with pagination
-    const resourceQuery = buildResourceListQuery(queryParams, offset, 200);
+    const { query: resourceQuery, params: qp } = buildSecureResourceQuery(queryParams, offset, 200);
     const resourceRows = await new Promise((resolve, reject) => {
-      xigDb.all(resourceQuery, [], (err, rows) => {
+      xigDb.all(resourceQuery, qp, (err, rows) => {
         if (err) reject(err);
         else resolve(rows || []);
       });
@@ -566,12 +1005,12 @@ async function buildResourceTable(queryParams, resourceCount, offset = 0) {
       } else if (packageObj) {
         parts.push(`<td>${escapeHtml(packageObj.Id)}</td>`);
       } else {
-        parts.push(`<td>Package ${row.PackageKey}</td>`);
+        parts.push(`<td>Package ${escapeHtml(String(row.PackageKey))}</td>`);
       }
       
       // Version column (if not filtered)
       if (!ver || ver === '') {
-        parts.push(`<td>${showVersion(row)}</td>`);
+        parts.push(`<td>${escapeHtml(showVersion(row))}</td>`);
       }
       
       // Identity column with complex link logic

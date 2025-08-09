@@ -175,7 +175,7 @@ function buildRootPageContent() {
 
   if (config.modules.registry && config.modules.registry.enabled) {
     content += '<li class="list-group-item">';
-    content += '<a href="/registry" class="text-decoration-none">Terminology Server Registry</a>: ';
+    content += '<a href="/tx-reg" class="text-decoration-none">Terminology Server Registry</a>: ';
     content += 'Discover and query FHIR terminology servers for code system and value set support';
     content += '</li>';
   }
