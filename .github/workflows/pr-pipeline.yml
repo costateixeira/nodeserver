@@ -23,10 +23,16 @@ jobs:
     
     - name: Install dependencies
       run: npm ci
-    
-    - name: Lint code
-      run: npm run lint -- --quiet --max-warnings=0
-      continue-on-error: true
+
+    - name: Lint only changed files
+      run: |
+          # Get list of changed JS files, excluding vendor directories
+          CHANGED_FILES=$(git diff --name-only origin/main...HEAD | grep '\.js$' | grep -v 'static/js/' | grep -v 'node_modules/' | xargs)
+          if [ -n "$CHANGED_FILES" ]; then
+            npx eslint $CHANGED_FILES
+          else
+            echo "No JavaScript files changed"
+          fi
     
     - name: Run tests
       run: npm run test:ci
