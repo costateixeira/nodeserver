@@ -135,7 +135,7 @@ class PackagesModule {
       '`': '&#x60;',
       '=': '&#x3D;'
     };
-    
+
     return str.replace(/[&<>"'`=\/]/g, (match) => escapeMap[match]);
   }
 
@@ -1868,166 +1868,6 @@ class PackagesModule {
     }
   }
 
-  async searchPackages(params, req = null, secure = false) {
-    const {
-      name = '',
-      dependson = '',
-      canonicalPkg = '',
-      canonicalUrl = '',
-      fhirVersion = '',
-      dependency = '',
-      sort = ''
-    } = params;
-
-    return new Promise((resolve, reject) => {
-      const results = [];
-      const deps = [];
-      const depsDone = new Set();
-      let versioned = false;
-
-      const processSearch = () => {
-        try {
-          let filter = '';
-
-          // Build name filter
-          if (name) {
-            versioned = name.includes('#');
-            if (name.includes('#')) {
-              const [packageId, version] = name.split('#');
-              filter += ` AND PackageVersions.Id LIKE '%${this.escapeSql(packageId)}%' AND PackageVersions.Version LIKE '${this.escapeSql(version)}%'`;
-            } else {
-              filter += ` AND PackageVersions.Id LIKE '%${this.escapeSql(name)}%'`;
-            }
-          }
-
-          // Build dependency filters
-          if (deps.length > 0) {
-            const depList = deps.map(d => `'${this.escapeSql(d)}'`).join(',');
-            filter += ` AND PackageVersions.PackageVersionKey IN (SELECT PackageDependencies.PackageVersionKey FROM PackageDependencies WHERE PackageDependencies.Dependency IN (${depList}))`;
-          } else if (dependson) {
-            filter += ` AND PackageVersions.PackageVersionKey IN (SELECT PackageDependencies.PackageVersionKey FROM PackageDependencies WHERE PackageDependencies.Dependency LIKE '%${this.escapeSql(dependson)}%')`;
-            versioned = dependson.includes('#');
-          }
-
-          // Build canonical package filter
-          if (canonicalPkg) {
-            if (canonicalPkg.endsWith('%')) {
-              filter += ` AND PackageVersions.Canonical LIKE '${this.escapeSql(canonicalPkg)}'`;
-            } else {
-              filter += ` AND PackageVersions.Canonical = '${this.escapeSql(canonicalPkg)}'`;
-            }
-          }
-
-          // Build canonical URL filter
-          if (canonicalUrl) {
-            filter += ` AND PackageVersions.PackageVersionKey IN (SELECT PackageVersionKey FROM PackageURLs WHERE URL LIKE '${this.escapeSql(canonicalUrl)}%')`;
-          }
-
-          // Build FHIR version filter
-          if (fhirVersion) {
-            const version = this.getVersion(fhirVersion);
-            filter += ` AND PackageVersions.PackageVersionKey IN (SELECT PackageVersionKey FROM PackageFHIRVersions WHERE Version LIKE '${this.escapeSql(version)}%')`;
-          }
-
-          // Build dependency filter
-          if (dependency) {
-            if (dependency.includes('#')) {
-              filter += ` AND PackageVersions.PackageVersionKey IN (SELECT PackageVersionKey FROM PackageDependencies WHERE Dependency LIKE '${this.escapeSql(dependency)}%')`;
-            } else if (dependency.includes('|')) {
-              const normalizedDep = dependency.replace('|', '#');
-              filter += ` AND PackageVersions.PackageVersionKey IN (SELECT PackageVersionKey FROM PackageDependencies WHERE Dependency LIKE '${this.escapeSql(normalizedDep)}%')`;
-            } else {
-              filter += ` AND PackageVersions.PackageVersionKey IN (SELECT PackageVersionKey FROM PackageDependencies WHERE Dependency LIKE '${this.escapeSql(dependency)}#%')`;
-            }
-          }
-
-          // Build SQL query based on versioned flag
-          let sql;
-          if (versioned) {
-            sql = `SELECT Id, Version, PubDate, FhirVersions, Kind, Canonical, Description
-                   FROM PackageVersions
-                   WHERE PackageVersions.PackageVersionKey > 0 ${filter}
-                   ORDER BY PubDate`;
-          } else {
-            sql = `SELECT Packages.Id,
-                          Version,
-                          PubDate,
-                          FhirVersions,
-                          Kind,
-                          PackageVersions.Canonical,
-                          Packages.DownloadCount,
-                          Description
-                   FROM Packages,
-                        PackageVersions
-                   WHERE Packages.CurrentVersion = PackageVersions.PackageVersionKey ${filter}
-                   ORDER BY PubDate`;
-          }
-
-          this.db.all(sql, (err, rows) => {
-            if (err) {
-              reject(err);
-              return;
-            }
-
-            deps.length = 0; // Clear deps array
-
-            for (const row of rows) {
-              const dep = `${row.Id}#${row.Version}`;
-
-              if (!versioned || !depsDone.has(dep)) {
-                if (versioned) {
-                  depsDone.add(dep);
-                  if (dependson) {
-                    deps.push(dep);
-                  }
-                }
-
-                const packageInfo = {
-                  name: row.Id,
-                  version: row.Version,
-                  fhirVersion: this.interpretVersion(row.FhirVersions),
-                  canonical: row.Canonical,
-                  kind: this.codeForKind(row.Kind),
-                  url: this.buildPackageUrl(row.Id, row.Version, false, req) // secure parameter would come from request
-                };
-
-                if (row.PubDate) {
-                  packageInfo.date = new Date(row.PubDate).toISOString();
-                }
-
-                if (!versioned && row.DownloadCount) {
-                  packageInfo.count = row.DownloadCount;
-                }
-
-                if (row.Description) {
-                  // Convert BLOB/Buffer to string
-                  packageInfo.description = Buffer.isBuffer(row.Description)
-                    ? row.Description.toString('utf8')
-                    : row.Description;
-                }
-
-                results.push(packageInfo);
-              }
-            }
-
-            // Continue processing if there are more dependencies to resolve
-            if (deps.length > 0) {
-              setImmediate(processSearch);
-            } else {
-              // Apply sorting if specified
-              const sortedResults = this.applySorting(results, sort);
-              resolve(sortedResults);
-            }
-          });
-        } catch (error) {
-          reject(error);
-        }
-      };
-
-      processSearch();
-    });
-  }
-
   async returnSearchHtml(req, res, searchParams, results, secure) {
     try {
       const startTime = Date.now();
@@ -2405,16 +2245,6 @@ class PackagesModule {
     </body>
     </html>
   `;
-  }
-
-  escapeHtml(str) {
-    if (!str) return '';
-    return str
-      .replace(/&/g, '&amp;')
-      .replace(/</g, '&lt;')
-      .replace(/>/g, '&gt;')
-      .replace(/"/g, '&quot;')
-      .replace(/'/g, '&#39;');
   }
 
   async shutdown() {
