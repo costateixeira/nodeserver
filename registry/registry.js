@@ -182,10 +182,47 @@ class RegistryModule {
     }
   }
 
+  _normalizeQueryParams(query) {
+    const normalized = {};
+
+    // Process each parameter
+    Object.keys(query).forEach(key => {
+      const value = query[key];
+
+      // If the value is an array, take the first element
+      if (Array.isArray(value)) {
+        normalized[key] = value.length > 0 ? String(value[0]) : '';
+      } else {
+        // Convert to string to ensure consistent type
+        normalized[key] = value !== null && value !== undefined ? String(value) : '';
+      }
+    });
+
+    return normalized;
+  }
+
+  setupSecurityMiddleware() {
+    this.router.use((req, res, next) => {
+      // Basic security headers
+      res.setHeader('X-Content-Type-Options', 'nosniff');
+      res.setHeader('X-Frame-Options', 'DENY');
+      res.setHeader('X-XSS-Protection', '1; mode=block');
+      res.setHeader('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
+      res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
+
+      // Content Security Policy
+      res.setHeader('Content-Security-Policy', "default-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline'");
+
+      next();
+    });
+  }
+
   /**
    * Set up Express routes
    */
   setupRoutes() {
+    this.setupSecurityMiddleware();
+
     // Attach API to all routes
     this.router.use((req, res, next) => {
       req.registryAPI = this.api;
@@ -900,7 +937,21 @@ class RegistryModule {
    */
   handleResolveEndpoint(req, res) {
     try {
-      const { fhirVersion, url, valueSet, authoritativeOnly, usage } = req.query;
+      const params = this._normalizeQueryParams(req.query);
+      const { fhirVersion, url, valueSet, usage } = params;
+
+      // Convert authoritativeOnly to boolean
+      const authoritativeOnly = params.authoritativeOnly === 'true';
+
+      // Validate URL parameters if provided
+      if (url && !this._isValidUrl(url)) {
+        return res.status(400).json({ error: 'Invalid code system URL format' });
+      }
+
+      if (valueSet && !this._isValidUrl(valueSet)) {
+        return res.status(400).json({ error: 'Invalid value set URL format' });
+      }
+
 
       // Check if this is a browser request (based on Accept header)
       const acceptsHtml = req.headers.accept && req.headers.accept.includes('text/html');
@@ -1194,9 +1245,9 @@ class RegistryModule {
 
   handleLogEndpoint(req, res) {
     try {
-      // Get query parameters
-      const limit = parseInt(req.query.limit || '100');
-      const level = req.query.level || null;
+      const params = this._normalizeQueryParams(req.query);
+      const requestedLimit = parseInt(params.limit, 10);
+      const limit = isNaN(requestedLimit) ? 100 : Math.min(requestedLimit, 1000);
 
       // Get logs from crawler
       const logs = this.crawler.getLogs(limit, level);
