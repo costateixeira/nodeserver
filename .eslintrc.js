@@ -27,6 +27,9 @@ module.exports = {
     'indent': ['warn', 2],
     'quotes': ['warn', 'single'],
     'semi': ['warn', 'always'],
-    'no-undef': 'warn'
+    'no-undef': 'warn',
+    'no-useless-escape': ['error', {
+      'extra': ['/'] // Allow escaping forward slashes
+    }]
   }
 };
