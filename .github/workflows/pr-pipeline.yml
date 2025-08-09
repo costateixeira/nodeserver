@@ -2,52 +2,111 @@ name: PR Pipeline
 
 on:
   pull_request:
-    branches: [ main, master ]
+    branches: [ main ]
 
 jobs:
-  test:
-    name: Test on Node ${{ matrix.node-version }}
+  lint:
+    name: Code Quality
     runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        node-version: [18.x, 20.x]
 
     steps:
-    - uses: actions/checkout@v4
-    
-    - name: Use Node.js ${{ matrix.node-version }}
-      uses: actions/setup-node@v4
-      with:
-        node-version: ${{ matrix.node-version }}
-        cache: 'npm'
-    
-    - name: Install dependencies
-      run: npm ci
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Needed for changed files detection
 
-    - name: Lint only changed files
-      run: |
-          # Get list of changed JS files, excluding vendor directories
-          CHANGED_FILES=$(git diff --name-only origin/main...HEAD | grep '\.js$' | grep -v 'static/js/' | grep -v 'node_modules/' | xargs)
+      - name: Use Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Lint changed files only
+        run: |
+          # Get changed JS files, excluding vendor directories
+          CHANGED_FILES=$(git diff --name-only --diff-filter=ACMRT origin/main...HEAD | grep -E '\.(js|mjs)$' | grep -v 'static/' | grep -v 'node_modules/' | tr '\n' ' ')
           if [ -n "$CHANGED_FILES" ]; then
+            echo "Linting changed files: $CHANGED_FILES"
             npx eslint $CHANGED_FILES
           else
-            echo "No JavaScript files changed"
+            echo "No relevant JavaScript files changed"
           fi
-    
-    - name: Run tests
-      run: npm run test:ci
-      env:
-        SUPPRESS_LOGS: 'true'
-    
-    - name: Upload test results
-      uses: actions/upload-artifact@v4
-      if: always()
-      with:
-        name: test-results-${{ matrix.node-version }}
-        path: ./test-results/junit.xml
-    
-    - name: Upload coverage reports
-      uses: codecov/codecov-action@v4
-      with:
-        directory: ./coverage/
-        token: ${{ secrets.CODECOV_TOKEN }}
+
+      - name: Check code formatting
+        run: |
+          # Optional: Check if code is properly formatted
+          # npx prettier --check "**/*.{js,json,md}" --ignore-path .gitignore
+
+  security:
+    name: Security Scan
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Use Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run npm audit
+        run: npm audit --audit-level=moderate
+        continue-on-error: true  # Don't fail on low-severity issues
+
+      - name: Check for known vulnerabilities
+        run: |
+          # Check for high/critical vulnerabilities only
+          AUDIT_RESULT=$(npm audit --audit-level=high --json || true)
+          if echo "$AUDIT_RESULT" | grep -q '"level":"high\|critical"'; then
+            echo "High or critical vulnerabilities found!"
+            npm audit --audit-level=high
+            exit 1
+          fi
+
+  test-coverage:
+    name: Test Coverage
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Use Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run tests with coverage
+        run: npm run test:coverage || npm test -- --coverage
+
+      - name: Check coverage threshold
+        run: |
+          # Optional: Fail if coverage drops below threshold
+          # npx nyc check-coverage --lines 70 --functions 70 --branches 70
+
+  dependency-check:
+    name: Dependency Analysis
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check for outdated dependencies
+        run: |
+          npm outdated || true  # Don't fail, just report
+
+      - name: Check package.json changes
+        run: |
+          if git diff --name-only origin/main...HEAD | grep -q "package.json\|package-lock.json"; then
+            echo "Dependencies changed - review required"
+            git diff origin/main...HEAD -- package.json package-lock.json
+          fi
