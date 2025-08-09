@@ -1,3 +1,4 @@
+const CodeSystem = require('../library/codesystem');
 
 class TxOperationContext {
 
@@ -457,3 +458,10 @@ class CodeSystemFactoryProvider {
     this.uses++;
   }
 }
+
+module.exports = {
+  TxOperationContext,
+  Designation,
+  CodeSystemProvider,
+  CodeSystemFactoryProvider
+};

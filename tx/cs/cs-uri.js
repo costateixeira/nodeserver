@@ -1,9 +1,12 @@
-const { CodeSystemProvider } = require('./cs-api');
+const CodeSystem = require('../library/codesystem');
+const { CodeSystemProvider, CodeSystemFactoryProvider} = require('./cs-api');
+const { Language, Languages } = require('../../tx/library/languages');
 
 /**
  * Code system provider for URIs
  * This is a simple provider that treats any URI as a valid code
  * Uses strings directly as context since URIs have no additional metadata
+ * Enhanced to support supplements for display and definition lookup
  */
 class UriServices extends CodeSystemProvider {
   /**
@@ -14,8 +17,26 @@ class UriServices extends CodeSystemProvider {
   constructor(supplements) {
     super();
     this.supplements = supplements;
+    this._validateSupplements();
   }
 
+  /**
+   * Validates that supplements are CodeSystem instances
+   * @private
+   */
+  _validateSupplements() {
+    if (!this.supplements) return;
+
+    if (!Array.isArray(this.supplements)) {
+      throw new Error('Supplements must be an array');
+    }
+
+    this.supplements.forEach((supplement, index) => {
+      if (!(supplement instanceof CodeSystem)) {
+        throw new Error(`Supplement ${index} must be a CodeSystem instance, got ${typeof supplement}`);
+      }
+    });
+  }
 
   // ============================================================================
   // Metadata for the code system
@@ -46,7 +67,51 @@ class UriServices extends CodeSystemProvider {
   }
 
   hasAnyDisplays(languages) {
-    return false; // URIs don't have displays
+    // Convert input to Languages instance if needed
+    const langs = languages instanceof Languages ? languages :
+      Array.isArray(languages) ? Languages.fromAcceptLanguage(languages.join(',')) :
+        Languages.fromAcceptLanguage(languages || '');
+
+    // Check if any supplements have displays in the requested languages
+    if (this.supplements) {
+      for (const supplement of this.supplements) {
+        // Check if supplement language matches and has displays
+        if (supplement.jsonObj.language) {
+          const supplementLang = new Language(supplement.jsonObj.language);
+          for (const requestedLang of langs) {
+            if (supplementLang.matchesForDisplay(requestedLang)) {
+              // Check if any concept has a display
+              const allConcepts = supplement.getAllConcepts();
+              if (allConcepts.some(c => c.display)) {
+                return true;
+              }
+            }
+          }
+        }
+
+        // Check concept designations for display uses
+        const allConcepts = supplement.getAllConcepts();
+        for (const concept of allConcepts) {
+          if (concept.designation) {
+            for (const designation of concept.designation) {
+              // Check if designation is a display use
+              if (CodeSystem.isUseADisplay(designation.use)) {
+                if (designation.language) {
+                  const designationLang = new Language(designation.language);
+                  for (const requestedLang of langs) {
+                    if (designationLang.matchesForDisplay(requestedLang)) {
+                      return true;
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+
+    return false; // URIs don't have displays by default
   }
 
   hasParents() {
@@ -62,11 +127,33 @@ class UriServices extends CodeSystemProvider {
   }
 
   async display(opContext, code) {
-    return ''; // URIs don't have displays
+    // Check supplements for display
+    if (this.supplements) {
+      for (const supplement of this.supplements) {
+        const concept = supplement.getConceptByCode(code);
+        if (concept && concept.display) {
+          return concept.display;
+        }
+      }
+    }
+
+    return ''; // URIs don't have displays by default
   }
 
   async definition(opContext, code) {
-    return ''; // URIs don't have definitions
+    // Check supplements for definition
+    if (this.supplements) {
+      for (const supplement of this.supplements) {
+        if (supplement.concept) {
+          const concept = supplement.concept.find(c => c.code === code);
+          if (concept && concept.definition) {
+            return concept.definition;
+          }
+        }
+      }
+    }
+
+    return ''; // URIs don't have definitions by default
   }
 
   isAbstract(opContext, code) {
@@ -85,12 +172,36 @@ class UriServices extends CodeSystemProvider {
     return null;
   }
 
-  designations(opContext, code) {
-    return null; // No designations for URIs
+  async designations(opContext, code) {
+    let allDesignations = [];
+
+    if (this.supplements) {
+      for (const supplement of this.supplements) {
+        const concept = supplement.getConceptByCode(code);  // ← Uses CodeSystem API
+        if (concept && concept.designation) {
+          allDesignations = allDesignations.concat(concept.designation);
+        }
+      }
+    }
+
+    return allDesignations.length > 0 ? allDesignations : null;
   }
 
   properties(opContext, code) {
-    return null; // No properties for URIs
+    // Collect properties from all supplements
+    let allProperties = [];
+
+    if (this.supplements) {
+      for (const supplement of this.supplements) {
+        const concept = supplement.getConceptByCode(code);  // ← Uses CodeSystem API
+        if (concept && concept.property) {
+          // Add all properties from this concept
+          allProperties = allProperties.concat(concept.property);
+        }
+      }
+    }
+
+    return allProperties.length > 0 ? allProperties : null;
   }
 
   sameConcept(opContext, a, b) {
@@ -103,6 +214,22 @@ class UriServices extends CodeSystemProvider {
 
   async locate(opContext, code) {
     // For URIs, any string is potentially valid
+    // But we can check if it exists in supplements for better validation
+    if (this.supplements) {
+      for (const supplement of this.supplements) {
+        if (supplement.concept) {
+          const concept = supplement.concept.find(c => c.code === code);
+          if (concept) {
+            return {
+              context: code,
+              message: null
+            };
+          }
+        }
+      }
+    }
+
+    // Even if not in supplements, URIs are still valid
     return {
       context: code, // Use the string directly as context
       message: null
