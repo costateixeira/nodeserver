@@ -1,0 +1,15 @@
+# Third-party libraries (minified/vendor code)
+static/assets/js/*.js
+
+# Node modules
+node_modules/
+
+# Build outputs
+dist/
+build/
+coverage/
+
+# Other vendor/generated files that shouldn't be linted
+vendor/
+lib/
+*.min.js
