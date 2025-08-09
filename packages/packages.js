@@ -10,7 +10,7 @@ const cron = require('node-cron');
 const path = require('path');
 const fs = require('fs');
 const PackageCrawler = require('./package-crawler.js');
-const htmlServer = require('../html-server');
+const htmlServer = require('../common/html-server');
 
 class PackagesModule {
   constructor() {
