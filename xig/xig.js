@@ -13,15 +13,16 @@ const cron = require('node-cron');
 const sqlite3 = require('sqlite3').verbose();
 const { EventEmitter } = require('events');
 const zlib = require('zlib');
-const htmlServer = require('../html-server');
+const htmlServer = require('../common/html-server');
 
+const Logger = require('../common/logger');
+const xigLog = Logger.getInstance().child({ module: 'xig' });
 
 const router = express.Router();
 
 // Configuration
 const XIG_DB_URL = 'http://fhir.org/guides/stats/xig.db';
 const XIG_DB_PATH = path.join(__dirname, 'data', 'xig.db');
-const DOWNLOAD_LOG_PATH = path.join(__dirname, 'xig-download.log');
 const TEMPLATE_PATH = path.join(__dirname, 'xig-template.html');
 
 // Global database instance
@@ -50,34 +51,17 @@ const cacheEmitter = new EventEmitter();
 // Cache loading lock to prevent concurrent loads
 let cacheLoadInProgress = false;
 
-// Utility function to log messages
-function logMessage(message) {
-  const timestamp = new Date().toISOString();
-  const logEntry = `[${timestamp}] ${message}\n`;
-  
-  console.log(`[XIG] ${message}`);
-  
-  // Also write to log file
-  fs.appendFile(DOWNLOAD_LOG_PATH, logEntry, (err) => {
-    if (err) {
-      console.error('[XIG] Failed to write to log file:', err.message);
-    }
-  });
-}
-
 // Template Functions
 
 function loadTemplate() {
   try {
     // Load using shared HTML server
     const templateLoaded = htmlServer.loadTemplate('xig', TEMPLATE_PATH);
-    if (templateLoaded) {
-      logMessage('HTML template loaded successfully via shared framework');
-    } else {
-      logMessage('Failed to load HTML template via shared framework');
+    if (!templateLoaded) {
+      xigLog.error('Failed to load HTML template via shared framework');
     }
   } catch (error) {
-    logMessage(`Failed to load HTML template: ${error.message}`);
+    xigLog.error(`Failed to load HTML template: ${error.message}`);
   }
 }
 
@@ -135,7 +119,7 @@ async function gatherPageStatistics() {
     };
     
   } catch (error) {
-    logMessage(`Error gathering page statistics: ${error.message}`);
+    xigLog.error(`Error gathering page statistics: ${error.message}`);
     
     const endTime = Date.now();
     const processingTime = endTime - startTime;
@@ -674,7 +658,7 @@ async function buildResourceTable(queryParams, resourceCount, offset = 0) {
     return parts.join('');
     
   } catch (error) {
-    logMessage(`Error building resource table: ${error.message}`);
+    xigLog.error(`Error building resource table: ${error.message}`);
     return `<p class="text-danger">Error loading resource list: ${escapeHtml(error.message)}</p>`;
   }
 }
@@ -797,7 +781,7 @@ async function buildSummaryStats(queryParams, baseUrl) {
       html += '</div><p>&nbsp;</p>';
     
   } catch (error) {
-    logMessage(`Error building summary stats: ${error.message}`);
+    xigLog.error(`Error building summary stats: ${error.message}`);
     html += `<p class="text-warning">Error loading summary statistics: ${escapeHtml(error.message)}</p>`;
   }
   
@@ -1251,7 +1235,7 @@ function getMetadata(key) {
 
 function downloadFile(url, destination, maxRedirects = 5) {
   return new Promise((resolve, reject) => {
-    logMessage(`Starting download from ${url}`);
+    xigLog.error(`Starting download from ${url}`);
     
     function attemptDownload(currentUrl, redirectCount = 0) {
       if (redirectCount > maxRedirects) {
@@ -1264,8 +1248,7 @@ function downloadFile(url, destination, maxRedirects = 5) {
       const request = protocol.get(currentUrl, (response) => {
         // Handle redirects
         if (response.statusCode >= 300 && response.statusCode < 400 && response.headers.location) {
-          logMessage(`Redirect ${response.statusCode} to: ${response.headers.location}`);
-          
+
           // Resolve relative URLs
           let redirectUrl = response.headers.location;
           if (!redirectUrl.startsWith('http')) {
@@ -1300,7 +1283,7 @@ function downloadFile(url, destination, maxRedirects = 5) {
         
         fileStream.on('finish', () => {
           fileStream.close();
-          logMessage(`Download completed successfully. Downloaded ${downloadedBytes} bytes to ${destination}`);
+          xigLog.error(`Download completed successfully. Downloaded ${downloadedBytes} bytes to ${destination}`);
           resolve();
         });
         
@@ -1355,18 +1338,16 @@ function validateDatabaseFile(filePath) {
 
 async function loadConfigCache() {
   if (cacheLoadInProgress) {
-    logMessage('Cache load already in progress, skipping');
     return;
   }
   
   if (!xigDb) {
-    logMessage('No database connection available for cache loading');
+    xigLog.error('No database connection available for cache loading');
     return;
   }
   
   cacheLoadInProgress = true;
-  logMessage('Starting config cache load');
-  
+
   try {
     // Create new cache object (this will be atomically replaced)
     const newCache = {
@@ -1389,16 +1370,13 @@ async function loadConfigCache() {
     };
     
     // Load metadata
-    logMessage('Loading metadata...');
     const metadataRows = await executeQuery('SELECT Name, Value FROM Metadata');
     newCache.maps.metadata = new Map();
     metadataRows.forEach(row => {
       newCache.maps.metadata.set(row.Name, row.Value);
     });
-    logMessage(`Loaded ${metadataRows.length} metadata entries`);
-    
+
     // Load realms
-    logMessage('Loading realms...');
     const realmRows = await executeQuery('SELECT Code FROM Realms');
     newCache.maps.realms = new Set();
     realmRows.forEach(row => {
@@ -1406,19 +1384,15 @@ async function loadConfigCache() {
         newCache.maps.realms.add(row.Code);
       }
     });
-    logMessage(`Loaded ${realmRows.length} realms`);
-    
+
     // Load authorities
-    logMessage('Loading authorities...');
     const authRows = await executeQuery('SELECT Code FROM Authorities');
     newCache.maps.authorities = new Set();
     authRows.forEach(row => {
       newCache.maps.authorities.add(row.Code);
     });
-    logMessage(`Loaded ${authRows.length} authorities`);
-    
+
     // Load packages
-    logMessage('Loading packages...');
     const packageRows = await executeQuery('SELECT PackageKey, Id, PID, Web, Canonical FROM Packages');
     newCache.maps.packages = new Map();
     newCache.maps.packagesById = new Map();
@@ -1440,8 +1414,7 @@ async function loadConfigCache() {
         newCache.maps.packagesById.set(pidKey, packageObj);
       }
     });
-    logMessage(`Loaded ${packageRows.length} packages`);
-    
+
     // Check if Resources table exists before querying it
     const tableCheckQuery = "SELECT name FROM sqlite_master WHERE type='table' AND name='Resources'";
     const resourcesTableExists = await executeQuery(tableCheckQuery);
@@ -1518,13 +1491,13 @@ async function loadConfigCache() {
     const oldCache = configCache;
     configCache = newCache;
     
-    logMessage(`Config cache updated successfully. Total cached collections: ${Object.keys(newCache.maps).length}`);
-    
+
     // Emit event
     cacheEmitter.emit('cacheUpdated', newCache, oldCache);
-    
+    xigLog.info(`XIG Loaded from database`);
+
   } catch (error) {
-    logMessage(`Config cache load failed: ${error.message}`);
+    xigLog.error(`Config cache load failed: ${error.message}`);
   } finally {
     cacheLoadInProgress = false;
   }
@@ -1533,22 +1506,21 @@ async function loadConfigCache() {
 function initializeDatabase() {
   return new Promise((resolve, reject) => {
     if (!fs.existsSync(XIG_DB_PATH)) {
-      logMessage('XIG database file not found, will download on first update');
+      xigLog.error('XIG database file not found, will download on first update');
       resolve();
       return;
     }
     
     xigDb = new sqlite3.Database(XIG_DB_PATH, sqlite3.OPEN_READONLY, async (err) => {
       if (err) {
-        logMessage(`Failed to open XIG database: ${err.message}`);
+        xigLog.error(`Failed to open XIG database: ${err.message}`);
         reject(err);
       } else {
-        logMessage('XIG database connected successfully');
-        
+
         try {
           await loadConfigCache();
         } catch (cacheError) {
-          logMessage(`Warning: Failed to load config cache: ${cacheError.message}`);
+          xigLog.warn(`Failed to load config cache: ${cacheError.message}`);
         }
         
         resolve();
@@ -1559,8 +1531,7 @@ function initializeDatabase() {
 
 async function updateXigDatabase() {
   try {
-    logMessage('Starting XIG database update process');
-    
+
     const tempPath = XIG_DB_PATH + '.tmp';
     
     await downloadFile(XIG_DB_URL, tempPath);
@@ -1570,7 +1541,7 @@ async function updateXigDatabase() {
       await new Promise((resolve) => {
         xigDb.close((err) => {
           if (err) {
-            logMessage(`Warning: Error closing existing database: ${err.message}`);
+            xigLog.warn(`Warning: Error closing existing database: ${err.message}`);
           }
           xigDb = null;
           resolve();
@@ -1584,11 +1555,11 @@ async function updateXigDatabase() {
     fs.renameSync(tempPath, XIG_DB_PATH);
     
     await initializeDatabase();
-    
-    logMessage('XIG database update completed successfully');
+
+    xigLog.info('XIG database updated');
     
   } catch (error) {
-    logMessage(`XIG database update failed: ${error.message}`);
+    xigLog.error(`XIG database update failed: ${error.message}`);
     
     const tempPath = XIG_DB_PATH + '.tmp';
     if (fs.existsSync(tempPath)) {
@@ -1838,7 +1809,6 @@ router.get('/:packagePid/:resourceType/:resourceId', async (req, res) => {
   
   if (isPackagePidFormat && isFhirResourceType) {
     // This looks like a legacy resource URL, redirect to the proper format
-    // logMessage(`Redirecting legacy URL: /${packagePid}/${resourceType}/${resourceId} -> /resource/${packagePid}/${resourceType}/${resourceId}`);
     res.redirect(301, `/xig/resource/${packagePid}/${resourceType}/${resourceId}`);
   } else {
     // Not a resource URL pattern, return 404
@@ -1892,7 +1862,7 @@ router.get('/', async (req, res) => {
       }
     } catch (error) {
       countError = error.message;
-      logMessage(`Error getting resource count: ${error.message}`);
+      xigLog.error(`Error getting resource count: ${error.message}`);
     }
     
     // Build resource count paragraph
@@ -1929,7 +1899,7 @@ router.get('/', async (req, res) => {
     res.send(html);
     
   } catch (error) {
-    logMessage(`Error rendering resources page: ${error.message}`);
+    xigLog.error(`Error rendering resources page: ${error.message}`);
     htmlServer.sendErrorResponse(res, 'xig', error);
   }
 });
@@ -1939,8 +1909,7 @@ router.get('/stats', async (req, res) => {
   const startTime = Date.now(); // Add this at the very beginning
 
   try {
-    logMessage('Generating stats page');
-    
+
     const [dbInfo, tableCounts] = await Promise.all([
       getDatabaseInfo(),
       getDatabaseTableCounts()
@@ -1980,7 +1949,7 @@ router.get('/stats', async (req, res) => {
     res.send(html);
     
   } catch (error) {
-    logMessage(`Error generating stats page: ${error.message}`);
+    xigLog.error(`Error generating stats page: ${error.message}`);
     htmlServer.sendErrorResponse(res, 'xig', error);
   }
 });
@@ -2034,7 +2003,7 @@ router.get('/resource/:packagePid/:resourceType/:resourceId', async (req, res) =
     res.send(html);
     
   } catch (error) {
-    logMessage(`Error rendering resource detail page: ${error.message}`);
+    xigLog.error(`Error rendering resource detail page: ${error.message}`);
     htmlServer.sendErrorResponse(res, 'xig', error);
   }
 });
@@ -2070,7 +2039,7 @@ async function buildResourceDetailPage(packageObj, resourceData, secure = false)
     html += await buildResourceSource(resourceData.ResourceKey);
     
   } catch (error) {
-    logMessage(`Error building resource detail content: ${error.message}`);
+    xigLog.error(`Error building resource detail content: ${error.message}`);
     html += `<div class="alert alert-warning">Error loading some content: ${escapeHtml(error.message)}</div>`;
   }
   
@@ -2252,7 +2221,7 @@ async function buildExtensionExamplesSection(resourceUrl) {
     }
     
   } catch (error) {
-    logMessage(`Error loading extension examples: ${error.message}`);
+    xigLog.error(`Error loading extension examples: ${error.message}`);
     html += `<div class="alert alert-warning">Error loading extension examples: ${escapeHtml(error.message)}</div>`;
   }
   
@@ -2364,7 +2333,7 @@ async function buildResourceNarrative(resourceKey, packageObj) {
     }
     
   } catch (error) {
-    logMessage(`Error loading narrative: ${error.message}`);
+    xigLog.error(`Error loading narrative: ${error.message}`);
     html += `<div class="alert alert-warning">Error loading narrative: ${escapeHtml(error.message)}</div>`;
   }
   
@@ -2418,7 +2387,7 @@ async function buildResourceSource(resourceKey) {
     html += '</pre>';
     
   } catch (error) {
-    logMessage(`Error loading source: ${error.message}`);
+    xigLog.error(`Error loading source: ${error.message}`);
     html += `<div class="alert alert-warning">Error loading source: ${escapeHtml(error.message)}</div>`;
   }
   
@@ -2439,7 +2408,7 @@ function fixNarrative(narrativeHtml, baseUrl) {
     
     return fixed;
   } catch (error) {
-    logMessage(`Error fixing narrative links: ${error.message}`);
+    xigLog.error(`Error fixing narrative links: ${error.message}`);
     return narrativeHtml; // Return original if fixing fails
   }
 }
@@ -2470,7 +2439,7 @@ router.get('/cache', (req, res) => {
 
 router.post('/update', async (req, res) => {
   try {
-    logMessage('Manual update triggered via API');
+    xigLog.info('Manual update triggered via API');
     await updateXigDatabase();
     res.json({
       status: 'SUCCESS',
@@ -2488,14 +2457,13 @@ router.post('/update', async (req, res) => {
 // Initialize the XIG module
 async function initializeXigModule() {
   try {
-    logMessage('Initializing XIG module');
-    
+
     loadTemplate();
     
     await initializeDatabase();
     
     if (!fs.existsSync(XIG_DB_PATH)) {
-      logMessage('No existing XIG database found, triggering initial download');
+      xigLog.info('No existing XIG database found, triggering initial download');
       setTimeout(() => {
         updateXigDatabase();
       }, 5000);
@@ -2503,16 +2471,12 @@ async function initializeXigModule() {
     
     // Check if auto-update is enabled
     // Note: This assumes we're called only when XIG is enabled
-    logMessage('Setting up XIG scheduled update');
     cron.schedule('0 2 * * *', () => {
-      logMessage('Scheduled daily update triggered');
       updateXigDatabase();
     });
-    
-    logMessage('XIG module initialized successfully');
-    
+
   } catch (error) {
-    logMessage(`XIG module initialization failed: ${error.message}`);
+    xigLog.error(`XIG module initialization failed: ${error.message}`);
     throw error; // Re-throw so caller knows about failure
   }
 }
@@ -2521,12 +2485,11 @@ async function initializeXigModule() {
 function shutdown() {
   return new Promise((resolve) => {
     if (xigDb) {
-      logMessage('Closing XIG database connection');
       xigDb.close((err) => {
         if (err) {
-          logMessage(`Error closing XIG database: ${err.message}`);
+          xigLog.error(`Error closing XIG database: ${err.message}`);
         } else {
-          logMessage('XIG database connection closed');
+          xigLog.error('XIG database connection closed');
         }
         resolve();
       });

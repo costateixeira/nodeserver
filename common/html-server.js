@@ -1,3 +1,4 @@
+
 //
 // Copyright 2025, Health Intersections Pty Ltd (http://www.healthintersections.com.au)
 //
@@ -8,8 +9,14 @@ const fs = require('fs');
 const path = require('path');
 
 class HtmlServer {
+  log;
+
   constructor() {
     this.templates = new Map(); // templateName -> template content
+  }
+
+  useLog(logv) {
+    this.log = logv;
   }
 
   // Template Management
@@ -18,14 +25,13 @@ class HtmlServer {
       if (fs.existsSync(templatePath)) {
         const templateContent = fs.readFileSync(templatePath, 'utf8');
         this.templates.set(templateName, templateContent);
-        console.log(`[HtmlServer] Template '${templateName}' loaded successfully`);
         return true;
       } else {
-        console.warn(`[HtmlServer] Template file not found: ${templatePath}`);
+        this.log.error(`Template file not found: ${templatePath}`);
         return false;
       }
     } catch (error) {
-      console.error(`[HtmlServer] Failed to load template '${templateName}':`, error.message);
+      this.log.error(`Failed to load template '${templateName}':`, error.message);
       return false;
     }
   }
@@ -101,7 +107,7 @@ class HtmlServer {
       res.setHeader('Content-Type', 'text/html');
       res.send(html);
     } catch (error) {
-      console.error('[HtmlServer] Error rendering page:', error);
+      this.log.error('[HtmlServer] Error rendering page:', error);
       res.status(500).send(`<h1>Error</h1><p>Failed to render page: ${this.escapeHtml(error.message)}</p>`);
     }
   }
@@ -119,7 +125,7 @@ class HtmlServer {
       res.status(statusCode).setHeader('Content-Type', 'text/html');
       res.send(html);
     } catch (renderError) {
-      console.error('[HtmlServer] Error rendering error page:', renderError);
+      this.log.error('[HtmlServer] Error rendering error page:', renderError);
       res.status(statusCode).send(`<h1>Error</h1><p>Failed to render error page: ${this.escapeHtml(renderError.message)}</p>`);
     }
   }
@@ -140,7 +146,7 @@ class HtmlServer {
   // Initialize templates from directory
   loadTemplatesFromDirectory(templatesDir) {
     if (!fs.existsSync(templatesDir)) {
-      console.warn(`[HtmlServer] Templates directory not found: ${templatesDir}`);
+      this.log.warn(`Templates directory not found: ${templatesDir}`);
       return;
     }
 

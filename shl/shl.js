@@ -14,6 +14,9 @@ const pako = require('pako');
 const base45 = require('base45');
 const fs = require('fs');
 
+const Logger = require('../common/logger');
+const shlLog = Logger.getInstance().child({ module: 'shl' });
+
 // Import the FHIR Validator
 const FhirValidator = require('fhir-validator-wrapper');
 
@@ -22,7 +25,7 @@ let vhlProcessor;
 try {
   vhlProcessor = require('./vhl.js');
 } catch (err) {
-  console.log('vhl.js not found - VHL processing will be skipped');
+  shlLog.warning('vhl.js not found - VHL processing will be skipped');
   vhlProcessor = null;
 }
 
@@ -38,9 +41,7 @@ class SHLModule {
 
   async initialize(config) {
     this.config = config;
-    
-    console.log('Initializing SHL module...');
-    
+
     // Initialize database
     await this.initializeDatabase();
     
@@ -52,7 +53,7 @@ class SHLModule {
     // Start cleanup cron job
     this.startCleanupJob();
     
-    console.log('SHL module initialized successfully');
+    shlLog.info('SHL module initialized successfully');
   }
 
   async initializeDatabase() {
@@ -60,11 +61,23 @@ class SHLModule {
       const dbPath = path.join(__dirname, this.config.database);
       this.db = new sqlite3.Database(dbPath, (err) => {
         if (err) {
-          console.error('Error opening SHL database:', err.message);
+          shlLog.error('Error opening SHL SQLite database at "'+dbPath+'":', err.message);
           reject(err);
         } else {
-          console.log('Connected to SHL SQLite database');
-          this.createTables().then(resolve).catch(reject);
+          shlLog.info('Connected to SHL SQLite database at "'+dbPath+'"');
+
+          // Check if tables already exist before creating them
+          this.db.get("SELECT name FROM sqlite_master WHERE type='table' AND name='SHL'", (err, row) => {
+            if (err) {
+              reject(err);
+            } else if (row) {
+              // Tables already exist, no need to create them
+              resolve();
+            } else {
+              // Tables don't exist, create them
+              this.createTables().then(resolve).catch(reject);
+            }
+          });
         }
       });
     });
@@ -110,14 +123,14 @@ class SHLModule {
       const checkComplete = () => {
         tablesCreated++;
         if (tablesCreated === totalTables) {
-          console.log('SHL tables ready');
+          shlLog.info('SHL database initialized');
           resolve();
         }
       };
 
       this.db.run(createSHLTable, (err) => {
         if (err) {
-          console.error('Error creating SHL table:', err.message);
+          shlLog.error('Error creating SHL table:', err.message);
           reject(err);
         } else {
           checkComplete();
@@ -126,7 +139,7 @@ class SHLModule {
       
       this.db.run(createSHLFilesTable, (err) => {
         if (err) {
-          console.error('Error creating SHLFiles table:', err.message);
+          shlLog.error('Error creating SHLFiles table:', err.message);
           reject(err);
         } else {
           checkComplete();
@@ -135,7 +148,7 @@ class SHLModule {
       
       this.db.run(createSHLViewsTable, (err) => {
         if (err) {
-          console.error('Error creating SHLViews table:', err.message);
+          shlLog.error('Error creating SHLViews table:', err.message);
           reject(err);
         } else {
           checkComplete();
@@ -146,7 +159,7 @@ class SHLModule {
 
   async initializeFhirValidator() {
     try {
-      console.log('Initializing FHIR Validator...');
+      shlLog.info('Initializing FHIR Validator...');
       
       const validatorConfig = {
         version: this.config.validator.version,
@@ -157,15 +170,15 @@ class SHLModule {
         timeout: this.config.validator.timeout
       };
       
-      console.log('Starting FHIR Validator with config:', validatorConfig);
+      shlLog.info('Starting FHIR Validator with config:', validatorConfig);
       
-      const validatorJarPath = path.join(__dirname, 'validator_cli.jar');
-      this.fhirValidator = new FhirValidator(validatorJarPath);
+      const validatorJarPath = path.join(__dirname, '../validator_cli.jar');
+      this.fhirValidator = new FhirValidator(validatorJarPath, shlLog);
       await this.fhirValidator.start(validatorConfig);
       
-      console.log('FHIR Validator started successfully');
+      shlLog.info('FHIR Validator started successfully');
     } catch (error) {
-      console.error('Failed to start FHIR Validator:', error);
+      shlLog.error('Failed to start FHIR Validator:', error);
       throw error;
     }
   }
@@ -187,10 +200,10 @@ class SHLModule {
   startCleanupJob() {
     if (this.config.cleanup && this.config.cleanup.schedule) {
       this.cleanupJob = cron.schedule(this.config.cleanup.schedule, () => {
-        console.log('Running scheduled cleanup of expired SHL entries...');
+        shlLog.info('Running scheduled cleanup of expired SHL entries...');
         this.cleanupExpiredEntries();
       });
-      console.log(`SHL cleanup job scheduled: ${this.config.cleanup.schedule}`);
+      shlLog.info(`SHL cleanup job scheduled: ${this.config.cleanup.schedule}`);
     }
   }
 
@@ -206,9 +219,9 @@ class SHLModule {
     
     this.db.run(deleteSql, function(err) {
       if (err) {
-        console.error('SHL cleanup error:', err.message);
+        shlLog.error('SHL cleanup error:', err.message);
       } else if (this.changes > 0) {
-        console.log(`Cleaned up ${this.changes} expired SHL entries`);
+        shlLog.info(`Cleaned up ${this.changes} expired SHL entries`);
       }
     });
   }
@@ -307,7 +320,7 @@ class SHLModule {
       return encoded;
 
     } catch (error) {
-      console.error('COSE Sign1 creation error:', error);
+      shlLog.error('COSE Sign1 creation error:', error);
       throw error;
     }
   }
@@ -315,7 +328,7 @@ class SHLModule {
   setupRoutes() {
     // FHIR Validation endpoint
     this.router.post('/validate', async (req, res) => {
-      console.log("validate! (1)");
+      shlLog.info("validate! (1)");
       if (!this.fhirValidator || !this.fhirValidator.isRunning()) {
         return res.status(503).json({
           resourceType: 'OperationOutcome',
@@ -346,7 +359,7 @@ class SHLModule {
         if (req.query.displayOption) {
           options.displayOption = req.query.displayOption;
         }
-        console.log("validate! (4)");
+        shlLog.info("validate! (4)");
 
         let resource;
         if (Buffer.isBuffer(req.body)) {
@@ -356,16 +369,16 @@ class SHLModule {
         } else {
           resource = JSON.stringify(req.body);
         }
-        console.log("validate! (5)");
+        shlLog.info("validate! (5)");
 
         const operationOutcome = await this.fhirValidator.validate(resource, options);
-        console.log("validate! (6)");
+        shlLog.info("validate! (6)");
 
         res.json(operationOutcome);
-        console.log("validate! (7)");
+        shlLog.info("validate! (7)");
 
       } catch (error) {
-        console.error('Validation error:', error);
+        shlLog.error('Validation error:', error);
         res.status(500).json({
           resourceType: 'OperationOutcome',
           issue: [{
@@ -417,7 +430,7 @@ class SHLModule {
         const result = await this.fhirValidator.loadIG(packageId, version);
         res.json(result);
       } catch (error) {
-        console.error('Load IG error:', error);
+        shlLog.error('Load IG error:', error);
         res.status(500).json({
           resourceType: 'OperationOutcome',
           issue: [{
@@ -543,7 +556,7 @@ class SHLModule {
               res.json({ msg: 'ok' });
             })
             .catch((error) => {
-              console.error('File upload error:', error);
+              shlLog.error('File upload error:', error);
               res.status(500).json({ error: 'Failed to upload files' });
             });
         });
@@ -588,7 +601,7 @@ class SHLModule {
         
         this.db.run(logAccessSql, [uuid, recipient, clientIP], function(logErr) {
           if (logErr) {
-            console.error('Failed to log SHL access:', logErr.message);
+            shlLog.error('Failed to log SHL access:', logErr.message);
           }
           
           const getFilesSql = 'SELECT id, cnt, type FROM SHLFiles WHERE shl_uuid = ?';
@@ -622,7 +635,7 @@ class SHLModule {
                 const vhlResponse = vhlProcessor.processVHL(host, uuid, standardResponse);
                 res.json(vhlResponse);
               } catch (vhlErr) {
-                console.error('VHL processing error:', vhlErr.message);
+                shlLog.error('VHL processing error:', vhlErr.message);
                 res.json(standardResponse);
               }
             } else {
@@ -661,13 +674,13 @@ class SHLModule {
         
         this.db.run(logMasterAccessSql, [fileRow.shl_uuid, null, clientIP], function(logErr) {
           if (logErr) {
-            console.error('Failed to log master SHL file access:', logErr.message);
+            shlLog.error('Failed to log master SHL file access:', logErr.message);
           }
         });
         
         this.db.run(logFileAccessSql, [fileRow.id, null, clientIP], function(logErr) {
           if (logErr) {
-            console.error('Failed to log file-specific access:', logErr.message);
+            shlLog.error('Failed to log file-specific access:', logErr.message);
           }
         });
         
@@ -764,13 +777,13 @@ class SHLModule {
           });
           
         } catch (error) {
-          console.error('SHL sign processing error:', error);
+          shlLog.error('SHL sign processing error:', error);
           res.status(500).json({
             error: 'Failed to sign URL: ' + error.message
           });
         }
       } catch (error) {
-        console.error('SHL sign error:', error);
+        shlLog.error('SHL sign error:', error);
         res.status(500).json({
           error: 'Failed to sign URL'
         });
@@ -779,18 +792,18 @@ class SHLModule {
   }
 
   async shutdown() {
-    console.log('Shutting down SHL module...');
+    shlLog.info('Shutting down SHL module...');
     
     this.stopCleanupJob();
     
     // Stop FHIR validator
     if (this.fhirValidator) {
       try {
-        console.log('Stopping FHIR validator...');
+        shlLog.info('Stopping FHIR validator...');
         await this.fhirValidator.stop();
-        console.log('FHIR validator stopped');
+        shlLog.info('FHIR validator stopped');
       } catch (error) {
-        console.error('Error stopping FHIR validator:', error);
+        shlLog.error('Error stopping FHIR validator:', error);
       }
     }
     
@@ -798,9 +811,9 @@ class SHLModule {
       return new Promise((resolve) => {
         this.db.close((err) => {
           if (err) {
-            console.error('Error closing SHL database:', err.message);
+            shlLog.error('Error closing SHL database:', err.message);
           } else {
-            console.log('SHL database connection closed');
+            shlLog.info('SHL database connection closed');
           }
           resolve();
         });

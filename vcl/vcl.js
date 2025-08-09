@@ -7,6 +7,9 @@
 const express = require('express');
 const {parseVCL, parseVCLAndSetId, validateVCLExpression, VCLParseException} = require('./vcl-parser.js');
 
+const Logger = require('../common/logger');
+const vclLog = Logger.getInstance().child({ module: 'vcl' });
+
 class VCLModule {
   constructor() {
     this.router = express.Router();
@@ -16,7 +19,6 @@ class VCLModule {
 
   async initialize(config) {
     this.config = config;
-    console.log('VCL module initialized successfully');
   }
 
   setupRoutes() {
@@ -50,7 +52,7 @@ class VCLModule {
         res.json(valueSet);
 
       } catch (error) {
-        console.error('VCL parsing error:', error);
+        vclLog.error('VCL parsing error:'+ error);
 
         if (error instanceof VCLParseException) {
           return res.status(400).json({
@@ -69,7 +71,6 @@ class VCLModule {
   }
 
   async shutdown() {
-    console.log('VCL module shut down');
     // VCL module doesn't have any resources to clean up
   }
 
