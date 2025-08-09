@@ -34,15 +34,15 @@ function processVHL(host, uuid, standardResponse) {
   };
 
   for (const file of standardResponse.files) {
-    var uuid = tail(file.location);
+    var uuid2 = tail(file.location);
     var e = {
       "fullUrl": file.location,
       "resource": {
         "resourceType": "DocumentReference",
-        "id": uuid,
+        "id": uuid2,
         "masterIdentifier": {
           "system": "urn:ietf:rfc:3986",
-          "value": "urn:uuid:" + uuid
+          "value": "urn:uuid:" + uuid2
         },
         "content": [{
           "url": file.location,

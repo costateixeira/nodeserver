@@ -486,8 +486,6 @@ class RegistryModule {
           (tag == 'public' ? '' : `<span class="badge badge-info mr-1">${this._escapeHtml(tag)}</span>`)
         );
         html += badges.join(' ');
-      } else {
-
       }
       html += '</td>';
       html += `<td>${server.codeSystems}</td>`;
