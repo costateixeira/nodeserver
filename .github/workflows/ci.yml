@@ -41,30 +41,30 @@ jobs:
           directory: ./coverage/
           token: ${{ secrets.CODECOV_TOKEN }}
 
-docker:
-  name: Build Docker Image
-  runs-on: ubuntu-latest
-  needs: test
-  if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-  permissions:
-    contents: read
-    packages: write
+  docker:
+    name: Build Docker Image
+    runs-on: ubuntu-latest
+    needs: test
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    permissions:
+      contents: read
+      packages: write
 
-  steps:
-    - uses: actions/checkout@v4
-    - name: Set up Docker Buildx
-      uses: docker/setup-buildx-action@v3
-    - name: Login to GitHub Container Registry
-      uses: docker/login-action@v3
-      with:
-        registry: ghcr.io
-        username: ${{ github.actor }}
-        password: ${{ secrets.PACKAGE_TOKEN }}
-    - name: Build and push
-      uses: docker/build-push-action@v5
-      with:
-        context: .
-        push: true
-        tags: |
-          ghcr.io/${{ github.actor }}/nodeserver:cibuild
-          ghcr.io/${{ github.actor }}/nodeserver:cibuild-${{ github.sha }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+      - name: Login to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.PACKAGE_TOKEN }}
+      - name: Build and push
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          push: true
+          tags: |
+            ghcr.io/${{ github.actor }}/nodeserver:cibuild
+            ghcr.io/${{ github.actor }}/nodeserver:cibuild-${{ github.sha }}
