@@ -1,6 +1,7 @@
 const { UriServices, UriServicesFactory } = require('../../tx/cs/cs-uri');
 const { Languages, Language } = require('../../tx/library/languages');
 const CodeSystem = require('../../tx/library/codesystem');
+const {TxOperationContext} = require("../../tx/cs/cs-api");
 
 describe('Enhanced UriServices with Language Support', () => {
   let uriServices;
@@ -35,7 +36,7 @@ describe('Enhanced UriServices with Language Support', () => {
     };
 
     const supplement = new CodeSystem(supplData);
-    opContext = {}; // Mock operation context
+    opContext = new TxOperationContext(new Languages());
     uriServices = new UriServices([supplement]);
   });
 
@@ -95,9 +96,7 @@ describe('Enhanced UriServices with Language Support', () => {
       const testUri = 'https://example.com/different';
 
       // Set up operation context with French language preference
-      const frenchContext = {
-        languages: Languages.fromAcceptLanguage('fr')
-      };
+      const frenchContext = new TxOperationContext(Languages.fromAcceptLanguage('fr'));
 
       const display = await uriServices.display(frenchContext, testUri);
       expect(display).toBe('Example Different URL');
@@ -106,16 +105,19 @@ describe('Enhanced UriServices with Language Support', () => {
     test('should return designation when it matches language preference', async () => {
       const testUri = 'https://example.com/different';
 
+      // Set up operation context with French language preference
+      const frenchContext = new TxOperationContext(Languages.fromAcceptLanguage('fr'));
+
       // Test that designations are considered in display method
       // (This would require enhancing the display method to check designations)
-      const display = await uriServices.display(opContext, testUri);
+      const display = await uriServices.display(frenchContext, testUri);
       expect(display).toBe('Example Different URL');
     });
 
     test('should return empty string for URI not in supplement', async () => {
       const unknownUri = 'https://unknown.example.com/test';
       const display = await uriServices.display(opContext, unknownUri);
-      expect(display).toBe('');
+      expect(display).toBe(null);
     });
   });
 
@@ -124,9 +126,10 @@ describe('Enhanced UriServices with Language Support', () => {
       const testUri = 'https://example.com/different';
       const designations = await uriServices.designations(opContext, testUri);
 
-      expect(designations).toHaveLength(3);
+      expect(designations).toHaveLength(4);
 
       const languages = designations.map(d => d.language);
+      expect(languages).toContain('fr');
       expect(languages).toContain('es');
       expect(languages).toContain('fr-CA');
       expect(languages).toContain('en');
@@ -136,9 +139,9 @@ describe('Enhanced UriServices with Language Support', () => {
     });
 
     test('should return null for URI with no designations', async () => {
-      const testUri = 'https://example.com/another';
+      const testUri = 'https://example.com/another2';
       const designations = await uriServices.designations(opContext, testUri);
-      expect(designations).toBeNull();
+      expect(designations).toHaveLength(0);
     });
   });
 

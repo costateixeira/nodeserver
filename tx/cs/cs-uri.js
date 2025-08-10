@@ -1,6 +1,7 @@
 const CodeSystem = require('../library/codesystem');
-const { CodeSystemProvider, CodeSystemFactoryProvider} = require('./cs-api');
+const { CodeSystemProvider, CodeSystemFactoryProvider, TxOperationContext, Designation} = require('./cs-api');
 const { Language, Languages } = require('../../tx/library/languages');
+const assert = require('assert');
 
 /**
  * Code system provider for URIs
@@ -9,33 +10,8 @@ const { Language, Languages } = require('../../tx/library/languages');
  * Enhanced to support supplements for display and definition lookup
  */
 class UriServices extends CodeSystemProvider {
-  /**
-   * @type {CodeSystem[]}
-   */
-  supplements;
-
   constructor(supplements) {
-    super();
-    this.supplements = supplements;
-    this._validateSupplements();
-  }
-
-  /**
-   * Validates that supplements are CodeSystem instances
-   * @private
-   */
-  _validateSupplements() {
-    if (!this.supplements) return;
-
-    if (!Array.isArray(this.supplements)) {
-      throw new Error('Supplements must be an array');
-    }
-
-    this.supplements.forEach((supplement, index) => {
-      if (!(supplement instanceof CodeSystem)) {
-        throw new Error(`Supplement ${index} must be a CodeSystem instance, got ${typeof supplement}`);
-      }
-    });
+    super(supplements);
   }
 
   // ============================================================================
@@ -67,51 +43,12 @@ class UriServices extends CodeSystemProvider {
   }
 
   hasAnyDisplays(languages) {
-    // Convert input to Languages instance if needed
-    const langs = languages instanceof Languages ? languages :
-      Array.isArray(languages) ? Languages.fromAcceptLanguage(languages.join(',')) :
-        Languages.fromAcceptLanguage(languages || '');
-
-    // Check if any supplements have displays in the requested languages
-    if (this.supplements) {
-      for (const supplement of this.supplements) {
-        // Check if supplement language matches and has displays
-        if (supplement.jsonObj.language) {
-          const supplementLang = new Language(supplement.jsonObj.language);
-          for (const requestedLang of langs) {
-            if (supplementLang.matchesForDisplay(requestedLang)) {
-              // Check if any concept has a display
-              const allConcepts = supplement.getAllConcepts();
-              if (allConcepts.some(c => c.display)) {
-                return true;
-              }
-            }
-          }
-        }
-
-        // Check concept designations for display uses
-        const allConcepts = supplement.getAllConcepts();
-        for (const concept of allConcepts) {
-          if (concept.designation) {
-            for (const designation of concept.designation) {
-              // Check if designation is a display use
-              if (CodeSystem.isUseADisplay(designation.use)) {
-                if (designation.language) {
-                  const designationLang = new Language(designation.language);
-                  for (const requestedLang of langs) {
-                    if (designationLang.matchesForDisplay(requestedLang)) {
-                      return true;
-                    }
-                  }
-                }
-              }
-            }
-          }
-        }
-      }
+    const langs = this._ensureLanguages(languages);
+    if (this._hasAnySupplementDisplays(langs)) {
+      return true;
+    } else {
+      return false; // URIs don't have displays by default
     }
-
-    return false; // URIs don't have displays by default
   }
 
   hasParents() {
@@ -122,72 +59,55 @@ class UriServices extends CodeSystemProvider {
   // Getting Information about concepts
   // ============================================================================
 
-  code(opContext, code) {
+  async code(opContext, code) {
+    this._ensureOpContext(opContext);
+    const ctxt = await this.#ensureContext(opContext, code);
     return code; // For URIs, the code is the context
   }
 
   async display(opContext, code) {
-    // Check supplements for display
-    if (this.supplements) {
-      for (const supplement of this.supplements) {
-        const concept = supplement.getConceptByCode(code);
-        if (concept && concept.display) {
-          return concept.display;
-        }
-      }
-    }
-
-    return ''; // URIs don't have displays by default
+    this._ensureOpContext(opContext);
+    const ctxt = await this.#ensureContext(opContext, code);
+    return this._displayFromSupplements(opContext, ctxt);
   }
 
   async definition(opContext, code) {
-    // Check supplements for definition
-    if (this.supplements) {
-      for (const supplement of this.supplements) {
-        if (supplement.concept) {
-          const concept = supplement.concept.find(c => c.code === code);
-          if (concept && concept.definition) {
-            return concept.definition;
-          }
-        }
-      }
-    }
-
-    return ''; // URIs don't have definitions by default
+    this._ensureOpContext(opContext);
+    const ctxt = await this.#ensureContext(opContext, code);
+    return null; // URIs don't have definitions by default
   }
 
-  isAbstract(opContext, code) {
+  async isAbstract(opContext, code) {
+    this._ensureOpContext(opContext);
+    const ctxt = await this.#ensureContext(opContext, code);
     return false; // URIs are not abstract
   }
 
-  isInactive(opContext, code) {
+  async isInactive(opContext, code) {
+    this._ensureOpContext(opContext);
+    const ctxt = await this.#ensureContext(opContext, code);
     return false; // URIs are not inactive
   }
 
-  isDeprecated(opContext, code) {
+  async isDeprecated(opContext, code) {
+    this._ensureOpContext(opContext);
+    const ctxt = await this.#ensureContext(opContext, code);
     return false; // URIs are not deprecated
   }
 
-  getStatus(opContext, code) {
-    return null;
-  }
-
   async designations(opContext, code) {
-    let allDesignations = [];
-
-    if (this.supplements) {
-      for (const supplement of this.supplements) {
-        const concept = supplement.getConceptByCode(code);  // ← Uses CodeSystem API
-        if (concept && concept.designation) {
-          allDesignations = allDesignations.concat(concept.designation);
-        }
-      }
+    this._ensureOpContext(opContext);
+    const ctxt = await this.#ensureContext(opContext, code);
+    const designations = [];
+    if (ctxt != null) {
+      designations.push(...this._listSupplementDesignations(ctxt));
     }
-
-    return allDesignations.length > 0 ? allDesignations : null;
+    return designations;
   }
 
-  properties(opContext, code) {
+  async properties(opContext, code) {
+    this._ensureOpContext(opContext);
+    const ctxt = await this.#ensureContext(opContext, code);
     // Collect properties from all supplements
     let allProperties = [];
 
@@ -204,8 +124,19 @@ class UriServices extends CodeSystemProvider {
     return allProperties.length > 0 ? allProperties : null;
   }
 
-  sameConcept(opContext, a, b) {
+  async sameConcept(opContext, a, b) {
+    this._ensureOpContext(opContext);
+    const ac = await this.#ensureContext(opContext, a);
+    const bc = await this.#ensureContext(opContext, b);
     return a === b; // For URIs, direct string comparison
+  }
+
+
+  async #ensureContext(opContext, code) {
+    if (code == null || typeof code === 'string') {
+      return code;
+    }
+    throw "Unknown Type at #ensureContext: "+ (typeof code);
   }
 
   // ============================================================================
@@ -213,110 +144,36 @@ class UriServices extends CodeSystemProvider {
   // ============================================================================
 
   async locate(opContext, code) {
+    this._ensureOpContext(opContext);
+    assert(code == null || typeof code === 'string', 'code must be string');
+    if (!code) return { context: null, message: 'Empty code' };
+
     // For URIs, any string is potentially valid
     // But we can check if it exists in supplements for better validation
-    if (this.supplements) {
-      for (const supplement of this.supplements) {
-        if (supplement.concept) {
-          const concept = supplement.concept.find(c => c.code === code);
-          if (concept) {
-            return {
-              context: code,
-              message: null
-            };
-          }
-        }
-      }
-    }
+    // but it doesn't make any difference...
 
-    // Even if not in supplements, URIs are still valid
     return {
       context: code, // Use the string directly as context
       message: null
     };
   }
 
-  async locateIsA(opContext, code, parent, disallowParent) {
-    // URIs don't have formal subsumption properties
-    return {
-      context: null,
-      message: `URIs do not have parents`
-    };
-  }
-
-  iterator(opContext, code) {
-    return null; // Cannot iterate URIs
-  }
-
-  nextContext(opContext, context) {
-    return null; // No iteration support
-  }
-
-  subsumesTest(opContext, codeA, codeB) {
-    return false; // No subsumption for URIs
-  }
-
   // ============================================================================
   // Filtering (not supported for URIs)
   // ============================================================================
 
-  doesFilter(opContext, prop, op, value) {
-    return false; // No filters supported
-  }
-
-  getPrepContext(opContext, iterate) {
-    return null; // No filtering context needed
-  }
-
-  async searchFilter(opContext, filterContext, filter, sort) {
-    throw new Error('Search filtering not supported for URI code system');
-  }
-
-  async specialFilter(opContext, filterContext, filter, sort) {
-    throw new Error('Special filtering not supported for URI code system');
-  }
-
-  async executeFilters(opContext, filterContext) {
-    throw new Error('Filter execution not supported for URI code system');
-  }
-
-  filterSize(opContext, filterContext, set) {
-    throw new Error('Filter size not supported for URI code system');
-  }
-
-  filtersNotClosed(opContext, filterContext) {
-    return true; // URI space is not closed
-  }
-
-  filterMore(opContext, filterContext, set) {
-    throw new Error('Filter iteration not supported for URI code system');
-  }
-
-  filterConcept(opContext, filterContext, set) {
-    throw new Error('Filter concept access not supported for URI code system');
-  }
-
-  filterLocate(opContext, filterContext, set, code) {
-    throw new Error('Filter locate not supported for URI code system');
-  }
-
-  filterCheck(opContext, filterContext, set, concept) {
-    throw new Error('Filter check not supported for URI code system');
-  }
-
-  filterFinish(opContext, filterContext) {
-    // Nothing to clean up
-  }
+  // nothing to declare
 
   // ============================================================================
   // Translations and concept maps
   // ============================================================================
 
-  registerConceptMaps(list) {
+  async registerConceptMaps(list) {
     // No concept maps for URIs
   }
 
-  getTranslations(opContext, coding, target) {
+  async getTranslations(opContext, coding, target) {
+    this._ensureOpContext(opContext);
     return null; // No translations available
   }
 }

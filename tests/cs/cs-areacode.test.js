@@ -1,5 +1,6 @@
 const { TxOperationContext } = require('../../tx/cs/cs-api');
 const { AreaCodeServices, AreaCodeFactoryProvider } = require('../../tx/cs/cs-areacode');
+const { LanguageDefinitions, Languages, Language } = require('../../tx/library/languages');
 
 describe('AreaCodeServices', () => {
   let factory;
@@ -9,7 +10,7 @@ describe('AreaCodeServices', () => {
   beforeEach(() => {
     factory = new AreaCodeFactoryProvider();
     provider = factory.build(null, []);
-    opContext = new TxOperationContext(['en']);
+    opContext = new TxOperationContext(Languages.fromAcceptLanguage('en'));
   });
 
   describe('Basic Functionality', () => {
@@ -36,14 +37,14 @@ describe('AreaCodeServices', () => {
       const result = await provider.locate(opContext, '840'); // USA
       expect(result.context).toBeTruthy();
       expect(result.message).toBeNull();
-      expect(provider.code(opContext, result.context)).toBe('840');
+      expect((await provider.code(opContext, result.context))).toBe('840');
     });
 
     test('should locate valid region codes', async () => {
       const result = await provider.locate(opContext, '150'); // Europe
       expect(result.context).toBeTruthy();
       expect(result.message).toBeNull();
-      expect(provider.code(opContext, result.context)).toBe('150');
+      expect((await provider.code(opContext, result.context))).toBe('150');
     });
 
     test('should return error for invalid codes', async () => {
@@ -65,31 +66,31 @@ describe('AreaCodeServices', () => {
     test('should return empty definition', async () => {
       const result = await provider.locate(opContext, '840');
       const definition = await provider.definition(opContext, result.context);
-      expect(definition).toBe('');
+      expect(definition).toBe(null);
     });
 
     test('should return false for abstract, inactive, deprecated', async () => {
       const result = await provider.locate(opContext, '840');
-      expect(provider.isAbstract(opContext, result.context)).toBe(false);
-      expect(provider.isInactive(opContext, result.context)).toBe(false);
-      expect(provider.isDeprecated(opContext, result.context)).toBe(false);
+      expect(await provider.isAbstract(opContext, result.context)).toBe(false);
+      expect(await provider.isInactive(opContext, result.context)).toBe(false);
+      expect(await provider.isDeprecated(opContext, result.context)).toBe(false);
     });
   });
 
   describe('Iterator Functionality', () => {
-    test('should create iterator for all concepts', () => {
-      const iterator = provider.iterator(opContext, null);
+    test('should create iterator for all concepts', async () => {
+      const iterator = await provider.iterator(opContext, null);
       expect(iterator).toBeTruthy();
       expect(iterator.index).toBe(0);
       expect(iterator.total).toBe(provider.totalCount());
     });
 
-    test('should iterate through concepts', () => {
-      const iterator = provider.iterator(opContext, null);
+    test('should iterate through concepts', async () => {
+      const iterator = await provider.iterator(opContext, null);
       const concepts = [];
 
       for (let i = 0; i < 10 && i < iterator.total; i++) {
-        const concept = provider.nextContext(opContext, iterator);
+        const concept = await provider.nextContext(opContext, iterator);
         expect(concept).toBeTruthy();
         concepts.push(concept);
       }
@@ -100,35 +101,36 @@ describe('AreaCodeServices', () => {
       expect(new Set(codes).size).toBe(codes.length);
     });
 
-    test('should return null when iterator exhausted', () => {
+    test('should return null when iterator exhausted', async () => {
       const iterator = { index: provider.totalCount(), total: provider.totalCount() };
-      const concept = provider.nextContext(opContext, iterator);
+      const concept = await provider.nextContext(opContext, iterator);
       expect(concept).toBeNull();
     });
   });
 
-  describe('Filter Support', () => {
-    test('should support class/type equals filters', () => {
-      expect(provider.doesFilter(opContext, 'class', 'equals', 'country')).toBe(true);
-      expect(provider.doesFilter(opContext, 'type', 'equals', 'region')).toBe(true);
+  describe('Filter Support',  () => {
+    test('should support class/type equals filters', async () => {
+      expect(await provider.doesFilter(opContext, 'class', 'equals', 'country')).toBe(true);
+      expect(await provider.doesFilter(opContext, 'type', 'equals', 'region')).toBe(true);
     });
 
-    test('should not support other filters', () => {
-      expect(provider.doesFilter(opContext, 'display', 'equals', 'test')).toBe(false);
-      expect(provider.doesFilter(opContext, 'class', 'contains', 'country')).toBe(false);
-      expect(provider.doesFilter(opContext, 'class', 'in', 'country,region')).toBe(false);
+    test('should not support other filters', async () => {
+      expect(await provider.doesFilter(opContext, 'display', 'equals', 'test')).toBe(false);
+      expect(await provider.doesFilter(opContext, 'class', 'contains', 'country')).toBe(false);
+      expect(await provider.doesFilter(opContext, 'class', 'in', 'country,region')).toBe(false);
     });
 
-    test('should return null for prep context', () => {
-      expect(provider.getPrepContext(opContext, true)).toBeNull();
-    });
   });
 
   describe('Filter by Country', () => {
     let countryFilter;
+    let ctxt;
 
     beforeEach(async () => {
-      countryFilter = await provider.filter(opContext, null, 'class', 'equals', 'country');
+      ctxt = await provider.getPrepContext(opContext, false);
+      await provider.filter(opContext, ctxt, 'class', 'equals', 'country');
+      const filters = await provider.executeFilters(opContext, ctxt);
+      countryFilter = filters[0];
     });
 
     test('should create country filter', () => {
@@ -137,20 +139,20 @@ describe('AreaCodeServices', () => {
       expect(countryFilter.cursor).toBe(-1);
     });
 
-    test('should return correct filter size for countries', () => {
-      const size = provider.filterSize(opContext, null, countryFilter);
+    test('should return correct filter size for countries', async () => {
+      const size = await provider.filterSize(opContext, ctxt, countryFilter);
       expect(size).toBeGreaterThan(190); // Should have many countries
       expect(size).toBeLessThan(300); // But not too many
     });
 
-    test('should iterate through countries only', () => {
+    test('should iterate through countries only', async () => {
       const countries = [];
       countryFilter.cursor = -1; // Reset cursor
 
       // Get first 10 countries
       for (let i = 0; i < 10; i++) {
-        if (provider.filterMore(opContext, null, countryFilter)) {
-          const concept = provider.filterConcept(opContext, null, countryFilter);
+        if (await provider.filterMore(opContext, ctxt, countryFilter)) {
+          const concept = await provider.filterConcept(opContext, ctxt, countryFilter);
           expect(concept).toBeTruthy();
           expect(concept.class_).toBe('country');
           countries.push(concept);
@@ -161,7 +163,7 @@ describe('AreaCodeServices', () => {
     });
 
     test('should locate specific country in filter', async () => {
-      const result = await provider.filterLocate(opContext, null, countryFilter, '840'); // USA
+      const result = await provider.filterLocate(opContext, ctxt, countryFilter, '840'); // USA
       expect(result).toBeTruthy();
       expect(typeof result).not.toBe('string'); // Should not be error message
       expect(result.code).toBe('840');
@@ -169,27 +171,31 @@ describe('AreaCodeServices', () => {
     });
 
     test('should not locate region in country filter', async () => {
-      const result = await provider.filterLocate(opContext, null, countryFilter, '150'); // Europe
+      const result = await provider.filterLocate(opContext, ctxt, countryFilter, '150'); // Europe
       expect(typeof result).toBe('string'); // Should be error message
       expect(result).toContain('not found');
     });
 
-    test('should check if concept is in country filter', () => {
+    test('should check if concept is in country filter', async () => {
       // Find a country concept
       countryFilter.cursor = -1;
-      provider.filterMore(opContext, null, countryFilter);
-      const countryConcept = provider.filterConcept(opContext, null, countryFilter);
+      await provider.filterMore(opContext, ctxt, countryFilter);
+      const countryConcept = await provider.filterConcept(opContext, ctxt, countryFilter);
 
-      const isInFilter = provider.filterCheck(opContext, null, countryFilter, countryConcept);
+      const isInFilter = await provider.filterCheck(opContext, ctxt, countryFilter, countryConcept);
       expect(isInFilter).toBe(true);
     });
   });
 
   describe('Filter by Region', () => {
     let regionFilter;
+    let ctxt;
 
     beforeEach(async () => {
-      regionFilter = await provider.filter(opContext, null, 'type', 'equals', 'region');
+      ctxt = await provider.getPrepContext(opContext, false);
+      await provider.filter(opContext, ctxt, 'type', 'equals', 'region');
+      const filters = await provider.executeFilters(opContext, ctxt);
+      regionFilter = filters[0];
     });
 
     test('should create region filter', () => {
@@ -198,19 +204,19 @@ describe('AreaCodeServices', () => {
       expect(regionFilter.cursor).toBe(-1);
     });
 
-    test('should return correct filter size for regions', () => {
-      const size = provider.filterSize(opContext, null, regionFilter);
+    test('should return correct filter size for regions', async () => {
+      const size = await provider.filterSize(opContext, ctxt, regionFilter);
       expect(size).toBeGreaterThan(20); // Should have geographic regions
       expect(size).toBeLessThan(50); // But not too many
     });
 
-    test('should iterate through regions only', () => {
+    test('should iterate through regions only', async () => {
       const regions = [];
       regionFilter.cursor = -1; // Reset cursor
 
       // Get all regions
-      while (provider.filterMore(opContext, null, regionFilter)) {
-        const concept = provider.filterConcept(opContext, null, regionFilter);
+      while (await provider.filterMore(opContext, ctxt, regionFilter)) {
+        const concept = await provider.filterConcept(opContext, ctxt, regionFilter);
         expect(concept).toBeTruthy();
         expect(concept.class_).toBe('region');
         regions.push(concept);
@@ -228,7 +234,7 @@ describe('AreaCodeServices', () => {
     });
 
     test('should locate specific region in filter', async () => {
-      const result = await provider.filterLocate(opContext, null, regionFilter, '150'); // Europe
+      const result = await provider.filterLocate(opContext, ctxt, regionFilter, '150'); // Europe
       expect(result).toBeTruthy();
       expect(typeof result).not.toBe('string'); // Should not be error message
       expect(result.code).toBe('150');
@@ -236,7 +242,7 @@ describe('AreaCodeServices', () => {
     });
 
     test('should not locate country in region filter', async () => {
-      const result = await provider.filterLocate(opContext, null, regionFilter, '840'); // USA
+      const result = await provider.filterLocate(opContext, ctxt, regionFilter, '840'); // USA
       expect(typeof result).toBe('string'); // Should be error message
       expect(result).toContain('not found');
     });
@@ -245,33 +251,35 @@ describe('AreaCodeServices', () => {
   describe('Filter Error Cases', () => {
     test('should throw error for unsupported property', async () => {
       await expect(
-        provider.filter(opContext, null, 'display', 'equals', 'test')
+        provider.filter(opContext, await provider.getPrepContext(opContext, false), 'display', 'equals', 'test')
       ).rejects.toThrow('not supported');
     });
 
     test('should throw error for unsupported operator', async () => {
       await expect(
-        provider.filter(opContext, null, 'class', 'contains', 'country')
+        provider.filter(opContext, await provider.getPrepContext(opContext, false), 'class', 'contains', 'country')
       ).rejects.toThrow('not supported');
     });
 
     test('should throw error for search filter', async () => {
       await expect(
-        provider.searchFilter(opContext, null, 'test', false)
+        provider.searchFilter(opContext, await provider.getPrepContext(opContext, false), 'test', false)
       ).rejects.toThrow('not implemented');
     });
 
     test('should throw error for special filter', async () => {
       await expect(
-        provider.specialFilter(opContext, null, 'test', false)
+        provider.specialFilter(opContext, await provider.getPrepContext(opContext, false), 'test', false)
       ).rejects.toThrow('not implemented');
     });
   });
 
   describe('Execute Filters', () => {
     test('should execute single filter', async () => {
-      const countryFilter = await provider.filter(opContext, null, 'class', 'equals', 'country');
-      const results = await provider.executeFilters(opContext, countryFilter);
+      const ctxt = await provider.getPrepContext(opContext, false);
+      await provider.filter(opContext, ctxt, 'class', 'equals', 'country');
+      const results = await provider.executeFilters(opContext, ctxt);
+      const countryFilter = results[0];
 
       expect(results).toBeTruthy();
       expect(Array.isArray(results)).toBe(true);
@@ -280,19 +288,19 @@ describe('AreaCodeServices', () => {
     });
 
     test('should return empty array for null filter', async () => {
-      const results = await provider.executeFilters(opContext, null);
+      const results = await provider.executeFilters(opContext, await provider.getPrepContext(opContext, false));
       expect(results).toEqual([]);
     });
 
-    test('should indicate filters are closed', () => {
-      expect(provider.filtersNotClosed(opContext, null)).toBe(false);
+    test('should indicate filters are closed', async () => {
+      expect(await provider.filtersNotClosed(opContext, await provider.getPrepContext(opContext, false))).toBe(false);
     });
   });
 
   describe('Subsumption', () => {
-    test('should not support subsumption', () => {
-      expect(provider.subsumesTest(opContext, '840', '150')).toBe(false);
-      expect(provider.subsumesTest(opContext, '150', '840')).toBe(false);
+    test('should not support subsumption', async () => {
+      expect(await provider.subsumesTest(opContext, '840', '150')).toBe(false);
+      expect(await provider.subsumesTest(opContext, '150', '840')).toBe(false);
     });
 
     test('should return error for locateIsA', async () => {

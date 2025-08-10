@@ -1,4 +1,6 @@
-const { CodeSystemProvider, TxOperationContext, Designation } = require('./cs-api');
+const { CodeSystemProvider, TxOperationContext, Designation, FilterExecutionContext } = require('./cs-api');
+const assert = require('assert');
+const CodeSystem = require("../library/codesystem");
 
 class AreaCodeConcept {
   constructor(code, display, abbrev, class_) {
@@ -43,61 +45,112 @@ class AreaCodeServices extends CodeSystemProvider {
     return false; // No hierarchical relationships
   }
 
+  hasAnyDisplays(languages) {
+    const langs = this._ensureLanguages(languages);
+    if (this._hasAnySupplementDisplays(langs)) {
+      return true;
+    }
+    return super.hasAnyDisplays(langs);
+  }
+
   // Core concept methods
-  code(opContext, context) {
-    if (typeof context === 'string') {
-      return context;
+  async code(opContext, code) {
+    this._ensureOpContext(opContext);
+    const ctxt = await this.#ensureContext(opContext, code);
+    return ctxt ? ctxt.code : null;
+  }
+
+  async display(opContext, code) {
+    this._ensureOpContext(opContext);
+    const ctxt = await this.#ensureContext(opContext, code);
+    if (!ctxt) {
+      return null;
     }
-    return context.code;
-  }
-
-  async display(opContext, context) {
-    if (typeof context === 'string') {
-      const concept = this.codeMap.get(context);
-      return concept ? concept.display : '';
+    if (ctxt.display && opContext.langs.isEnglishOrNothing()) {
+      return ctxt ? ctxt.display : '';
     }
-    return context.display;
+    let disp = this._displayFromSupplements(ctxt.code);
+    if (disp) {
+      return disp;
+    }
+    return ctxt.display;
   }
 
-  async definition(opContext, context) {
-    return ''; // No definitions provided in original
+  async definition(opContext, code) {
+    this._ensureOpContext(opContext);
+    const ctxt = await this.#ensureContext(opContext, code);
+    return null; // No definitions provided in original
   }
 
-  isAbstract(opContext, context) {
+  async isAbstract(opContext, code) {
+    this._ensureOpContext(opContext);
+    const ctxt = await this.#ensureContext(opContext, code);
     return false; // No abstract concepts
   }
 
-  isInactive(opContext, context) {
+  async isInactive(opContext, code) {
+    this._ensureOpContext(opContext);
+    const ctxt = await this.#ensureContext(opContext, code);
     return false; // No inactive concepts
   }
 
-  isDeprecated(opContext, context) {
+  async isDeprecated(opContext, code) {
+    this._ensureOpContext(opContext);
+    const ctxt = await this.#ensureContext(opContext, code);
     return false; // No deprecated concepts
+  }
+
+
+  async designations(opContext, code) {
+    this._ensureOpContext(opContext);
+    const ctxt = await this.#ensureContext(opContext, code);
+    let designations = [];
+    if (ctxt != null) {
+      designations.push(new Designation('en', CodeSystem.makeUseForDisplay(), ctxt.display));
+      designations.push(...this._listSupplementDesignations(ctxt));
+    }
+    return designations;
+  }
+
+  async #ensureContext(opContext, code) {
+    if (code == null) {
+      return code;
+    }
+    if (typeof code === 'string') {
+      return (await this.locate(opContext, code)).concept;
+    }
+    if (code instanceof AreaCodeConcept) {
+      return code;
+    }
+    throw "Unknown Type at #ensureContext: "+ (typeof code);
   }
 
   // Lookup methods
   async locate(opContext, code) {
+    this._ensureOpContext(opContext);
+    assert(code == null || typeof code === 'string', 'code must be string');
+    if (!code) return { context: null, message: 'Empty code' };
+
     const concept = this.codeMap.get(code);
     if (concept) {
       return { context: concept, message: null };
     }
-    return { context: null, message: `Code '${code}' not found` };
-  }
-
-  async locateIsA(opContext, code, parent, disallowParent) {
-    // Area codes don't have formal subsumption, so not supported
-    return { context: null, message: `The CodeSystem ${this.system()} does not have parents` };
+    return { context: null, message: `Area Code '${code}' not found` };
   }
 
   // Iterator methods
-  iterator(opContext, context) {
-    if (!context) {
+  async iterator(opContext, code) {
+    this._ensureOpContext(opContext);
+    const ctxt = await this.#ensureContext(opContext, code);
+    if (!ctxt) {
       return { index: 0, total: this.totalCount() };
     }
     return null; // No child iteration
   }
 
-  nextContext(opContext, iteratorContext) {
+  async nextContext(opContext, iteratorContext) {
+    this._ensureOpContext(opContext);
+    assert(iteratorContext, 'iteratorContext must be provided');
     if (iteratorContext && iteratorContext.index < iteratorContext.total) {
       const concept = this.codes[iteratorContext.index];
       iteratorContext.index++;
@@ -107,23 +160,40 @@ class AreaCodeServices extends CodeSystemProvider {
   }
 
   // Filtering methods
-  doesFilter(opContext, prop, op, value) {
+  async doesFilter(opContext, prop, op, value) {
+    this._ensureOpContext(opContext);
+    assert(prop != null && typeof prop === 'string', 'prop must be a non-null string');
+    assert(op != null && typeof op === 'string', 'op must be a non-null string');
+    assert(value != null && typeof value === 'string', 'value must be a non-null string');
+
     return (prop === 'type' || prop === 'class') && op === 'equals';
   }
 
-  getPrepContext(opContext, iterate) {
-    return null; // No preparation needed
-  }
-
   async searchFilter(opContext, filterContext, filter, sort) {
+    this._ensureOpContext(opContext);
+    assert(filterContext && filterContext instanceof FilterExecutionContext, 'filterContext must be a FilterExecutionContext');
+    assert(filter && typeof filter === 'string', 'filter must be a non-null string');
+    assert(typeof sort === 'boolean', 'sort must be a boolean');
+
     throw new Error('Search filter not implemented for AreaCode');
   }
 
   async specialFilter(opContext, filterContext, filter, sort) {
+    this._ensureOpContext(opContext);
+    assert(filterContext && filterContext instanceof FilterExecutionContext, 'filterContext must be a FilterExecutionContext');
+    assert(filter && typeof filter === 'string', 'filter must be a non-null string');
+    assert(typeof sort === 'boolean', 'sort must be a boolean');
+
     throw new Error('Special filter not implemented for AreaCode');
   }
 
   async filter(opContext, filterContext, prop, op, value) {
+    this._ensureOpContext(opContext);
+    assert(filterContext && filterContext instanceof FilterExecutionContext, 'filterContext must be a FilterExecutionContext');
+    assert(prop != null && typeof prop === 'string', 'prop must be a non-null string');
+    assert(op != null && typeof op === 'string', 'op must be a non-null string');
+    assert(value != null && typeof value === 'string', 'value must be a non-null string');
+
     if ((prop === 'type' || prop === 'class') && op === 'equals') {
       const result = new AreaCodeConceptFilter();
 
@@ -132,32 +202,43 @@ class AreaCodeServices extends CodeSystemProvider {
           result.list.push(concept);
         }
       }
-
-      return result;
+      filterContext.filters.push(result);
+    } else {
+      throw new Error(`The filter ${prop} ${op} = ${value} is not supported for ${this.system()}`);
     }
-
-    throw new Error(`The filter ${prop} ${op} = ${value} is not supported for ${this.system()}`);
   }
 
   async executeFilters(opContext, filterContext) {
-    // Since we handle filters individually, just return them
-    return filterContext ? [filterContext] : [];
+    this._ensureOpContext(opContext);
+    assert(filterContext && filterContext instanceof FilterExecutionContext, 'filterContext must be a FilterExecutionContext');
+    return filterContext.filters;
   }
 
-  filterSize(opContext, filterContext, set) {
+  async filterSize(opContext, filterContext, set) {
+    this._ensureOpContext(opContext);
+    assert(filterContext && filterContext instanceof FilterExecutionContext, 'filterContext must be a FilterExecutionContext');
+    assert(set && set instanceof AreaCodeConceptFilter, 'set must be a AreaCodeConceptFilter');
     return set.list.length;
   }
 
-  filtersNotClosed(opContext, filterContext) {
+  async filtersNotClosed(opContext, filterContext) {
+    this._ensureOpContext(opContext);
+    assert(filterContext && filterContext instanceof FilterExecutionContext, 'filterContext must be a FilterExecutionContext');
     return false; // Finite set
   }
 
-  filterMore(opContext, filterContext, set) {
+  async filterMore(opContext, filterContext, set) {
+    this._ensureOpContext(opContext);
+    assert(filterContext && filterContext instanceof FilterExecutionContext, 'filterContext must be a FilterExecutionContext');
+    assert(set && set instanceof AreaCodeConceptFilter, 'set must be a AreaCodeConceptFilter');
     set.cursor++;
     return set.cursor < set.list.length;
   }
 
-  filterConcept(opContext, filterContext, set) {
+  async filterConcept(opContext, filterContext, set) {
+    this._ensureOpContext(opContext);
+    assert(filterContext && filterContext instanceof FilterExecutionContext, 'filterContext must be a FilterExecutionContext');
+    assert(set && set instanceof AreaCodeConceptFilter, 'set must be a AreaCodeConceptFilter');
     if (set.cursor >= 0 && set.cursor < set.list.length) {
       return set.list[set.cursor];
     }
@@ -165,6 +246,11 @@ class AreaCodeServices extends CodeSystemProvider {
   }
 
   async filterLocate(opContext, filterContext, set, code) {
+    this._ensureOpContext(opContext);
+    assert(filterContext && filterContext instanceof FilterExecutionContext, 'filterContext must be a FilterExecutionContext');
+    assert(set && set instanceof AreaCodeConceptFilter, 'set must be a AreaCodeConceptFilter');
+    assert(typeof code === 'string', 'code must be non-null string');
+
     for (const concept of set.list) {
       if (concept.code === code) {
         return concept;
@@ -173,16 +259,22 @@ class AreaCodeServices extends CodeSystemProvider {
     return `Code '${code}' not found in filter set`;
   }
 
-  filterCheck(opContext, filterContext, set, concept) {
-    return set.list.includes(concept);
+  async filterCheck(opContext, filterContext, set, concept) {
+    this._ensureOpContext(opContext);
+    assert(filterContext && filterContext instanceof FilterExecutionContext, 'filterContext must be a FilterExecutionContext');
+    assert(set && set instanceof AreaCodeConceptFilter, 'set must be a AreaCodeConceptFilter');
+    const ctxt = await this.#ensureContext(opContext, concept);
+    return set.list.includes(ctxt);
   }
 
-  filterFinish(opContext, filterContext) {
+  async filterFinish(opContext, filterContext) {
+    this._ensureOpContext(opContext);
     // No cleanup needed
   }
 
   // Subsumption
-  subsumesTest(opContext, codeA, codeB) {
+  async subsumesTest(opContext, codeA, codeB) {
+    this._ensureOpContext(opContext);
     return false; // No subsumption relationships
   }
 }

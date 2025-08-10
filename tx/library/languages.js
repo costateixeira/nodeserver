@@ -290,6 +290,11 @@ class Language {
     return true;
   }
 
+
+  isEnglishOrNothing() {
+    return !this.code || this.code === 'en' || this.code === 'en-US';
+  }
+
   toString() {
     const parts = [];
 
@@ -402,6 +407,15 @@ class Languages {
    */
   getPrimary() {
     return this.languages.length > 0 ? this.languages[0] : new Language('en-US');
+  }
+
+  isEnglishOrNothing() {
+    for (const lang of this.languages) {
+      if (!lang.isEnglishOrNothing()) {
+        return false;
+      }
+    }
+    return true;
   }
 }
 
@@ -593,6 +607,8 @@ class LanguageDefinitions {
 
   /**
    * Parse and validate a language code
+   *
+   * @return {Language} parsed language (or null)
    */
   parse(code) {
     if (!code) return null;

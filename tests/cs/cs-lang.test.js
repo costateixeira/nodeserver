@@ -99,14 +99,14 @@ describe('IETF Language CodeSystem Provider', () => {
       expect(result.message).toBe('Empty code');
     });
 
-    test('should extract code from string context', () => {
-      const code = provider.code(opContext, 'en-US');
+    test('should extract code from string context',  async () => {
+      const code = await provider.code(opContext, 'en-US');
       expect(code).toBe('en-US');
     });
 
-    test('should extract code from Language context', () => {
+    test('should extract code from Language context', async () => {
       const lang = new Language('fr-CA');
-      const code = provider.code(opContext, lang);
+      const code = await provider.code(opContext, lang);
       expect(code).toBe('fr-CA');
     });
   });
@@ -124,14 +124,14 @@ describe('IETF Language CodeSystem Provider', () => {
       expect(display).not.toBe('??');
     });
 
-    test('should return ?? for invalid codes', async () => {
+    test('should return null for invalid codes', async () => {
       const display = await provider.display(opContext, 'invalid');
-      expect(display).toBe('??');
+      expect(display).toBe(null);
     });
 
-    test('should return ?? for empty codes', async () => {
+    test('should return null for empty codes', async () => {
       const display = await provider.display(opContext, '');
-      expect(display).toBe('??');
+      expect(display).toBe(null);
     });
   });
 
@@ -142,7 +142,7 @@ describe('IETF Language CodeSystem Provider', () => {
       expect(designations.length).toBeGreaterThan(0);
       
       // Should have at least one primary designation
-      const primary = designations.find(d => d.lang === 'en');
+      const primary = designations.find(d => d.language === 'en');
       expect(primary).toBeTruthy();
       expect(primary.value).toBeTruthy();
     });
@@ -163,26 +163,26 @@ describe('IETF Language CodeSystem Provider', () => {
     });
   });
 
-  describe('Filtering', () => {
-    test('should support exists filters for language components', () => {
-      expect(provider.doesFilter(opContext, 'language', 'exists', 'true')).toBe(true);
-      expect(provider.doesFilter(opContext, 'script', 'exists', 'false')).toBe(true);
-      expect(provider.doesFilter(opContext, 'region', 'exists', 'true')).toBe(true);
-      expect(provider.doesFilter(opContext, 'invalid', 'exists', 'true')).toBe(false);
-      expect(provider.doesFilter(opContext, 'language', 'equals', 'en')).toBe(false);
+  describe('Filtering',  () => {
+    test('should support exists filters for language components', async () => {
+      expect(await provider.doesFilter(opContext, 'language', 'exists', 'true')).toBe(true);
+      expect(await provider.doesFilter(opContext, 'script', 'exists', 'false')).toBe(true);
+      expect(await provider.doesFilter(opContext, 'region', 'exists', 'true')).toBe(true);
+      expect(await provider.doesFilter(opContext, 'invalid', 'exists', 'true')).toBe(false);
+      expect(await provider.doesFilter(opContext, 'language', 'equals', 'en')).toBe(false);
     });
 
     test('should create language component filters', async () => {
-      const prep = provider.getPrepContext(opContext, false);
-      const filter = await provider.filter(opContext, prep, 'language', 'exists', 'true');
-      
-      expect(filter).toBeInstanceOf(IETFLanguageCodeFilter);
-      expect(filter.component).toBe(LanguageComponent.LANG);
-      expect(filter.status).toBe(true);
+      const prep = await provider.getPrepContext(opContext, false);
+      await provider.filter(opContext, prep, 'language', 'exists', 'true');
+      const filters = await provider.executeFilters(opContext, prep);
+      expect(filters[0]).toBeInstanceOf(IETFLanguageCodeFilter);
+      expect(filters[0].component).toBe(LanguageComponent.LANG);
+      expect(filters[0].status).toBe(true);
     });
 
     test('should reject unsupported filter operators', async () => {
-      const prep = provider.getPrepContext(opContext, false);
+      const prep = await provider.getPrepContext(opContext, false);
       
       await expect(
         provider.filter(opContext, prep, 'language', 'equals', 'en')
@@ -190,7 +190,7 @@ describe('IETF Language CodeSystem Provider', () => {
     });
 
     test('should reject invalid exists values', async () => {
-      const prep = provider.getPrepContext(opContext, false);
+      const prep = await provider.getPrepContext(opContext, false);
       
       await expect(
         provider.filter(opContext, prep, 'language', 'exists', 'maybe')
@@ -198,7 +198,7 @@ describe('IETF Language CodeSystem Provider', () => {
     });
 
     test('should reject unsupported properties', async () => {
-      const prep = provider.getPrepContext(opContext, false);
+      const prep = await provider.getPrepContext(opContext, false);
       
       await expect(
         provider.filter(opContext, prep, 'invalid-prop', 'exists', 'true')
@@ -208,17 +208,19 @@ describe('IETF Language CodeSystem Provider', () => {
 
   describe('Filter location', () => {
     test('should locate code with required language component', async () => {
-      const prep = provider.getPrepContext(opContext, false);
-      const filter = await provider.filter(opContext, prep, 'language', 'exists', 'true');
-      
-      const result = await provider.filterLocate(opContext, prep, filter, 'en-US');
+      const prep = await provider.getPrepContext(opContext, false);
+      await provider.filter(opContext, prep, 'language', 'exists', 'true');
+      const filters = await provider.executeFilters(opContext, prep);
+      const result = await provider.filterLocate(opContext, prep, filters[0], 'en-US');
       expect(result).toBeInstanceOf(Language);
       expect(result.code).toBe('en-US');
     });
 
     test('should locate code with required region component', async () => {
-      const prep = provider.getPrepContext(opContext, false);
-      const filter = await provider.filter(opContext, prep, 'region', 'exists', 'true');
+      const prep = await provider.getPrepContext(opContext, false);
+      await provider.filter(opContext, prep, 'region', 'exists', 'true');
+      const filters = await provider.executeFilters(opContext, prep);
+      const filter = filters[0];
       
       const result = await provider.filterLocate(opContext, prep, filter, 'en-US');
       expect(result).toBeInstanceOf(Language);
@@ -226,18 +228,22 @@ describe('IETF Language CodeSystem Provider', () => {
     });
 
     test('should reject code missing required component', async () => {
-      const prep = provider.getPrepContext(opContext, false);
-      const filter = await provider.filter(opContext, prep, 'region', 'exists', 'true');
-      
+      const prep = await provider.getPrepContext(opContext, false);
+      await provider.filter(opContext, prep, 'region', 'exists', 'true');
+      const filters = await provider.executeFilters(opContext, prep);
+      const filter = filters[0];
+
       const result = await provider.filterLocate(opContext, prep, filter, 'en');
       expect(typeof result).toBe('string');
       expect(result).toContain('does not contain');
     });
 
     test('should reject code with forbidden component', async () => {
-      const prep = provider.getPrepContext(opContext, false);
-      const filter = await provider.filter(opContext, prep, 'region', 'exists', 'false');
-      
+      const prep = await provider.getPrepContext(opContext, false);
+      await provider.filter(opContext, prep, 'region', 'exists', 'false');
+      const filters = await provider.executeFilters(opContext, prep);
+      const filter = filters[0];
+
       const result = await provider.filterLocate(opContext, prep, filter, 'en-US');
       expect(typeof result).toBe('string');
       expect(result).toContain('contains');
@@ -245,9 +251,11 @@ describe('IETF Language CodeSystem Provider', () => {
     });
 
     test('should reject invalid language codes in filter', async () => {
-      const prep = provider.getPrepContext(opContext, false);
-      const filter = await provider.filter(opContext, prep, 'language', 'exists', 'true');
-      
+      const prep = await provider.getPrepContext(opContext, false);
+      await provider.filter(opContext, prep, 'language', 'exists', 'true');
+      const filters = await provider.executeFilters(opContext, prep);
+      const filter = filters[0];
+
       const result = await provider.filterLocate(opContext, prep, filter, 'invalid-code');
       expect(typeof result).toBe('string');
       expect(result).toContain('Invalid language code');
@@ -255,36 +263,36 @@ describe('IETF Language CodeSystem Provider', () => {
   });
 
   describe('Filter checking', () => {
-    test('should check if concept matches filter', () => {
+    test('should check if concept matches filter', async () => {
       const filter = new IETFLanguageCodeFilter(LanguageComponent.REGION, true);
       const concept = new Language('en-US');
       
-      const result = provider.filterCheck(opContext, null, filter, concept);
+      const result = await provider.filterCheck(opContext, await provider.getPrepContext(opContext, false), filter, concept);
       expect(result).toBe(true);
     });
 
-    test('should check if concept fails filter', () => {
+    test('should check if concept fails filter', async () => {
       const filter = new IETFLanguageCodeFilter(LanguageComponent.REGION, true);
       const concept = new Language('en');
       
-      const result = provider.filterCheck(opContext, null, filter, concept);
+      const result = await provider.filterCheck(opContext, await provider.getPrepContext(opContext, false), filter, concept);
       expect(result).toBe(false);
     });
 
-    test('should validate filter type in filterCheck', () => {
+    test('should validate filter type in filterCheck', async () => {
       const concept = new Language('en');
       
-      expect(() => {
-        provider.filterCheck(opContext, null, 'invalid', concept);
-      }).toThrow('Invalid filter set type');
+      expect(async () => {
+        await provider.filterCheck(opContext, null, 'invalid', concept);
+      }).rejects.toThrow('Invalid filter set type');
     });
 
-    test('should validate concept type in filterCheck', () => {
+    test('should validate concept type in filterCheck', async () => {
       const filter = new IETFLanguageCodeFilter(LanguageComponent.REGION, true);
       
-      expect(() => {
-        provider.filterCheck(opContext, null, filter, 'invalid');
-      }).toThrow('Invalid concept type');
+      expect(async () => {
+        await provider.filterCheck(opContext, null, filter, 'invalid');
+      }).rejects.toThrow('Invalid concept type');
     });
   });
 
@@ -311,28 +319,28 @@ describe('IETF Language CodeSystem Provider', () => {
     test('should not support subsumption', async () => {
       const result = await provider.locateIsA(opContext, 'en-US', 'en');
       expect(result.context).toBe(null);
-      expect(result.message).toContain('subsumption');
+      expect(result.message).toContain('parents');
     });
 
-    test('should not support iteration', () => {
-      expect(provider.iterator(opContext, null)).toBe(null);
-      expect(provider.nextContext(opContext, null)).toBe(null);
+    test('should not support iteration', async () => {
+      expect(await provider.iterator(opContext, null)).toBe(null);
+      expect(await provider.nextContext(opContext, null)).toBe(null);
     });
 
-    test('should not support expansion', () => {
+    test('should not support expansion', async () => {
       const filter = new IETFLanguageCodeFilter(LanguageComponent.LANG, true);
       
-      expect(() => {
-        provider.filterSize(opContext, null, filter);
-      }).toThrow('cannot be expanded');
+      expect(async () => {
+        await provider.filterSize(opContext, null, filter);
+      }).rejects.toThrow('cannot be expanded');
       
-      expect(() => {
-        provider.filterMore(opContext, null, filter);
-      }).toThrow('cannot be expanded');
+      expect(async () => {
+        await provider.filterMore(opContext, null, filter);
+      }).rejects.toThrow('cannot be expanded');
       
-      expect(() => {
-        provider.filterConcept(opContext, null, filter);
-      }).toThrow('cannot be expanded');
+      expect(async () => {
+        await provider.filterConcept(opContext, null, filter);
+      }).rejects.toThrow('cannot be expanded');
     });
 
     test('should not support text search', async () => {
@@ -341,45 +349,45 @@ describe('IETF Language CodeSystem Provider', () => {
       ).rejects.toThrow('Text search not supported');
     });
 
-    test('should indicate filters are not closed', () => {
-      expect(provider.filtersNotClosed(opContext, null)).toBe(true);
+    test('should indicate filters are not closed', async () => {
+      expect(await provider.filtersNotClosed(opContext, await provider.getPrepContext(opContext, false))).toBe(true);
     });
   });
 
-  describe('Utility methods', () => {
-    test('should compare concepts correctly', () => {
+  describe('Utility methods',  () => {
+    test('should compare concepts correctly', async () => {
       const lang1 = new Language('en-US');
       const lang2 = new Language('en-US');
       const lang3 = new Language('fr-CA');
       
-      expect(provider.sameConcept(opContext, lang1, lang2)).toBe(true);
-      expect(provider.sameConcept(opContext, lang1, lang3)).toBe(false);
-      expect(provider.sameConcept(opContext, 'en-US', 'en-US')).toBe(true);
+      expect(await provider.sameConcept(opContext, lang1, lang2)).toBe(true);
+      expect(await provider.sameConcept(opContext, lang1, lang3)).toBe(false);
+      expect(await provider.sameConcept(opContext, 'en-US', 'en-US')).toBe(true);
     });
 
-    test('should not support subsumption testing', () => {
-      expect(provider.subsumesTest(opContext, 'en', 'en-US')).toBe(false);
+    test('should not support subsumption testing', async () => {
+      expect(await provider.subsumesTest(opContext, 'en', 'en-US')).toBe(false);
     });
 
     test('should return empty definitions', async () => {
       const definition = await provider.definition(opContext, 'en');
-      expect(definition).toBe('');
+      expect(definition).toBe(null);
     });
 
-    test('should report codes as not abstract', () => {
-      expect(provider.isAbstract(opContext, 'en')).toBe(false);
+    test('should report codes as not abstract', async () => {
+      expect(await provider.isAbstract(opContext, 'en')).toBe(false);
     });
 
-    test('should report codes as not inactive', () => {
-      expect(provider.isInactive(opContext, 'en')).toBe(false);
+    test('should report codes as not inactive', async () => {
+      expect(await provider.isInactive(opContext, 'en')).toBe(false);
     });
 
-    test('should report codes as not deprecated', () => {
-      expect(provider.isDeprecated(opContext, 'en')).toBe(false);
+    test('should report codes as not deprecated', async () => {
+      expect(await provider.isDeprecated(opContext, 'en')).toBe(false);
     });
 
-    test('should return null status', () => {
-      expect(provider.getStatus(opContext, 'en')).toBe(null);
+    test('should return null status', async () => {
+      expect(await provider.getStatus(opContext, 'en')).toBe(null);
     });
   });
 

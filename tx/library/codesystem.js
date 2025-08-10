@@ -1,3 +1,4 @@
+
 /**
  * Represents a FHIR CodeSystem resource with version conversion support
  * @class
@@ -735,6 +736,11 @@ class CodeSystem {
   static isUseADisplay(use) {
     return true; // for now
   }
+
+  static makeUseForDisplay() {
+    return null;
+  }
+
 }
 
 module.exports = CodeSystem;

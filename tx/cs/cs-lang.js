@@ -1,6 +1,7 @@
-const { CodeSystemProvider, TxOperationContext, Designation } = require('./cs-api');
+const { CodeSystemProvider, TxOperationContext, Designation, FilterExecutionContext } = require('./cs-api');
 const { Language, LanguageDefinitions, Languages} = require('../library/languages');
 const CodeSystem = require("../library/codesystem");
+const assert = require('assert');
 
 /**
  * Language component types for filtering
@@ -28,48 +29,13 @@ class IETFLanguageCodeFilter {
 }
 
 /**
- * Filter preparation context (empty for now)
- */
-class IETFLanguageCodeFilterPrep {
-  constructor() {
-    // Empty preparation context
-  }
-}
-
-/**
  * IETF Language CodeSystem Provider
  * Provides validation and lookup for BCP 47 language tags
  */
 class IETFLanguageCodeProvider extends CodeSystemProvider {
-
-  /**
-   * @type {CodeSystem[]}
-   */
-  supplements;
-
   constructor(languageDefinitions, supplements = null) {
-    super();
+    super(supplements);
     this.languageDefinitions = languageDefinitions; // LanguageDefinitions instance
-    this.supplements = supplements; // Array of supplement CodeSystems
-    this._validateSupplements();
-  }
-
-  /**
-   * Validates that supplements are CodeSystem instances
-   * @private
-   */
-  _validateSupplements() {
-    if (!this.supplements) return;
-
-    if (!Array.isArray(this.supplements)) {
-      throw new Error('Supplements must be an array');
-    }
-
-    this.supplements.forEach((supplement, index) => {
-      if (!(supplement instanceof CodeSystem)) {
-        throw new Error(`Supplement ${index} must be a CodeSystem instance, got ${typeof supplement}`);
-      }
-    });
   }
 
   // ========== Metadata Methods ==========
@@ -98,15 +64,6 @@ class IETFLanguageCodeProvider extends CodeSystemProvider {
     return 'complete'
   }
 
-  hasSupplement(url) {
-    if (!this.supplements) return false;
-    return this.supplements.some(supp => supp.jsonObj.url === url || supp.jsonObj.versionedUrl === url);
-  }
-
-  listSupplements() {
-    return this.supplements ? this.supplements.map(s => s.jsonObj.url) : [];
-  }
-
   listFeatures() {
     // not sure about this?
 
@@ -118,182 +75,118 @@ class IETFLanguageCodeProvider extends CodeSystemProvider {
   }
 
   hasAnyDisplays(languages) {
-    // Convert input to Languages instance if needed
-    const langs = languages instanceof Languages ? languages :
-      Array.isArray(languages) ? Languages.fromAcceptLanguage(languages.join(',')) :
-        Languages.fromAcceptLanguage(languages || '');
-
-    // Language definitions are always in English, so return true if English is requested
-    for (const requestedLang of langs) {
-      if (requestedLang.language === 'en' || requestedLang.language === '') {
-        return true;
-      }
+    const langs = this._ensureLanguages(languages);
+    if (this._hasAnySupplementDisplays(langs)) {
+      return true;
     }
-
-    // Check if any supplements have displays in the requested languages
-    if (this.supplements) {
-      for (const supplement of this.supplements) {
-        // Check if supplement language matches and has displays
-        if (supplement.jsonObj.language) {
-          const supplementLang = new Language(supplement.jsonObj.language);
-          for (const requestedLang of langs) {
-            if (supplementLang.matchesForDisplay(requestedLang)) {
-              // Check if any concept has a display
-              const allConcepts = supplement.getAllConcepts();
-              if (allConcepts.some(c => c.display)) {
-                return true;
-              }
-            }
-          }
-        }
-
-        // Check concept designations for display uses
-        const allConcepts = supplement.getAllConcepts();
-        for (const concept of allConcepts) {
-          if (concept.designation) {
-            for (const designation of concept.designation) {
-              // Check if designation is a display use
-              if (CodeSystem.isUseADisplay(designation.use)) {
-                if (designation.language) {
-                  const designationLang = new Language(designation.language);
-                  for (const requestedLang of langs) {
-                    if (designationLang.matchesForDisplay(requestedLang)) {
-                      return true;
-                    }
-                  }
-                }
-              }
-            }
-          }
-        }
-      }
-    }
-
-    return false;
+    return super.hasAnyDisplays(langs);
   }
 
   // ========== Code Information Methods ==========
 
-  code(opContext, context) {
-    if (typeof context === 'string') return context;
-    if (context instanceof Language) {
-      return context.code;
+  async code(opContext, code) {
+    this._ensureOpContext(opContext);
+    const ctxt = await this.#ensureContext(opContext, code);
+    if (ctxt instanceof Language) {
+      return ctxt.code;
     }
     throw new Error('Invalid context type');
   }
 
-  async display(opContext, context) {
-    const code = this.code(opContext, context);
-    return this.getDisplay(opContext, code);
+  async display(opContext, code) {
+    this._ensureOpContext(opContext);
+    const ctxt = await this.#ensureContext(opContext, code);
+    if (!ctxt) {
+      return null;
+    }
+    if (opContext.langs.isEnglishOrNothing()) {
+      return this.languageDefinitions.present(ctxt).trim();
+    }
+    let disp = this._displayFromSupplements(context);
+    if (disp) {
+      return disp;
+    }
+    return this.languageDefinitions.present(ctxt).trim();
   }
 
-  async definition(opContext, context) {
-    return ''; // No definitions for language codes
+  async definition(opContext, code) {
+    this._ensureOpContext(opContext);
+    const ctxt = await this.#ensureContext(opContext, code);
+    return null; // No definitions for language codes
   }
 
-  isAbstract(opContext, context) {
+  async isAbstract(opContext, code) {
+    this._ensureOpContext(opContext);
+    const ctxt = await this.#ensureContext(opContext, code);
     return false; // Language codes are not abstract
   }
 
-  isInactive(opContext, context) {
+  async isInactive(opContext, code) {
+    this._ensureOpContext(opContext);
+    const ctxt = await this.#ensureContext(opContext, code);
     return false; // We don't track inactive language codes
   }
 
-  isDeprecated(opContext, context) {
+  async isDeprecated(opContext, code) {
+    this._ensureOpContext(opContext);
+    const ctxt = await this.#ensureContext(opContext, code);
     return false; // We don't track deprecated language codes
   }
 
-  getStatus(opContext, context) {
-    return null; // No status information
-  }
-
-  async designations(opContext, context) {
-    const concept = typeof context === 'string' ?
-      await this.locate(opContext, context) : { context: context };
-
-    if (!concept.context) return [];
-
+  async designations(opContext, code) {
+    this._ensureOpContext(opContext);
+    const ctxt = await this.#ensureContext(opContext, code);
     const designations = [];
-    const lang = concept.context;
-
-    // Add primary display
-    const primaryDisplay = this.languageDefinitions.present(lang).trim();
-    if (primaryDisplay) {
-      designations.push({
-        lang: 'en',
-        use: null,
-        value: primaryDisplay
-      });
-    }
-
-    // Add language-region variants if applicable
-    if (lang.isLangRegion()) {
-      const langDisplay = this.languageDefinitions.getDisplayForLang(lang.language);
-      const regionDisplay = this.languageDefinitions.getDisplayForRegion(lang.region);
-      
-      const regionVariant = `${langDisplay} (${regionDisplay})`;
-      designations.push({
-        lang: 'en',
-        use: null,
-        value: regionVariant
-      });
-
-      const regionVariant2 = `${langDisplay} (Region=${regionDisplay})`;
-      designations.push({
-        lang: 'en',
-        use: null,
-        value: regionVariant2
-      });
-    }
-
-    // Add alternative displays if available
-    const displayCount = this.languageDefinitions.displayCount(lang);
-    for (let i = 0; i < displayCount; i++) {
-      const altDisplay = this.languageDefinitions.present(lang, i).trim();
-      if (altDisplay && altDisplay !== primaryDisplay) {
-        designations.push({
-          lang: 'en',
-          use: null,
-          value: altDisplay
-        });
-
-        // Add region variants for alternatives too
-        if (lang.isLangRegion()) {
-          const langDisplay = this.languageDefinitions.getDisplayForLang(lang.language, i);
-          const regionDisplay = this.languageDefinitions.getDisplayForRegion(lang.region);
-          
-          const altRegionVariant = `${langDisplay} (${regionDisplay})`;
-          designations.push({
-            lang: 'en',
-            use: null,
-            value: altRegionVariant
-          });
-        }
+    if (ctxt != null) {
+      const primaryDisplay = this.languageDefinitions.present(ctxt).trim();
+      designations.push(new Designation('en', CodeSystem.makeUseForDisplay(), primaryDisplay));
+      if (ctxt.isLangRegion()) {
+        const langDisplay = this.languageDefinitions.getDisplayForLang(ctxt.language);
+        const regionDisplay = this.languageDefinitions.getDisplayForRegion(ctxt.region);
+        const regionVariant = `${langDisplay} (${regionDisplay})`;
+        const regionVariant2 = `${langDisplay} (Region=${regionDisplay})`;
+        designations.push(new Designation('en', CodeSystem.makeUseForDisplay(), regionVariant));
+        designations.push(new Designation('en', CodeSystem.makeUseForDisplay(), regionVariant2));
       }
-    }
-
-    // Add supplement designations if available
-    if (this.supplements) {
-      for (const supp of this.supplements) {
-        const suppConcept = supp.getCode(lang.code);
-        if (suppConcept && suppConcept.designation) {
-          for (const designation of suppConcept.designation) {
-            designations.push({
-              lang: designation.language,
-              use: designation.use,
-              value: designation.value
-            });
+      // add alternative displays if available
+      const displayCount = this.languageDefinitions.displayCount(ctxt);
+      for (let i = 0; i < displayCount; i++) {
+        const altDisplay = this.languageDefinitions.present(ctxt, i).trim();
+        if (altDisplay && altDisplay !== primaryDisplay) {
+          designations.push(new Designation('en', CodeSystem.makeUseForDisplay(), altDisplay));
+          // Add region variants for alternatives too
+          if (lang.isLangRegion()) {
+            const langDisplay = this.languageDefinitions.getDisplayForLang(ctxt.language, i);
+            const regionDisplay = this.languageDefinitions.getDisplayForRegion(ctxt.region);
+            const altRegionVariant = `${langDisplay} (${regionDisplay})`;
+            designations.push(new Designation('en', CodeSystem.makeUseForDisplay(), altRegionVariant));
           }
         }
       }
+      designations.push(...this._listSupplementDesignations(ctxt.code));
     }
-
     return designations;
+  }
+
+
+  async #ensureContext(opContext, code) {
+    if (code == null) {
+      return code;
+    }
+    if (typeof code === 'string') {
+      return (await this.locate(opContext, code)).context;
+    }
+    if (code instanceof Language) {
+      return code;
+    }
+    throw "Unknown Type at #ensureContext: "+ (typeof code);
   }
 
   // ========== Lookup Methods ==========
 
   async locate(opContext, code) {
+    this._ensureOpContext(opContext);
+    assert(code == null || typeof code === 'string', 'code must be string');
     if (!code) return { context: null, message: 'Empty code' };
 
     const language = this.languageDefinitions.parse(code);
@@ -304,49 +197,14 @@ class IETFLanguageCodeProvider extends CodeSystemProvider {
     return { context: language, message: null };
   }
 
-  async locateIsA(opContext, code, parent, disallowParent = false) {
-    return { context: null, message: 'Language codes do not have subsumption relationships' };
-  }
-
-  // ========== Helper Methods ==========
-
-  /**
-   * Get display name for a language code
-   */
-  getDisplay(opContext, code) {
-    if (!code) return '??';
-
-    // Check supplements first
-    if (this.supplements) {
-      for (const supp of this.supplements) {
-        const concept = supp.getCode(code);
-        if (concept) {
-          // Try to find display in requested language
-          if (concept.display) return concept.display;
-
-          // Check designations
-          if (concept.designation && concept.designation.length > 0) {
-            // For now, just return first designation
-            // TODO: Implement proper language matching
-            return concept.designation[0].value;
-          }
-        }
-      }
-    }
-
-    // Use language definitions
-    const language = this.languageDefinitions.parse(code);
-    if (language) {
-      const display = this.languageDefinitions.present(language).trim();
-      return display || '??';
-    }
-
-    return '??';
-  }
-
   // ========== Filter Methods ==========
 
-  doesFilter(opContext, prop, op, value) {
+  async doesFilter(opContext, prop, op, value) {
+    this._ensureOpContext(opContext);
+    assert(prop != null && typeof prop === 'string', 'prop must be a non-null string');
+    assert(op != null && typeof op === 'string', 'op must be a non-null string');
+    assert(value != null && typeof value === 'string', 'value must be a non-null string');
+
     // Support exists filters for language components
     if (op === 'exists' && (value === 'true' || value === 'false')) {
       return CODES_LanguageComponent.includes(prop);
@@ -354,11 +212,31 @@ class IETFLanguageCodeProvider extends CodeSystemProvider {
     return false;
   }
 
-  getPrepContext(opContext, iterate) {
-    return new IETFLanguageCodeFilterPrep();
+  async searchFilter(opContext, filterContext, filter, sort) {
+    this._ensureOpContext(opContext);
+    assert(filterContext && filterContext instanceof FilterExecutionContext, 'filterContext must be a FilterExecutionContext');
+    assert(filter && typeof filter === 'string', 'filter must be a non-null string');
+    assert(typeof sort === 'boolean', 'sort must be a boolean');
+
+    throw new Error('Search filter not implemented for Language Codes');
+  }
+
+  async specialFilter(opContext, filterContext, filter, sort) {
+    this._ensureOpContext(opContext);
+    assert(filterContext && filterContext instanceof FilterExecutionContext, 'filterContext must be a FilterExecutionContext');
+    assert(filter && typeof filter === 'string', 'filter must be a non-null string');
+    assert(typeof sort === 'boolean', 'sort must be a boolean');
+
+    throw new Error('Special filter not implemented for Language Codes');
   }
 
   async filter(opContext, filterContext, prop, op, value) {
+    this._ensureOpContext(opContext);
+    assert(filterContext && filterContext instanceof FilterExecutionContext, 'filterContext must be a FilterExecutionContext');
+    assert(prop != null && typeof prop === 'string', 'prop must be a non-null string');
+    assert(op != null && typeof op === 'string', 'op must be a non-null string');
+    assert(value != null && typeof value === 'string', 'value must be a non-null string');
+
     if (op !== 'exists') {
       throw new Error(`Unsupported filter operator: ${op}`);
     }
@@ -375,34 +253,48 @@ class IETFLanguageCodeProvider extends CodeSystemProvider {
     const component = CODES_LanguageComponent[componentIndex];
     const status = value === 'true';
 
-    return new IETFLanguageCodeFilter(component, status);
+    filterContext.filters.push(new IETFLanguageCodeFilter(component, status));
   }
 
   async executeFilters(opContext, filterContext) {
-    // Return any filters that were created
-    return filterContext.filters || [];
+    this._ensureOpContext(opContext);
+    assert(filterContext && filterContext instanceof FilterExecutionContext, 'filterContext must be a FilterExecutionContext');
+    return filterContext.filters;
   }
 
-  filterSize(opContext, filterContext, set) {
+  async filterSize(opContext, filterContext, set) {
+    this._ensureOpContext(opContext);
+    assert(filterContext && filterContext instanceof FilterExecutionContext, 'filterContext must be a FilterExecutionContext');
+    assert(set && set instanceof IETFLanguageCodeFilter, 'set must be a IETFLanguageCodeFilter');
+
     throw new Error('Language valuesets cannot be expanded as they are based on a grammar');
   }
 
-  filtersNotClosed(opContext, filterContext) {
+  async filtersNotClosed(opContext, filterContext) {
+    this._ensureOpContext(opContext);
+    assert(filterContext && filterContext instanceof FilterExecutionContext, 'filterContext must be a FilterExecutionContext');
     return true; // Grammar-based system is not closed
   }
 
-  filterMore(opContext, filterContext, set) {
+  async filterMore(opContext, filterContext, set) {
+    this._ensureOpContext(opContext);
+    assert(filterContext && filterContext instanceof FilterExecutionContext, 'filterContext must be a FilterExecutionContext');
+    assert(set && set instanceof IETFLanguageCodeFilter, 'set must be a IETFLanguageCodeFilter');
     throw new Error('Language valuesets cannot be expanded as they are based on a grammar');
   }
 
-  filterConcept(opContext, filterContext, set) {
+  async filterConcept(opContext, filterContext, set) {
+    this._ensureOpContext(opContext);
+    assert(filterContext && filterContext instanceof FilterExecutionContext, 'filterContext must be a FilterExecutionContext');
+    assert(set && set instanceof IETFLanguageCodeFilter, 'set must be a IETFLanguageCodeFilter');
     throw new Error('Language valuesets cannot be expanded as they are based on a grammar');
   }
 
   async filterLocate(opContext, filterContext, set, code) {
-    if (!(set instanceof IETFLanguageCodeFilter)) {
-      throw new Error('Invalid filter set type');
-    }
+    this._ensureOpContext(opContext);
+    assert(filterContext && filterContext instanceof FilterExecutionContext, 'filterContext must be a FilterExecutionContext');
+    assert(set && set instanceof IETFLanguageCodeFilter, 'set must be a IETFLanguageCodeFilter');
+    assert(typeof code === 'string', 'code must be non-null string');
 
     const language = this.languageDefinitions.parse(code);
     if (!language) {
@@ -447,39 +339,37 @@ class IETFLanguageCodeProvider extends CodeSystemProvider {
     }
   }
 
-  filterCheck(opContext, filterContext, set, concept) {
-    if (!(set instanceof IETFLanguageCodeFilter)) {
-      throw new Error('Invalid filter set type');
-    }
+  async filterCheck(opContext, filterContext, set, concept) {
+    this._ensureOpContext(opContext);
+    assert(filterContext && filterContext instanceof FilterExecutionContext, 'filterContext must be a FilterExecutionContext');
+    assert(set && set instanceof IETFLanguageCodeFilter, 'set must be a IETFLanguageCodeFilter');
+    const ctxt = await this.#ensureContext(opContext, concept);
 
-    if (!(concept instanceof Language)) {
-      throw new Error('Invalid concept type');
-    }
 
     const filter = set;
     let hasComponent = false;
 
     switch (filter.component) {
       case LanguageComponent.LANG:
-        hasComponent = concept.language !== '';
+        hasComponent = ctxt.language !== '';
         break;
       case LanguageComponent.EXTLANG:
-        hasComponent = concept.extLang.length > 0;
+        hasComponent = ctxt.extLang.length > 0;
         break;
       case LanguageComponent.SCRIPT:
-        hasComponent = concept.script !== '';
+        hasComponent = ctxt.script !== '';
         break;
       case LanguageComponent.REGION:
-        hasComponent = concept.region !== '';
+        hasComponent = ctxt.region !== '';
         break;
       case LanguageComponent.VARIANT:
-        hasComponent = concept.variant !== '';
+        hasComponent = ctxt.variant !== '';
         break;
       case LanguageComponent.EXTENSION:
-        hasComponent = concept.extension !== '';
+        hasComponent = ctxt.extension !== '';
         break;
       case LanguageComponent.PRIVATE_USE:
-        hasComponent = concept.privateUse.length > 0;
+        hasComponent = ctxt.privateUse.length > 0;
         break;
       default:
         return `Unknown language component: ${filter.component}`;
@@ -488,49 +378,58 @@ class IETFLanguageCodeProvider extends CodeSystemProvider {
     return hasComponent === filter.status;
   }
 
-  filterFinish(opContext, filterContext) {
+  async filterFinish(opContext, filterContext) {
+    this._ensureOpContext(opContext);
     // Nothing to clean up
   }
 
   // ========== Iterator Methods ==========
 
-  iterator(opContext, context) {
+  async iterator(opContext, context) {
+    this._ensureOpContext(opContext);
     return null; // Cannot iterate language codes (grammar-based)
   }
 
-  nextContext(opContext, iterator) {
+  async nextContext(opContext, iterator) {
+    this._ensureOpContext(opContext);
     return null; // Cannot iterate language codes
   }
 
   // ========== Additional Methods ==========
 
-  sameConcept(opContext, a, b) {
-    const codeA = this.code(opContext, a);
-    const codeB = this.code(opContext, b);
+  async sameConcept(opContext, a, b) {
+    this._ensureOpContext(opContext);
+    const codeA = await this.code(opContext, a);
+    const codeB = await this.code(opContext, b);
     return codeA === codeB;
   }
 
-  subsumesTest(opContext, codeA, codeB) {
+  async subsumesTest(opContext, codeA, codeB) {
+    this._ensureOpContext(opContext);
     return false; // No subsumption in language codes
   }
 
   async searchFilter(opContext, filterContext, filter, sort) {
+    this._ensureOpContext(opContext);
     throw new Error('Text search not supported for language codes');
   }
 
   async specialFilter(opContext, filterContext, filter, sort) {
+    this._ensureOpContext(opContext);
     throw new Error('Special filters not supported for language codes');
   }
 
-  extendLookup(opContext, ctxt, props, params) {
+  async extendLookup(opContext, ctxt, props, params) {
+    this._ensureOpContext(opContext);
     // No additional properties to add
   }
 
-  registerConceptMaps(list) {
+  async registerConceptMaps(list) {
     // No concept maps for language codes
   }
 
   async getTranslations(opContext, coding, target) {
+    this._ensureOpContext(opContext);
     return null; // No translations available
   }
 }

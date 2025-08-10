@@ -1,24 +1,70 @@
 const CodeSystem = require('../library/codesystem');
+const {Languages, Language} = require("../library/languages");
+const assert = require('assert');
 
 class TxOperationContext {
 
   constructor(langs) {
-    this.langs = langs;
+    this.langs = this._ensureLanguages(langs);
+  }
+
+  _ensureLanguages(param) {
+    assert(typeof param === 'string' || param instanceof Languages, 'Parameter must be string or Languages object');
+    return typeof param === 'string' ? this.parseLanguages(param) : param;
   }
 
   /**
-   * @type {Language} languages specified in request
+   * @type {Languages} languages specified in request
    */
   langs;
 }
 
 class Designation {
-  lang;
+  language;
   use;
   value;
+
+  constructor(language, use, value) {
+    this.language = language;
+    this.use = use;
+    this.value = value;
+  }
+}
+
+class FilterExecutionContext {
+  filters = [];
 }
 
 class CodeSystemProvider {
+
+  /**
+   * @type {CodeSystem[]}
+   */
+  supplements;
+
+  constructor(supplements) {
+    this.supplements = supplements;
+    this._validateSupplements();
+  }
+
+  /**
+   * Validates that supplements are CodeSystem instances
+   * @private
+   */
+  _validateSupplements() {
+    if (!this.supplements) return;
+
+    if (!Array.isArray(this.supplements)) {
+      throw new Error('Supplements must be an array');
+    }
+
+    this.supplements.forEach((supplement, index) => {
+      if (!(supplement instanceof CodeSystem)) {
+        throw new Error(`Supplement ${index} must be a CodeSystem instance, got ${typeof supplement}`);
+      }
+    });
+  }
+
   /**
    * @section Metadata for the code system
    */
@@ -26,7 +72,7 @@ class CodeSystemProvider {
   /**
    * @returns {string} uri for the code system
    */
-  name() { return system() + (this.version() ? "|"+this.version() : "") }
+  name() { return this.system() + (this.version() ? "|"+this.version() : "") }
 
   /**
    * @returns {string} uri for the code system
@@ -77,7 +123,61 @@ class CodeSystemProvider {
    * @param {Languages} languages language specification
    * @returns {boolean} defined properties for the code system
    */
-  hasAnyDisplays(languages) { return languages.matches('en'); }
+  hasAnyDisplays(languages) {
+    const langs = this._ensureLanguages(languages);
+    return langs.isEnglishOrNothing();
+  }
+
+  resourceLanguageMatches(resource, languages, ifNoLang = false) {
+    if (resource.language) {
+      const resourceLang = new Language(resource.language);
+      for (const requestedLang of languages) {
+        if (resourceLang.matchesForDisplay(requestedLang)) {
+          return true;
+        }
+      }
+    } else {
+      return ifNoLang;
+    }
+  }
+
+  _hasAnySupplementDisplays(languages) {
+    // Check if any supplements have displays in the requested languages
+    if (this.supplements) {
+      // displays have preference
+      for (const supplement of this.supplements) {
+        // Check if supplement language matches and has displays
+        if (this.resourceLanguageMatches(supplement.jsonObj, languages, false)) {
+          // Check if any concept has a display
+          const allConcepts = supplement.getAllConcepts();
+          if (allConcepts.some(c => c.display)) {
+            return true;
+          }
+        }
+      }
+      // Check concept designations for display uses
+      for (const supplement of this.supplements) {
+        const allConcepts = supplement.getAllConcepts();
+        for (const concept of allConcepts) {
+          if (concept.designation) {
+            for (const designation of concept.designation) {
+              if (CodeSystem.isUseADisplay(designation.use)) {
+                if (designation.language) {
+                  const designationLang = new Language(designation.language);
+                  for (const requestedLang of languages) {
+                    if (designationLang.matchesForDisplay(requestedLang)) {
+                      return true;
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+    return false; // nothing in the supplements
+  }
 
   /**
    * @returns {boolean} true if there's a heirarchy
@@ -93,12 +193,17 @@ class CodeSystemProvider {
    * @param {string} url the supplement of interest
    * @returns {boolean} true if the nominated supplement is in scope
    */
-  hasSupplement(url) { return false; }
+  hasSupplement(url) {
+    if (!this.supplements) return false;
+    return this.supplements.some(supp => supp.jsonObj.url === url || supp.jsonObj.versionedUrl === url);
+  }
 
   /**
    * @returns {string[]} all supplements in scope
    */
-  listSupplements() { return null; }
+  listSupplements() {
+    return this.supplements ? this.supplements.map(s => s.jsonObj.url) : [];
+  }
 
   /**
    * @returns {Feature[]} applicable Features
@@ -126,14 +231,64 @@ class CodeSystemProvider {
    * @param {String | CodeSystemProviderContext} code
    * @returns {string} the correct code for the concept specified
    */
-  code(opContext, code) {throw "Must override"; }
+  async code(opContext, code) {throw "Must override"; }
 
   /**
    * @param {TxOperationContext} opContext operation context (logging, etc)
    * @param {String | CodeSystemProviderContext} code
    * @returns {string} the best display given the languages in the operation context
    */
-  async display(opContext, code) {throw "Must override"; }
+  async display(opContext, code) {
+    throw "Must override";
+  }
+
+  /**
+   * Protected!
+   *
+   * @param {TxOperationContext} opContext operation context (logging, etc)
+   * @param {String} code
+   * @returns {string} the best display given the languages in the operation context
+   */
+  _displayFromSupplements(opContext, code) {
+    assert(typeof code === 'string', 'code must be string');
+    if (this.supplements) {
+      const concepts = [];
+      // displays have preference
+      for (const supplement of this.supplements) {
+        // Check if supplement language matches and has displays
+        if (this.resourceLanguageMatches(supplement.jsonObj, opContext.langs, false)) {
+          // Check if any concept has a display
+          const concept= supplement.getConceptByCode(code);
+          if (concept) {
+            if (concept.display) {
+              return concept.display;
+            }
+            concepts.push(concept);
+          }
+        }
+      }
+      // Check concept designations for display uses
+      for (const concept in concepts) {
+        if (concept.designation) {
+          for (const designation of concept.designation) {
+            if (CodeSystem.isUseADisplay(designation.use) && opContext.langs.hasMatch(designation.language)) {
+              return designation.value;
+            }
+          }
+        }
+      }
+      // still here? try again, for any non-language display
+      for (const supplement of this.supplements) {
+        if (!supplement.jsonObj.language) {
+          const concept= supplement.getConceptByCode(code);
+          if (concept && concept.display) {
+            return concept.display;
+          }
+        }
+      }
+    }
+    return null; // nothing in the supplements
+  }
 
   /**
    * @param {TxOperationContext} opContext operation context (logging, etc)
@@ -147,42 +302,42 @@ class CodeSystemProvider {
    * @param {string | CodeSystemProviderContext} code
    * @returns {boolean} if the concept is abstract
    */
-  isAbstract(opContext, code) { return false; }
+  async isAbstract(opContext, code) { return false; }
 
   /**
    * @param {TxOperationContext} opContext operation context (logging, etc)
    * @param {string | CodeSystemProviderContext} code
    * @returns {boolean} if the concept is inactive
    */
-  isInactive(opContext, code) { return false; }
+  async isInactive(opContext, code) { return false; }
 
   /**
    * @param {TxOperationContext} opContext operation context (logging, etc)
    * @param {string | CodeSystemProviderContext} code
    * @returns {boolean} if the concept is inactive
    */
-  isDeprecated(opContext, code) { return false; }
+  async isDeprecated(opContext, code) { return false; }
 
   /**
    * @param {TxOperationContext} opContext operation context (logging, etc)
    * @param {string | CodeSystemProviderContext} code
    * @returns {string} status
    */
-  getStatus(opContext, code) { return null; }
+  async getStatus(opContext, code) { return null; }
 
   /**
    * @param {TxOperationContext} opContext operation context (logging, etc)
    * @param {string | CodeSystemProviderContext} code
    * @returns {string} assigned itemWeight - if there is one
    */
-  itemWeight(opContext, code) { return null; }
+  async itemWeight(opContext, code) { return null; }
 
   /**
    * @param {TxOperationContext} opContext operation context (logging, etc)
    * @param {string | CodeSystemProviderContext} code
    * @returns {string} parent, if there is one
    */
-  parent(opContext, code) { return null; }
+  async parent(opContext, code) { return null; }
 
   /**
    * @param {TxOperationContext} opContext operation context (logging, etc)
@@ -191,26 +346,48 @@ class CodeSystemProvider {
    */
   async designations(opContext, code) { return null; }
 
+  _listSupplementDesignations(code) {
+    assert(typeof code === 'string', 'code must be string');
+    let designations = [];
+
+    if (this.supplements) {
+      for (const supplement of this.supplements) {
+        const concept= supplement.getConceptByCode(code);
+        if (concept) {
+          if (concept.display) {
+            designations.push(new Designation(supplement.jsonObj.language, CodeSystem.makeUseForDisplay(), concept.display));
+          }
+          if (concept.designation) {
+            for (const d of concept.designation) {
+              designations.push(new Designation(d.language, d.use, d.value));
+            }
+          }
+        }
+      }
+    }
+    return designations;
+  }
+
   /**
    * @param {TxOperationContext} opContext operation context (logging, etc)
    * @param {string | CodeSystemProviderContext} code
    * @returns {Extension[]} extensions, if any
    */
-  extensions(opContext, code) { return null; }
+  async extensions(opContext, code) { return null; }
 
   /**
    * @param {TxOperationContext} opContext operation context (logging, etc)
    * @param {string | CodeSystemProviderContext} code
    * @returns {CodeSystem.concept.property[]} parent, if there is one
    */
-  properties(opContext, code) { return null; }
+  async properties(opContext, code) { return null; }
 
   /**
    * @param {TxOperationContext} opContext operation context (logging, etc)
    * @param {string | CodeSystemProviderContext} code
    * @returns {string} information about incomplete validation on the concept, if there is any information (SCT)
    */
-  incompleteValidationMessage(opContext, code) { return null; }
+  async incompleteValidationMessage(opContext, code) { return null; }
 
   /**
    * @param {TxOperationContext} opContext operation context (logging, etc)
@@ -218,7 +395,7 @@ class CodeSystemProvider {
    * @param {string | CodeSystemProviderContext} b
    * @returns {boolean} true if they're the same
    */
-  sameConcept(/*TxOperationContext*/ opContext, a, b) { return false; }
+  async sameConcept(/*TxOperationContext*/ opContext, a, b) { return false; }
 
   /**
    * @section Finding concepts in the CodeSystem
@@ -247,14 +424,14 @@ class CodeSystemProvider {
    * @param {string | CodeSystemProviderContext} code
    * @returns {CodeSystemIterator} a handle that can be passed to nextConcept (or null, if it can't be iterated)
    */
-  iterator(opContext, code) { return null }
+  async iterator(opContext, code) { return null }
 
   /**
    * @param {TxOperationContext} opContext operation context (logging, etc)
    * @param {CodeSystemIterator} context
    * @returns {CodeSystemProviderContext} the next concept, or null
    */
-  nextContext(opContext,context) { return null; }
+  async nextContext(opContext,context) { return null; }
 
   /**
    * @param {TxOperationContext} opContext operation context (logging, etc)
@@ -262,7 +439,7 @@ class CodeSystemProvider {
    * @param {string | CodeSystemIterator} codeB
    * @returns {boolean} true if codeA subsumes codeB
    */
-  subsumesTest(opContext, codeA, codeB) { return false; }
+  async subsumesTest(opContext, codeA, codeB) { return false; }
 
   /**
    * @param {TxOperationContext} opContext operation context (logging, etc)
@@ -270,7 +447,7 @@ class CodeSystemProvider {
    * @param {string[]} props the properties requested
    * @param {Parameters} params the parameters response to add to
    */
-  extendLookup(opContext, ctxt, props, params) { }
+  async extendLookup(opContext, ctxt, props, params) { }
 
   // procedure getCDSInfo(/*TxOperationContext*/ opContext; card : TCDSHookCard; langList : THTTPLanguageList; baseURL, code, display : String); virtual;
 
@@ -283,7 +460,7 @@ class CodeSystemProvider {
    * @param {String} prop
    * @returns {boolean} true if suppoted
    * */
-  doesFilter(/*TxOperationContext*/ opContext, prop, op, value) { return false; }
+  async doesFilter(/*TxOperationContext*/ opContext, prop, op, value) { return false; }
 
   /**
    * gets a single context in which filters will be evaluated. The application doesn't make use of this context;
@@ -293,7 +470,7 @@ class CodeSystemProvider {
    * @param {boolean} iterate true if the conceptSets that result from this will be iterated, and false if they'll be used to locate a single code
    * @returns {FilterExecutionContext} filter (or null, it no use for this)
    * */
-  getPrepContext(opContext, iterate) { return null; }
+  async getPrepContext(opContext, iterate) { return new FilterExecutionContext(); }
 
   /**
    * executes a text search filter (whatever that means) and returns a FilterConceptSet
@@ -350,7 +527,7 @@ class CodeSystemProvider {
    @param {FilterConceptSet} set of interest
    @returns {int} number of concepts in the set
    */
-  filterSize(opContext, filterContext, set) {throw "Must override"; }
+  async filterSize(opContext, filterContext, set) {throw "Must override"; }
 
   /**
    * return true if there's an infinite number of members (or at least, beyond knowing)
@@ -361,7 +538,7 @@ class CodeSystemProvider {
    @param {FilterExecutionContext} filterContext filtering context
    @returns {boolean} true if not closed
    */
-  filtersNotClosed(opContext, filterContext) { return false; }
+  async filtersNotClosed(opContext, filterContext) { return false; }
 
   /**
    * iterate the filter set. Iteration is forwards only, using the style
@@ -372,7 +549,7 @@ class CodeSystemProvider {
    @param {FilterConceptSet} set of interest
    @returns {boolean} if there is a concept
    */
-  filterMore(opContext, filterContext, set) {throw "Must override"; }
+  async filterMore(opContext, filterContext, set) {throw "Must override"; }
 
   /**
    * get the current concept
@@ -382,7 +559,7 @@ class CodeSystemProvider {
    @param {FilterConceptSet} set of interest
    @returns {CodeSystemProviderContext} if there is a concept
    */
-  filterConcept(opContext, filterContext, set) {throw "Must override"; }
+  async filterConcept(opContext, filterContext, set) {throw "Must override"; }
 
   /**
    * filterLocate - instead of iterating, find a code in the FilterConceptSet
@@ -393,7 +570,7 @@ class CodeSystemProvider {
    @param {string} code the code to find
    @returns {string | CodeSystemProviderContext} an error explaining why it isn't in the set, or a handle to the concept
    */
-  async filterLocate(opContext, filterContext, set, code) {throw "Must override"; }
+   async filterLocate(opContext, filterContext, set, code) {throw "Must override"; }
 
    /**
    * filterLocate - instead of iterating, find a code in the FilterConceptSet
@@ -404,7 +581,7 @@ class CodeSystemProvider {
    @param {CodeSystemProviderContext} concept the code to find
    @returns {string | boolean } an error explaining why it isn't in the set, or true if it is
    */
-   filterCheck(opContext, filterContext, set, concept) {throw "Must override"; }
+   async filterCheck(opContext, filterContext, set, concept) {throw "Must override"; }
 
   /**
    * filterFinish - opportunity for the provider to close up and recover resources etc
@@ -412,7 +589,7 @@ class CodeSystemProvider {
    @param {TxOperationContext} opContext  operation context (logging, etc)
    @param {FilterExecutionContext} filterContext filtering context
    */
-  filterFinish(opContext, filterContext) {throw "Must override"; }
+  async filterFinish(opContext, filterContext) {throw "Must override"; }
 
   /**
    * register the concept maps that are implicitly defined as part of the code system
@@ -432,6 +609,34 @@ class CodeSystemProvider {
    * @returns {CodeTranslation[]} the list of translations
    */
   async getTranslations(opContext, coding, target) { return null;}
+
+  // ==== Parameter checking methods =========
+  _ensureLanguages(param) {
+    assert(
+      typeof param === 'string' ||
+      param instanceof Languages ||
+      (Array.isArray(param) && param.every(item => typeof item === 'string')),
+      'Parameter must be string, Languages object, or array of strings'
+    );
+
+    if (typeof param === 'string') {
+      return Languages.fromAcceptLanguage(param);
+    } else if (Array.isArray(param)) {
+      const languages = new Languages();
+      for (const str of param) {
+        const lang = new Language(str);
+        languages.add(lang);
+      }
+      return languages;
+    } else {
+      return param; // Already a Languages object
+    }
+  }
+
+  _ensureOpContext(opContext) {
+    assert(opContext && opContext instanceof TxOperationContext, "opContext is not an instance of TxOperationContext");
+  }
+
 }
 
 class CodeSystemFactoryProvider {
@@ -462,6 +667,7 @@ class CodeSystemFactoryProvider {
 module.exports = {
   TxOperationContext,
   Designation,
+  FilterExecutionContext,
   CodeSystemProvider,
   CodeSystemFactoryProvider
 };
