@@ -124,14 +124,12 @@ describe('IETF Language CodeSystem Provider', () => {
       expect(display).not.toBe('??');
     });
 
-    test('should return null for invalid codes', async () => {
-      const display = await provider.display(opContext, 'invalid');
-      expect(display).toBe(null);
+    test('should throw an error for invalid codes', async () => {
+      await expect(provider.display(opContext, 'invalid')).rejects.toThrow("Invalid language code: invalid");
     });
 
     test('should return null for empty codes', async () => {
-      const display = await provider.display(opContext, '');
-      expect(display).toBe(null);
+      await expect(provider.display(opContext, '')).rejects.toThrow('Empty code');
     });
   });
 
@@ -158,8 +156,7 @@ describe('IETF Language CodeSystem Provider', () => {
     });
 
     test('should return empty array for invalid codes', async () => {
-      const designations = await provider.designations(opContext, 'invalid');
-      expect(designations).toEqual([]);
+      await expect(provider.designations(opContext, 'invalid')).rejects.toThrow('Invalid language code: invalid');
     });
   });
 

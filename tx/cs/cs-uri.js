@@ -136,7 +136,7 @@ class UriServices extends CodeSystemProvider {
     if (code == null || typeof code === 'string') {
       return code;
     }
-    throw "Unknown Type at #ensureContext: "+ (typeof code);
+    throw new Error("Unknown Type at #ensureContext: "+ (typeof code));
   }
 
   // ============================================================================

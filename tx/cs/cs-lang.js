@@ -174,12 +174,17 @@ class IETFLanguageCodeProvider extends CodeSystemProvider {
       return code;
     }
     if (typeof code === 'string') {
-      return (await this.locate(opContext, code)).context;
+      const ctxt = await this.locate(opContext, code);
+      if (ctxt.context == null) {
+        throw new Error(ctxt.message);
+      } else {
+        return ctxt.context;
+      }
     }
     if (code instanceof Language) {
       return code;
     }
-    throw "Unknown Type at #ensureContext: "+ (typeof code);
+    throw new Error("Unknown Type at #ensureContext: "+ (typeof code));
   }
 
   // ========== Lookup Methods ==========

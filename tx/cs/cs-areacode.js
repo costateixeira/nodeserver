@@ -117,7 +117,12 @@ class AreaCodeServices extends CodeSystemProvider {
       return code;
     }
     if (typeof code === 'string') {
-      return (await this.locate(opContext, code)).concept;
+      const ctxt = await this.locate(opContext, code);
+      if (ctxt.context == null) {
+        throw new Error(ctxt.message);
+      } else {
+        return ctxt.context;
+      }
     }
     if (code instanceof AreaCodeConcept) {
       return code;

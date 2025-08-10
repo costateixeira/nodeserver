@@ -77,12 +77,12 @@ class CodeSystemProvider {
   /**
    * @returns {string} uri for the code system
    */
-  system() { throw "Must override"; }
+  system() { throw new Error("Must override"); }
 
   /**
    * @returns {string} version for the code system
    */
-  version() { throw "Must override"; }
+  version() { throw new Error("Must override"); }
 
   /**
    * @returns {string} default language for the code system
@@ -102,7 +102,7 @@ class CodeSystemProvider {
   /**
    * @returns {string} description for the code system
    */
-  description() { throw "Must override"; }
+  description() { throw new Error("Must override"); }
 
   /**
    * @returns {string} source package for the code system, if known
@@ -112,7 +112,7 @@ class CodeSystemProvider {
   /**
    * @returns {integer} total number of concepts in the code system
    */
-  totalCount() { throw "Must override"; }
+  totalCount() { throw new Error("Must override"); }
 
   /**
    * @returns {CodeSystem.property[]} defined properties for the code system
@@ -231,7 +231,7 @@ class CodeSystemProvider {
    * @param {String | CodeSystemProviderContext} code
    * @returns {string} the correct code for the concept specified
    */
-  async code(opContext, code) {throw "Must override"; }
+  async code(opContext, code) {throw new Error("Must override"); }
 
   /**
    * @param {TxOperationContext} opContext operation context (logging, etc)
@@ -239,7 +239,7 @@ class CodeSystemProvider {
    * @returns {string} the best display given the languages in the operation context
    */
   async display(opContext, code) {
-    throw "Must override";
+    throw new Error("Must override");
   }
 
   /**
@@ -295,7 +295,7 @@ class CodeSystemProvider {
    * @param {string | CodeSystemProviderContext} code
    * @returns {string} the definition for the concept (if available)
    */
-  async definition(opContext, code) {throw "Must override"; }
+  async definition(opContext, code) {throw new Error("Must override"); }
 
   /**
    * @param {TxOperationContext} opContext operation context (logging, etc)
@@ -406,7 +406,7 @@ class CodeSystemProvider {
    * @param {string } code
    * @returns {{context : CodeSystemProviderContext, message : String} the result of looking for the code
    */
-  async locate(opContext, code) { throw "Must override"; }
+  async locate(opContext, code) { throw new Error("Must override"); }
 
   /**
    * @param {TxOperationContext} opContext operation context (logging, etc)
@@ -416,7 +416,7 @@ class CodeSystemProvider {
    * @returns {{context : CodeSystemProviderContext, message : String} the result of looking for the code in the context of the parent
    */
   async locateIsA(opContext, code) {
-    if (this.hasParents()) throw "Must override"; else return { context : null, message: "The CodeSystem "+this.name()+" does not have parents"}
+    if (this.hasParents()) throw new Error("Must override"); else return { context : null, message: "The CodeSystem "+this.name()+" does not have parents"}
   }
 
   /**
@@ -482,7 +482,7 @@ class CodeSystemProvider {
    * @param {String} filter user entered text search
    * @param {boolean} sort ?
    **/
-  async searchFilter(opContext, filterContext, filter, sort) { throw "Must override"; } // ? must override?
+  async searchFilter(opContext, filterContext, filter, sort) { throw new Error("Must override"); } // ? must override?
 
   /**
    * I don't know what this does
@@ -493,7 +493,7 @@ class CodeSystemProvider {
    * @param {String} filter user entered text search
    * @param {boolean} sort ?
    **/
-  async specialFilter(opContext, filterContext, filter, sort) { throw "Must override"; } // ? must override?
+  async specialFilter(opContext, filterContext, filter, sort) { throw new Error("Must override"); } // ? must override?
 
   /**
    * Get a FilterConceptSet for a value set filter
@@ -506,7 +506,7 @@ class CodeSystemProvider {
    * @param {ValueSetFilterOperator} op
    * @param {String} prop
    **/
-  async filter(opContext, filterContext, prop, op, value) { throw "Must override"; } // well, only if any filters are actually supported
+  async filter(opContext, filterContext, prop, op, value) { throw new Error("Must override"); } // well, only if any filters are actually supported
 
   /**
    * called once all the filters have been handled, and iteration is about to happen.
@@ -518,7 +518,7 @@ class CodeSystemProvider {
    * @param {FilterExecutionContext} filterContext filtering context
    * @returns {FilterConceptSet[]} filter sets
    **/
-  async executeFilters(opContext, filterContext) { throw "Must override"; } // well, only if any filters are actually supported
+  async executeFilters(opContext, filterContext) { throw new Error("Must override"); } // well, only if any filters are actually supported
 
   /**
    * return how many concepts are in the filter set
@@ -527,7 +527,7 @@ class CodeSystemProvider {
    @param {FilterConceptSet} set of interest
    @returns {int} number of concepts in the set
    */
-  async filterSize(opContext, filterContext, set) {throw "Must override"; }
+  async filterSize(opContext, filterContext, set) {throw new Error("Must override"); }
 
   /**
    * return true if there's an infinite number of members (or at least, beyond knowing)
@@ -549,7 +549,7 @@ class CodeSystemProvider {
    @param {FilterConceptSet} set of interest
    @returns {boolean} if there is a concept
    */
-  async filterMore(opContext, filterContext, set) {throw "Must override"; }
+  async filterMore(opContext, filterContext, set) {throw new Error("Must override"); }
 
   /**
    * get the current concept
@@ -559,7 +559,7 @@ class CodeSystemProvider {
    @param {FilterConceptSet} set of interest
    @returns {CodeSystemProviderContext} if there is a concept
    */
-  async filterConcept(opContext, filterContext, set) {throw "Must override"; }
+  async filterConcept(opContext, filterContext, set) {throw new Error("Must override"); }
 
   /**
    * filterLocate - instead of iterating, find a code in the FilterConceptSet
@@ -570,7 +570,7 @@ class CodeSystemProvider {
    @param {string} code the code to find
    @returns {string | CodeSystemProviderContext} an error explaining why it isn't in the set, or a handle to the concept
    */
-   async filterLocate(opContext, filterContext, set, code) {throw "Must override"; }
+   async filterLocate(opContext, filterContext, set, code) {throw new Error("Must override"); }
 
    /**
    * filterLocate - instead of iterating, find a code in the FilterConceptSet
@@ -581,7 +581,7 @@ class CodeSystemProvider {
    @param {CodeSystemProviderContext} concept the code to find
    @returns {string | boolean } an error explaining why it isn't in the set, or true if it is
    */
-   async filterCheck(opContext, filterContext, set, concept) {throw "Must override"; }
+   async filterCheck(opContext, filterContext, set, concept) {throw new Error("Must override"); }
 
   /**
    * filterFinish - opportunity for the provider to close up and recover resources etc
@@ -589,7 +589,7 @@ class CodeSystemProvider {
    @param {TxOperationContext} opContext  operation context (logging, etc)
    @param {FilterExecutionContext} filterContext filtering context
    */
-  async filterFinish(opContext, filterContext) {throw "Must override"; }
+  async filterFinish(opContext, filterContext) {throw new Error("Must override"); }
 
   /**
    * register the concept maps that are implicitly defined as part of the code system
@@ -645,14 +645,14 @@ class CodeSystemFactoryProvider {
   /**
    * @returns {String} the latest version, if known
    */
-  defaultVersion() { throw "Must override"; }
+  defaultVersion() { throw new Error("Must override"); }
 
   /**
    * @param {TxOperationContext} opContext operation context (logging, etc)
    * @param {CodeSystem[]} supplements any supplements that are in scope
    * @returns {CodeSystemProvider} a built provider - or an exception
    */
-  build(opContext, supplements) { throw "Must override Factory"; }
+  build(opContext, supplements) { throw new Error("Must override Factory"); }
 
   /**
    * @returns {number} how many times the factory has been asked to construct a provider
