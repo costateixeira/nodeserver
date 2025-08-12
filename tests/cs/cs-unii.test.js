@@ -8,7 +8,7 @@ const { UniiDataMigrator } = require('../../tx/importers/import-unii.module');
 
 describe('UniiDataMigrator', () => {
   const repoRoot = path.join(__dirname, '..', '..');
-  const sourceFile = path.join(repoRoot, 'data', 'unii-source-testing.txt');
+  const sourceFile = path.join(repoRoot, 'tests', 'data', 'unii-source-testing.txt');
   const destFile = path.join(repoRoot, 'data', 'unii-testing.db');
 
   let migrator;

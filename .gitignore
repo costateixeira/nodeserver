@@ -1,15 +1,12 @@
 
 .DS_Store
 
-data/
+/data
+/xig/data
 
 node_modules/
 
 config.json
-
-data/private-key.pem
-
-data/public-key.pem
 
 validator_cli.jar
 

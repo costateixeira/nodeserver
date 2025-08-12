@@ -29,7 +29,7 @@ describe('UCUM Library Tests', () => {
   beforeAll(async () => {
     // Load UCUM essence file
     try {
-      const ucumEssenceXml = readFileSync('./data/ucum-essence.xml', 'utf8');
+      const ucumEssenceXml = readFileSync('./tx/data/ucum-essence.xml', 'utf8');
       ucumService = new UcumService();
       ucumService.init(ucumEssenceXml);
     } catch (error) {
@@ -491,7 +491,7 @@ if (functionalTestCases.length > 0) {
     beforeAll(async () => {
       // Load UCUM essence file
       try {
-        const ucumEssenceXml = readFileSync('./data/ucum-essence.xml', 'utf8');
+        const ucumEssenceXml = readFileSync('./tx/data/ucum-essence.xml', 'utf8');
         ucumService = new UcumService();
         ucumService.init(ucumEssenceXml);
       } catch (error) {

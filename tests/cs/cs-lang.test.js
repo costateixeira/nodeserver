@@ -16,7 +16,7 @@ describe('IETF Language CodeSystem Provider', () => {
 
   beforeAll(async () => {
     // Load language definitions from data file
-    const dataPath = path.join(__dirname, '../../data/lang.dat');
+    const dataPath = path.join(__dirname, '../../tx/data/lang.dat');
     languageDefinitions = await LanguageDefinitions.fromFile(dataPath);
     
     // Create provider instance

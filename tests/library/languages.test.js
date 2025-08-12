@@ -279,7 +279,7 @@ describe('LanguageDefinitions Class', () => {
 
   beforeAll(() => {
     // Try to load real IETF data, fall back to mock if not available
-    const realDataPath = path.join(__dirname, '../../data/lang.dat');
+    const realDataPath = path.join(__dirname, '../../tx/data/lang.dat');
 
     if (fs.existsSync(realDataPath)) {
       const realContent = fs.readFileSync(realDataPath, 'utf8');
@@ -472,7 +472,7 @@ describe('Language System Integration Tests', () => {
 
   beforeAll(() => {
     // Try to load real IETF data, fall back to mock if not available
-    const realDataPath = path.join(__dirname, '../../data/lang.dat');
+    const realDataPath = path.join(__dirname, '../../tx/data/lang.dat');
 
     if (fs.existsSync(realDataPath)) {
       const realContent = fs.readFileSync(realDataPath, 'utf8');

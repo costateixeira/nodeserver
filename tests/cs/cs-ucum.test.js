@@ -25,7 +25,7 @@ describe('UCUM Provider Integration Tests', () => {
 
   beforeAll(async () => {
     // Initialize real UCUM service
-    const ucumEssenceXml = readFileSync('./data/ucum-essence.xml', 'utf8');
+    const ucumEssenceXml = readFileSync('./tx/data/ucum-essence.xml', 'utf8');
     ucumService = new UcumService();
     ucumService.init(ucumEssenceXml);
 
