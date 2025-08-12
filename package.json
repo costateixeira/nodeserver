@@ -18,7 +18,10 @@
     "test:unit": "jest --testPathPattern=unit",
     "lint": "eslint . --ext .js --ignore-path .gitignore",
     "lint:fix": "eslint . --fix --ignore-pattern 'static/assets/js/html5shiv.js'",
-    "lint:relaxed": "eslint . --config .eslintrc.relaxed.js"
+    "lint:relaxed": "eslint . --config .eslintrc.relaxed.js",
+    "install-global": "npm link",
+    "list": "node tx-import.js list",
+    "import": "node tx-import.js"
   },
   "dependencies": {
     "axios": "^1.6.0",
@@ -33,7 +36,13 @@
     "sqlite3": "^5.1.7",
     "tar": "^6.2.0",
     "winston": "^3.11.0",
-    "winston-daily-rotate-file": "^4.7.1"
+    "winston-daily-rotate-file": "^4.7.1",
+    "commander": "^9.4.1",
+    "inquirer": "^8.2.5",
+    "chalk": "^4.1.2",
+    "cli-progress": "^3.12.0",
+    "sqlite3": "^5.1.6",
+    "fs-extra": "^11.1.0"
   },
   "devDependencies": {
     "@types/jest": "^29.5.8",
@@ -63,5 +72,8 @@
     "smart-health-card"
   ],
   "author": "",
-  "license": "MIT"
+  "license": "MIT",
+  "bin": {
+    "tx-import": "./tx-import.js"
+  }
 }

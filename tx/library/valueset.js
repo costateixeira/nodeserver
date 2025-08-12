@@ -453,3 +453,5 @@ class ValueSet {
     };
   }
 }
+
+module.exports = ValueSet;

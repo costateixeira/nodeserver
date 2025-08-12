@@ -269,6 +269,8 @@ export class NamingSystemXML {
         xmlString.includes('http://hl7.org/fhir') &&
         xmlString.includes('</NamingSystem>');
     } catch (error) {
+      console.error('Error message:', error.message);
+      console.error('Stack trace:', error.stack);
       return false;
     }
   }
