@@ -280,16 +280,16 @@ describe('IETF Language CodeSystem Provider', () => {
       const concept = new Language('en');
       
       expect(async () => {
-        await provider.filterCheck(opContext, null, 'invalid', concept);
-      }).rejects.toThrow('Invalid filter set type');
+        await provider.filterCheck(opContext, new FilterExecutionContext(), 'invalid', concept);
+      }).rejects.toThrow('set must be a IETFLanguageCodeFilter');
     });
 
     test('should validate concept type in filterCheck', async () => {
       const filter = new IETFLanguageCodeFilter(LanguageComponent.REGION, true);
       
       expect(async () => {
-        await provider.filterCheck(opContext, null, filter, 'invalid');
-      }).rejects.toThrow('Invalid concept type');
+        await provider.filterCheck(opContext, new FilterExecutionContext(), filter, 'invalid');
+      }).rejects.toThrow('Invalid language code: invalid');
     });
   });
 
@@ -324,38 +324,20 @@ describe('IETF Language CodeSystem Provider', () => {
       expect(await provider.nextContext(opContext, null)).toBe(null);
     });
 
-    test('debug what error we actually get', async () => {
-      console.log('debug what error we actually get');
-
-      const filter = new IETFLanguageCodeFilter(LanguageComponent.LANG, true);
-      try {
-        await provider.filterMore(opContext, null, filter);
-        console.fail('Should have thrown an error');
-      } catch (error) {
-        console.log('Caught error message:', error.message);
-        console.log('Caught error stack:', error.stack);
-        console.log('Error constructor:', error.constructor.name);
-      }
-
-      expect(async () => {
-        await provider.filterMore(opContext, null, filter);
-      }).rejects.toThrow('cannot be expanded');
-
-    });
-
     test('should not support expansion', async () => {
+      const filterContext = new FilterExecutionContext();
       const filter = new IETFLanguageCodeFilter(LanguageComponent.LANG, true);
       
       expect(async () => {
-        await provider.filterSize(opContext, null, filter);
+        await provider.filterSize(opContext, filterContext, filter);
       }).rejects.toThrow('cannot be expanded');
 
       expect(async () => {
-        await provider.filterMore(opContext, null, filter);
+        await provider.filterMore(opContext, filterContext, filter);
       }).rejects.toThrow('cannot be expanded');
       
       expect(async () => {
-        await provider.filterConcept(opContext, null, filter);
+        await provider.filterConcept(opContext, filterContext, filter);
       }).rejects.toThrow('cannot be expanded');
     });
 
