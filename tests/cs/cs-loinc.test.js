@@ -881,7 +881,7 @@ describe('LOINC Provider', () => {
 
       expect(count).toBeGreaterThan(0);
       console.log(`✓ Iterated ${count} concepts from filter`);
-    // });
+    });
   });
 
   describe('Extended Lookup', () => {
