@@ -69,27 +69,27 @@ describe('NDC Module Import', () => {
         const count = await getTableCount(db, table.name);
 
         expect(count).toBeGreaterThanOrEqual(table.minRecords);
-        console.log(`✓ ${table.name}: ${count} records`);
+        // console.log(`✓ ${table.name}: ${count} records`);
       }
 
       // Verify version table has correct version
       const version = await getVersion(db);
       expect(version).toBe('2025-07-11');
-      console.log(`✓ Version: ${version}`);
+      // (`✓ Version: ${version}`);
 
       // Verify data integrity - packages should reference valid products
       const orphanedPackages = await getOrphanedPackagesCount(db);
       expect(orphanedPackages).toBe(0);
-      console.log(`✓ No orphaned packages found`);
+      // (`✓ No orphaned packages found`);
 
       // Verify lookup table integrity
       const productTypesUsed = await getUsedLookupCount(db, 'NDCProducts', 'Type', 'NDCProductTypes');
       expect(productTypesUsed).toBeGreaterThan(0);
-      console.log(`✓ Product types properly linked: ${productTypesUsed} used`);
+      // (`✓ Product types properly linked: ${productTypesUsed} used`);
 
       const organizationsUsed = await getUsedLookupCount(db, 'NDCProducts', 'Company', 'NDCOrganizations');
       expect(organizationsUsed).toBeGreaterThan(0);
-      console.log(`✓ Organizations properly linked: ${organizationsUsed} used`);
+      // (`✓ Organizations properly linked: ${organizationsUsed} used`);
 
     } finally {
       // Close database connection
@@ -107,12 +107,12 @@ describe('NDC Module Import', () => {
       // Check product codes are reasonable length (8-15 chars to allow for dashes)
       const invalidProductCodes = await getInvalidCodes(db, 'NDCProducts', 'Code', 15);
       expect(invalidProductCodes).toBe(0);
-      console.log(`✓ All product codes are reasonable length`);
+      // (`✓ All product codes are reasonable length`);
 
       // Check package codes are reasonable length (8-15 chars to allow for dashes)
       const invalidPackageCodes = await getInvalidCodes(db, 'NDCPackages', 'Code', 15);
       expect(invalidPackageCodes).toBe(0);
-      console.log(`✓ All package codes are reasonable length`);
+      // (`✓ All package codes are reasonable length`);
 
     } finally {
       await closeDatabase(db);
@@ -129,7 +129,7 @@ describe('NDC Module Import', () => {
 
       expect(activeProducts).toBeGreaterThan(0);
       expect(totalProducts).toBeGreaterThanOrEqual(activeProducts);
-      console.log(`✓ Products: ${activeProducts} active out of ${totalProducts} total`);
+      // (`✓ Products: ${activeProducts} active out of ${totalProducts} total`);
 
       // Check that we have both active and potentially inactive packages
       const activePackages = await getActiveCount(db, 'NDCPackages');
@@ -137,12 +137,12 @@ describe('NDC Module Import', () => {
 
       expect(activePackages).toBeGreaterThan(0);
       expect(totalPackages).toBeGreaterThanOrEqual(activePackages);
-      console.log(`✓ Packages: ${activePackages} active out of ${totalPackages} total`);
+      // (`✓ Packages: ${activePackages} active out of ${totalPackages} total`);
 
       // Check that we have some products with trade names
       const productsWithTradeNames = await getProductsWithTradeNames(db);
       expect(productsWithTradeNames).toBeGreaterThan(0);
-      console.log(`✓ Products with trade names: ${productsWithTradeNames}`);
+      // (`✓ Products with trade names: ${productsWithTradeNames}`);
 
     } finally {
       await closeDatabase(db);
@@ -324,7 +324,7 @@ describe('NDC Provider', () => {
       const count = await provider.totalCount();
       expect(count).toBeGreaterThan(0);
       expect(typeof count).toBe('number');
-      console.log(`✓ Total NDC codes: ${count}`);
+      // (`✓ Total NDC codes: ${count}`);
     });
 
     test('should not have parents', () => {
@@ -342,7 +342,7 @@ describe('NDC Provider', () => {
       expect(result.context.isPackage).toBe(false);
       expect(result.message).toBeNull();
 
-      console.log(`✓ Found product: ${result.context.code}`);
+      // (`✓ Found product: ${result.context.code}`);
     });
 
     test('should get display for product 0002-0152', async () => {
@@ -352,7 +352,7 @@ describe('NDC Provider', () => {
       expect(display).toContain('Zepbound');
       expect(display).toContain('(product)');
 
-      console.log(`✓ Product display: ${display}`);
+      // (`✓ Product display: ${display}`);
     });
 
     test('should locate product 0002-0213 (Humulin R)', async () => {
@@ -366,7 +366,7 @@ describe('NDC Provider', () => {
       expect(display).toContain('Humulin');
       expect(display).toContain('(product)');
 
-      console.log(`✓ Found Humulin product: ${display}`);
+      // (`✓ Found Humulin product: ${display}`);
     });
 
     test('should return null for non-existent product', async () => {
@@ -387,7 +387,7 @@ describe('NDC Provider', () => {
       expect(result.context.isPackage).toBe(true);
       expect(result.message).toBeNull();
 
-      console.log(`✓ Found package: ${result.context.code}`);
+      // (`✓ Found package: ${result.context.code}`);
     });
 
     test('should get display for package 0002-0152-01', async () => {
@@ -398,7 +398,7 @@ describe('NDC Provider', () => {
       expect(display).toContain('(package)');
       expect(display).toContain('VIAL');
 
-      console.log(`✓ Package display: ${display}`);
+      // (`✓ Package display: ${display}`);
     });
 
     test('should locate package by 11-digit code 00002121404', async () => {
@@ -409,7 +409,7 @@ describe('NDC Provider', () => {
       // The returned code should be the original format
       expect(result.context.code).toBe('00002121404');
 
-      console.log(`✓ Found 11-digit package: ${result.context.code}`);
+      // (`✓ Found 11-digit package: ${result.context.code}`);
     });
 
     test('should locate package 0002-4312-08 (blister pack)', async () => {
@@ -422,7 +422,7 @@ describe('NDC Provider', () => {
       expect(display).toContain('BLISTER PACK');
       expect(display).toContain('(package)');
 
-      console.log(`✓ Found blister pack: ${display}`);
+      // (`✓ Found blister pack: ${display}`);
     });
   });
 
@@ -476,7 +476,7 @@ describe('NDC Provider', () => {
       expect(firstDesignation.language).toBe('en');
       expect(firstDesignation.value).toContain('Zepbound');
 
-      console.log(`✓ Product designations: ${designations.length} found`);
+      // (`✓ Product designations: ${designations.length} found`);
     });
 
     test('should return designations for package', async () => {
@@ -489,7 +489,7 @@ describe('NDC Provider', () => {
       expect(firstDesignation.language).toBe('en');
       expect(firstDesignation.value).toContain('(package)');
 
-      console.log(`✓ Package designations: ${designations.length} found`);
+      // (`✓ Package designations: ${designations.length} found`);
     });
   });
 
@@ -518,8 +518,8 @@ describe('NDC Provider', () => {
       const codeTypeValue = codeTypeProp.part.find(part => part.name === 'value')?.valueString;
       expect(codeTypeValue).toBe('product');
 
-      console.log(`✓ Product properties: ${properties.length} found`);
-      console.log(`  Properties: ${properties.join(', ')}`);
+      // (`✓ Product properties: ${properties.length} found`);
+      // (`  Properties: ${properties.join(', ')}`);
     });
 
     test('should extend lookup for 10-digit package with properties', async () => {
@@ -551,7 +551,7 @@ describe('NDC Provider', () => {
       const productValue = productProp.part.find(part => part.name === 'value')?.valueString;
       expect(productValue).toBe('0002-0152');
 
-      console.log(`✓ 10-digit package properties: ${properties.length} found`);
+      // (`✓ 10-digit package properties: ${properties.length} found`);
     });
 
     test('should extend lookup for 11-digit package with properties', async () => {
@@ -574,7 +574,7 @@ describe('NDC Provider', () => {
       const codeTypeValue = codeTypeProp.part.find(part => part.name === 'value')?.valueString;
       expect(codeTypeValue).toBe('11-digit');
 
-      console.log(`✓ 11-digit package properties: ${properties.length} found`);
+      // (`✓ 11-digit package properties: ${properties.length} found`);
     });
   });
 
@@ -608,7 +608,7 @@ describe('NDC Provider', () => {
       const size = await provider.filterSize(opContext, filterContext, filter);
       expect(size).toBeGreaterThan(0);
 
-      console.log(`✓ Product filter size: ${size}`);
+      // (`✓ Product filter size: ${size}`);
     });
 
     test('should filter by 10-digit code-type', async () => {
@@ -618,7 +618,7 @@ describe('NDC Provider', () => {
       const size = await provider.filterSize(opContext, filterContext, filter);
       expect(size).toBeGreaterThan(0);
 
-      console.log(`✓ 10-digit filter size: ${size}`);
+      // (`✓ 10-digit filter size: ${size}`);
     });
 
     test('should locate code within filter', async () => {
@@ -629,7 +629,7 @@ describe('NDC Provider', () => {
       expect(located).toBeInstanceOf(NdcConcept);
       expect(located.isPackage).toBe(false);
 
-      console.log(`✓ Located in product filter: ${located.code}`);
+      // (`✓ Located in product filter: ${located.code}`);
     });
 
     test('should check if concept is in filter', async () => {
@@ -645,7 +645,7 @@ describe('NDC Provider', () => {
       expect(productInFilter).toBe(true);
       expect(packageInFilter).toBe(false);
 
-      console.log(`✓ Filter check: product=${productInFilter}, package=${packageInFilter}`);
+      // (`✓ Filter check: product=${productInFilter}, package=${packageInFilter}`);
     });
 
     test('should iterate filter results', async () => {
@@ -666,7 +666,7 @@ describe('NDC Provider', () => {
       }
 
       expect(count).toBeGreaterThan(0);
-      console.log(`✓ Iterated ${count} product concepts`);
+      // (`✓ Iterated ${count} product concepts`);
     });
   });
 
