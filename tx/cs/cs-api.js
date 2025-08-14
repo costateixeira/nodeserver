@@ -2,6 +2,9 @@ const CodeSystem = require('../library/codesystem');
 const {Languages, Language} = require("../library/languages");
 const assert = require('assert');
 
+const CodeSystemContentMode = Object.freeze({Complete: 'complete'});
+
+
 class TxOperationContext {
 
   constructor(langs) {
@@ -220,7 +223,7 @@ class CodeSystemProvider {
   /**
    * @returns { {status, standardsStatus : String, experimental : boolean} } applicable Features
    */
-  getStatus() { return null; }
+  status() { return null; }
 
   /**
    * @section Getting Information about the concepts in the CodeSystem
@@ -669,5 +672,6 @@ module.exports = {
   Designation,
   FilterExecutionContext,
   CodeSystemProvider,
+  CodeSystemContentMode,
   CodeSystemFactoryProvider
 };

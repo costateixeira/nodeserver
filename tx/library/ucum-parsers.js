@@ -1010,8 +1010,8 @@ class UcumValidator {
           }
         }
       } catch (e) {
-        console.error('Error message:', error.message);
-        console.error('Stack trace:', error.stack);
+        console.error('Error message:', e.message);
+        console.error('Stack trace:', e.stack);
         this.result.push(e.message);
       }
     }

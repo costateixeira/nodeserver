@@ -102,7 +102,7 @@ class IETFLanguageCodeProvider extends CodeSystemProvider {
     if (opContext.langs.isEnglishOrNothing()) {
       return this.languageDefinitions.present(ctxt).trim();
     }
-    let disp = this._displayFromSupplements(context);
+    let disp = this._displayFromSupplements(opContext);
     if (disp) {
       return disp;
     }
@@ -155,7 +155,7 @@ class IETFLanguageCodeProvider extends CodeSystemProvider {
         if (altDisplay && altDisplay !== primaryDisplay) {
           designations.push(new Designation('en', CodeSystem.makeUseForDisplay(), altDisplay));
           // Add region variants for alternatives too
-          if (lang.isLangRegion()) {
+          if (ctxt.language.isLangRegion()) {
             const langDisplay = this.languageDefinitions.getDisplayForLang(ctxt.language, i);
             const regionDisplay = this.languageDefinitions.getDisplayForRegion(ctxt.region);
             const altRegionVariant = `${langDisplay} (${regionDisplay})`;
@@ -412,16 +412,6 @@ class IETFLanguageCodeProvider extends CodeSystemProvider {
   async subsumesTest(opContext, codeA, codeB) {
     this._ensureOpContext(opContext);
     return false; // No subsumption in language codes
-  }
-
-  async searchFilter(opContext, filterContext, filter, sort) {
-    this._ensureOpContext(opContext);
-    throw new Error('Text search not supported for language codes');
-  }
-
-  async specialFilter(opContext, filterContext, filter, sort) {
-    this._ensureOpContext(opContext);
-    throw new Error('Special filters not supported for language codes');
   }
 
   async extendLookup(opContext, ctxt, props, params) {

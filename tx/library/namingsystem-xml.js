@@ -4,6 +4,7 @@
  */
 
 import { NamingSystem } from './NamingSystem.js';
+import {XMLBuilder, XMLParser} from "fast-xml-parser";
 
 /**
  * XML support for FHIR NamingSystem resources

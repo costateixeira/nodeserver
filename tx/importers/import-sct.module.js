@@ -1983,7 +1983,7 @@ class SnomedImporter {
       let value, type;
 
       switch (fieldType) {
-        case FIELD_TYPE_CONCEPT: // 'c'
+        case FIELD_TYPE_CONCEPT: { // 'c'
           const conceptId = field ? BigInt(field) : BigInt(0);
           const concept = this.conceptMap.get(conceptId);
           if (concept) {
@@ -2002,7 +2002,7 @@ class SnomedImporter {
             }
           }
           break;
-
+        }
         case FIELD_TYPE_INTEGER: // 'i'
           value = parseInt(field) || 0;
           type = 4; // Integer
