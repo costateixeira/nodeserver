@@ -335,6 +335,11 @@ describe('IETF Language CodeSystem Provider', () => {
         console.log('Caught error stack:', error.stack);
         console.log('Error constructor:', error.constructor.name);
       }
+
+      expect(async () => {
+        await provider.filterMore(opContext, null, filter);
+      }).rejects.toThrow('cannot be expanded');
+
     });
 
     test('should not support expansion', async () => {
