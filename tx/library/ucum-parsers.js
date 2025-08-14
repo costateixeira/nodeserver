@@ -767,8 +767,8 @@ class Search {
         const regex = new RegExp(text);
         return regex.test(value);
       } catch (e) {
-        console.error('Error message:', error.message);
-        console.error('Stack trace:', error.stack);
+        console.error('Error message:', e.message);
+        console.error('Stack trace:', e.stack);
         return false;
       }
     } else {
