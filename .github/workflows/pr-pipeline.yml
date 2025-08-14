@@ -62,10 +62,11 @@ jobs:
       - name: Check for known vulnerabilities
         run: |
           # Check for high/critical vulnerabilities only
-          AUDIT_RESULT=$(npm audit --audit-level=high --json || true)
-          if echo "$AUDIT_RESULT" | grep -q '"level":"high\|critical"'; then
+          # npm audit returns non-zero exit code if vulnerabilities are found at the specified level
+          if npm audit --audit-level=high; then
+            echo "No high or critical vulnerabilities found"
+          else
             echo "High or critical vulnerabilities found!"
-            npm audit --audit-level=high
             exit 1
           fi
 

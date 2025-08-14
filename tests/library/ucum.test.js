@@ -673,7 +673,7 @@ if (functionalTestCases.length > 0) {
           throw new Error(`Test case ${targetId} not found`);
         }
 
-        console.log(`Running specific test: ${targetId} (${testCase.type})`);
+        // console.log(`Running specific test: ${targetId} (${testCase.type})`);
 
         switch (testCase.type) {
           case 'validation':
@@ -695,7 +695,7 @@ if (functionalTestCases.length > 0) {
             throw new Error(`Unknown test type: ${testCase.type}`);
         }
 
-        console.log(`✓ Test ${targetId} passed`);
+        // console.log(`✓ Test ${targetId} passed`);
       });
     });
   }); // End of describe block for XML tests
@@ -751,11 +751,11 @@ function parseXmlTestCases(xmlContent) {
   // Process each section type
   for (const sectionType of validSectionTypes) {
     if (!ucumTests[sectionType]) {
-      console.log(`No ${sectionType} section found`);
+      // console.log(`No ${sectionType} section found`);
       continue;
     }
 
-    console.log(`Processing ${sectionType} section...`);
+    // console.log(`Processing ${sectionType} section...`);
 
     const section = ucumTests[sectionType];
     let cases = section.case;
@@ -798,7 +798,7 @@ function parseXmlTestCases(xmlContent) {
     return counts;
   }, {});
 
-  console.log('Loaded test cases by type:', testCounts);
+  // console.log('Loaded test cases by type:', testCounts);
 
   return testCases;
 }

@@ -6,7 +6,7 @@ const {
   LanguageComponent 
 } = require('../../tx/cs/cs-lang');
 const { LanguageDefinitions, Languages, Language } = require('../../tx/library/languages');
-const { TxOperationContext } = require('../../tx/cs/cs-api');
+const { TxOperationContext, FilterExecutionContext} = require('../../tx/cs/cs-api');
 const CodeSystem = require('../../tx/library/codesystem');
 
 describe('IETF Language CodeSystem Provider', () => {
@@ -280,16 +280,16 @@ describe('IETF Language CodeSystem Provider', () => {
       const concept = new Language('en');
       
       expect(async () => {
-        await provider.filterCheck(opContext, null, 'invalid', concept);
-      }).rejects.toThrow('Invalid filter set type');
+        await provider.filterCheck(opContext, new FilterExecutionContext(), 'invalid', concept);
+      }).rejects.toThrow('set must be a IETFLanguageCodeFilter');
     });
 
     test('should validate concept type in filterCheck', async () => {
       const filter = new IETFLanguageCodeFilter(LanguageComponent.REGION, true);
       
       expect(async () => {
-        await provider.filterCheck(opContext, null, filter, 'invalid');
-      }).rejects.toThrow('Invalid concept type');
+        await provider.filterCheck(opContext, new FilterExecutionContext(), filter, 'invalid');
+      }).rejects.toThrow('Invalid language code: invalid');
     });
   });
 
@@ -325,24 +325,25 @@ describe('IETF Language CodeSystem Provider', () => {
     });
 
     test('should not support expansion', async () => {
+      const filterContext = new FilterExecutionContext();
       const filter = new IETFLanguageCodeFilter(LanguageComponent.LANG, true);
       
       expect(async () => {
-        await provider.filterSize(opContext, null, filter);
+        await provider.filterSize(opContext, filterContext, filter);
+      }).rejects.toThrow('cannot be expanded');
+
+      expect(async () => {
+        await provider.filterMore(opContext, filterContext, filter);
       }).rejects.toThrow('cannot be expanded');
       
       expect(async () => {
-        await provider.filterMore(opContext, null, filter);
-      }).rejects.toThrow('cannot be expanded');
-      
-      expect(async () => {
-        await provider.filterConcept(opContext, null, filter);
+        await provider.filterConcept(opContext, filterContext, filter);
       }).rejects.toThrow('cannot be expanded');
     });
 
     test('should not support text search', async () => {
       await expect(
-        provider.searchFilter(opContext, null, 'english', false)
+        provider.searchFilter(opContext, new FilterExecutionContext(), 'english', false)
       ).rejects.toThrow('Text search not supported');
     });
 
