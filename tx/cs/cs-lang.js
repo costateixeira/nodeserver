@@ -283,7 +283,13 @@ class IETFLanguageCodeProvider extends CodeSystemProvider {
 
   async filterMore(opContext, filterContext, set) {
     this._ensureOpContext(opContext);
+
+    console.log('1. filterContext:', filterContext);
+    console.log('1. assert function:', typeof assert);
     assert(filterContext && filterContext instanceof FilterExecutionContext, 'filterContext must be a FilterExecutionContext');
+
+    console.log('2. filterContext:', filterContext);
+    console.log('2. assert function:', typeof assert);
     assert(set && set instanceof IETFLanguageCodeFilter, 'set must be a IETFLanguageCodeFilter');
     throw new Error('Language valuesets cannot be expanded as they are based on a grammar');
   }

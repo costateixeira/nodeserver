@@ -324,13 +324,26 @@ describe('IETF Language CodeSystem Provider', () => {
       expect(await provider.nextContext(opContext, null)).toBe(null);
     });
 
+    test('debug what error we actually get', async () => {
+
+      const filter = new IETFLanguageCodeFilter(LanguageComponent.LANG, true);
+      try {
+        await provider.filterMore(opContext, null, filter);
+        fail('Should have thrown an error');
+      } catch (error) {
+        console.log('Caught error message:', error.message);
+        console.log('Caught error stack:', error.stack);
+        console.log('Error constructor:', error.constructor.name);
+      }
+    });
+
     test('should not support expansion', async () => {
       const filter = new IETFLanguageCodeFilter(LanguageComponent.LANG, true);
       
       expect(async () => {
         await provider.filterSize(opContext, null, filter);
       }).rejects.toThrow('cannot be expanded');
-      
+
       expect(async () => {
         await provider.filterMore(opContext, null, filter);
       }).rejects.toThrow('cannot be expanded');
