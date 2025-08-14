@@ -57,47 +57,49 @@ class BaseTerminologyModule {
 
     // Source file/directory
     if (!options.source) {
-      const sourceQuestion = {
-        type: 'input',
-        name: 'source',
-        message: `Source file/directory for ${terminology}:`,
-        validate: (input) => {
-          if (!input) return 'Source is required';
-          if (!fs.existsSync(input)) return 'Source path does not exist';
-          return true;
-        },
-        filter: (input) => path.resolve(input)
-      };
-
-      // Add default if we have a previous source
-      if (smartDefaults.source) {
-        sourceQuestion.default = smartDefaults.source;
-      }
-
       // If we have recent sources, offer them as choices
       if (recentSources.length > 0) {
-        sourceQuestion.type = 'list';
-        sourceQuestion.choices = [
-          ...recentSources.map(src => ({
-            name: `${src} ${src === smartDefaults.source ? '(last used)' : ''}`.trim(),
-            value: src
-          })),
-          { name: 'Enter new path...', value: 'NEW_PATH' }
-        ];
-        sourceQuestion.message = `Select source for ${terminology}:`;
+        questions.push({
+          type: 'list',
+          name: 'sourceChoice',
+          message: `Select source for ${terminology}:`,
+          choices: [
+            ...recentSources.map(src => ({
+              name: `${src} ${src === smartDefaults.source ? '(last used)' : ''}`.trim(),
+              value: src
+            })),
+            { name: 'Enter new path...', value: 'NEW_PATH' }
+          ]
+        });
 
         // Follow up question for new path
         questions.push({
           type: 'input',
-          name: 'source',
+          name: 'newSource',
           message: `Enter new source path for ${terminology}:`,
-          when: (answers) => answers.source === 'NEW_PATH',
-          validate: sourceQuestion.validate,
-          filter: sourceQuestion.filter
+          when: (answers) => answers.sourceChoice === 'NEW_PATH',
+          validate: (input) => {
+            if (!input) return 'Source is required';
+            if (!fs.existsSync(input)) return 'Source path does not exist';
+            return true;
+          },
+          filter: (input) => path.resolve(input)
+        });
+      } else {
+        // No recent sources, just ask for input directly
+        questions.push({
+          type: 'input',
+          name: 'source',
+          message: `Source file/directory for ${terminology}:`,
+          default: smartDefaults.source,
+          validate: (input) => {
+            if (!input) return 'Source is required';
+            if (!fs.existsSync(input)) return 'Source path does not exist';
+            return true;
+          },
+          filter: (input) => path.resolve(input)
         });
       }
-
-      questions.push(sourceQuestion);
     }
 
     // Destination database
@@ -140,14 +142,48 @@ class BaseTerminologyModule {
 
     const answers = await inquirer.prompt(questions);
 
+    // Handle source selection logic
+    let finalSource = options.source;
+    if (!finalSource) {
+      if (answers.sourceChoice === 'NEW_PATH') {
+        finalSource = answers.newSource;
+      } else if (answers.sourceChoice) {
+        finalSource = answers.sourceChoice;
+      } else {
+        finalSource = answers.source;
+      }
+    }
+
     const finalConfig = {
       ...this.getDefaultConfig(),
       ...smartDefaults,
       ...options,
-      ...answers
+      ...answers,
+      source: finalSource
     };
 
     return finalConfig;
+  }
+
+  async confirmImport(config) {
+    console.log(chalk.cyan(`\n📋 ${this.getName()} Import Configuration:`));
+    console.log(`  Source: ${chalk.white(config.source)}`);
+    console.log(`  Destination: ${chalk.white(config.dest)}`);
+    console.log(`  Version: ${chalk.white(config.version || 'Not specified')}`);
+    console.log(`  Overwrite: ${chalk.white(config.overwrite ? 'Yes' : 'No')}`);
+
+    if (config.estimatedDuration) {
+      console.log(`  Estimated Duration: ${chalk.white(config.estimatedDuration)}`);
+    }
+
+    const { confirmed } = await inquirer.prompt({
+      type: 'confirm',
+      name: 'confirmed',
+      message: 'Proceed with import?',
+      default: true
+    });
+
+    return confirmed;
   }
 
   createProgressBar(format = null) {
