@@ -6,7 +6,7 @@ const {
   LanguageComponent 
 } = require('../../tx/cs/cs-lang');
 const { LanguageDefinitions, Languages, Language } = require('../../tx/library/languages');
-const { TxOperationContext } = require('../../tx/cs/cs-api');
+const { TxOperationContext, FilterExecutionContext} = require('../../tx/cs/cs-api');
 const CodeSystem = require('../../tx/library/codesystem');
 
 describe('IETF Language CodeSystem Provider', () => {
@@ -342,7 +342,7 @@ describe('IETF Language CodeSystem Provider', () => {
 
     test('should not support text search', async () => {
       await expect(
-        provider.searchFilter(opContext, null, 'english', false)
+        provider.searchFilter(opContext, new FilterExecutionContext(), 'english', false)
       ).rejects.toThrow('Text search not supported');
     });
 

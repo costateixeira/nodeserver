@@ -886,18 +886,18 @@ describe('LOINC Provider', () => {
 
   describe('Extended Lookup', () => {
     test('should extend lookup with properties and relationships', async () => {
-    //   const testCode = expectedResults.basic.knownCodes[0];
+      const testCode = expectedResults.basic.knownCodes[0];
       const params = { parameter: [] };
 
       await provider.extendLookup(opContext, testCode, [], params);
 
       expect(params.parameter).toBeDefined();
-//       expect(params.parameter.length).toBeGreaterThan(0);
+      expect(params.parameter.length).toBeGreaterThan(0);
 
       // Check for expected parameter types
       const paramTypes = params.parameter.map(p => p.name);
       expect(paramTypes).toContain('property');
-//       expect(paramTypes).toContain('designation');
+      expect(paramTypes).toContain('designation');
 
       // console.log(`✓ Extended lookup for ${testCode}: ${params.parameter.length} parameters`);
 
@@ -905,7 +905,7 @@ describe('LOINC Provider', () => {
       const properties = params.parameter.filter(p => p.name === 'property').slice(0, 5);
       properties.forEach(prop => {
         const code = prop.part.find(part => part.name === 'code')?.valueCode;
-        // // const value = prop.part.find(part => part.name === 'value')?.valueString;
+        const value = prop.part.find(part => part.name === 'value')?.valueString;
         console.log(`  Property: ${code} = ${value}`);
       });
     });

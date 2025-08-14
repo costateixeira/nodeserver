@@ -223,7 +223,7 @@ class IETFLanguageCodeProvider extends CodeSystemProvider {
     assert(filter && typeof filter === 'string', 'filter must be a non-null string');
     assert(typeof sort === 'boolean', 'sort must be a boolean');
 
-    throw new Error('Search filter not implemented for Language Codes');
+    throw new Error('Text search not supported');
   }
 
   async specialFilter(opContext, filterContext, filter, sort) {
