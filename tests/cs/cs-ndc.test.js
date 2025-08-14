@@ -704,7 +704,7 @@ describe('NDC Provider', () => {
           const display = await provider.display(opContext, result.context);
           expect(display).toContain('Cialis');
           expect(display).toContain('(product)');
-          console.log(`✓ Found Cialis product: ${code} - ${display}`);
+          // console.log(`✓ Found Cialis product: ${code} - ${display}`);
           break;
         }
       }
@@ -719,7 +719,7 @@ describe('NDC Provider', () => {
           const display = await provider.display(opContext, result.context);
           expect(display).toContain('RETEVMO');
           expect(display).toContain('(product)');
-          console.log(`✓ Found RETEVMO: ${code} - ${display}`);
+          // console.log(`✓ Found RETEVMO: ${code} - ${display}`);
           break;
         }
       }
@@ -735,7 +735,7 @@ describe('NDC Provider', () => {
           expect(display).toContain('Trulicity');
           expect(display).toContain('SYRINGE');
           expect(display).toContain('(package)');
-          console.log(`✓ Found Trulicity syringe: ${code} - ${display}`);
+          // console.log(`✓ Found Trulicity syringe: ${code} - ${display}`);
           break;
         }
       }

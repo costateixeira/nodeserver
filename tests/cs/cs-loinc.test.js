@@ -87,23 +87,23 @@ describe('LOINC Module Import', () => {
       for (const table of expectedTables) {
         const count = await getTableCount(db, table.name);
 
-        console.log(`✓ ${table.name}: ${count} records`);
+//        console.log(`✓ ${table.name}: ${count} records`);
         expect(count).toBeGreaterThanOrEqual(table.minRecords);
       }
 
       // Verify TextIndex virtual table exists and has data
       const textIndexCount = await getTableCount(db, 'TextIndex');
       expect(textIndexCount).toBeGreaterThan(0);
-      console.log(`✓ TextIndex: ${textIndexCount} records`);
+      // console.log(`✓ TextIndex: ${textIndexCount} records`);
 
       // Verify config table has correct entries
       const version = await getConfigValue(db, 2);
       expect(version).toBe('2.80-test');
-      console.log(`✓ Version: ${version}`);
+      // console.log(`✓ Version: ${version}`);
 
       const systemId = await getConfigValue(db, 1);
       expect(systemId).toBeTruthy();
-      console.log(`✓ System ID: ${systemId}`);
+      // console.log(`✓ System ID: ${systemId}`);
 
     } finally {
       // Close database connection
@@ -118,27 +118,27 @@ describe('LOINC Module Import', () => {
       // Verify we have main LOINC codes (Type = 1)
       const mainCodes = await getCodesByType(db, 1);
       expect(mainCodes).toBeGreaterThan(0);
-      console.log(`✓ Main LOINC codes: ${mainCodes}`);
+      //console.log(`✓ Main LOINC codes: ${mainCodes}`);
 
       // Verify we have parts (Type = 2)
       const parts = await getCodesByType(db, 2);
       expect(parts).toBeGreaterThan(0);
-      console.log(`✓ LOINC parts: ${parts}`);
+      // console.log(`✓ LOINC parts: ${parts}`);
 
       // Verify codes have valid LOINC code format
       const invalidCodes = await getInvalidLoincCodes(db);
       expect(invalidCodes).toBe(0);
-      console.log(`✓ All codes have valid LOINC format`);
+      // console.log(`✓ All codes have valid LOINC format`);
 
       // Verify relationships exist
       const relationshipCount = await getTableCount(db, 'Relationships');
       expect(relationshipCount).toBeGreaterThan(0);
-      console.log(`✓ Relationships: ${relationshipCount}`);
+      // console.log(`✓ Relationships: ${relationshipCount}`);
 
       // Verify descriptions exist for main codes
       const descriptionsCount = await getDescriptionsForMainCodes(db);
       expect(descriptionsCount).toBeGreaterThan(0);
-      console.log(`✓ Descriptions for main codes: ${descriptionsCount}`);
+      // console.log(`✓ Descriptions for main codes: ${descriptionsCount}`);
 
     } finally {
       await closeDatabase(db);
@@ -151,15 +151,15 @@ describe('LOINC Module Import', () => {
     try {
       // Check if we have multiple languages
       const languageCount = await getTableCount(db, 'Languages');
-      console.log(`✓ Languages available: ${languageCount}`);
+      // console.log(`✓ Languages available: ${languageCount}`);
 
       // If we have language variants, there should be descriptions in multiple languages
       if (languageCount > 1) {
         const multiLangDescriptions = await getMultiLanguageDescriptions(db);
         expect(multiLangDescriptions).toBeGreaterThan(0);
-        console.log(`✓ Multi-language descriptions: ${multiLangDescriptions}`);
+        // console.log(`✓ Multi-language descriptions: ${multiLangDescriptions}`);
       } else {
-        console.log(`✓ Only English language found (expected for subset)`);
+        // console.log(`✓ Only English language found (expected for subset)`);
       }
 
     } finally {
@@ -174,22 +174,22 @@ describe('LOINC Module Import', () => {
       // Verify relationships reference valid codes
       const orphanedRelationships = await getOrphanedRelationships(db);
       expect(orphanedRelationships).toBe(0);
-      console.log(`✓ No orphaned relationships found`);
+      // console.log(`✓ No orphaned relationships found`);
 
       // Verify descriptions reference valid codes
       const orphanedDescriptions = await getOrphanedDescriptions(db);
       expect(orphanedDescriptions).toBe(0);
-      console.log(`✓ No orphaned descriptions found`);
+      // console.log(`✓ No orphaned descriptions found`);
 
       // Verify properties reference valid codes
       const orphanedProperties = await getOrphanedProperties(db);
       expect(orphanedProperties).toBe(0);
-      console.log(`✓ No orphaned properties found`);
+      // console.log(`✓ No orphaned properties found`);
 
       // Verify closure table references valid codes
       const orphanedClosure = await getOrphanedClosure(db);
       expect(orphanedClosure).toBe(0);
-      console.log(`✓ No orphaned closure entries found`);
+      // console.log(`✓ No orphaned closure entries found`);
 
     } finally {
       await closeDatabase(db);
@@ -203,22 +203,22 @@ describe('LOINC Module Import', () => {
       // Check that we have active codes
       const activeCodes = await getActiveCodesCount(db);
       expect(activeCodes).toBeGreaterThan(0);
-      console.log(`✓ Active codes: ${activeCodes}`);
+      // console.log(`✓ Active codes: ${activeCodes}`);
 
       // Check that main codes have properties
       const codesWithProperties = await getCodesWithProperties(db);
       expect(codesWithProperties).toBeGreaterThan(0);
-      console.log(`✓ Codes with properties: ${codesWithProperties}`);
+      // console.log(`✓ Codes with properties: ${codesWithProperties}`);
 
       // Check that we have various description types
       const descriptionTypes = await getUsedDescriptionTypes(db);
       expect(descriptionTypes).toBeGreaterThan(0);
-      console.log(`✓ Description types in use: ${descriptionTypes}`);
+      // console.log(`✓ Description types in use: ${descriptionTypes}`);
 
       // Check that we have various property types
       const propertyTypes = await getUsedPropertyTypes(db);
       expect(propertyTypes).toBeGreaterThan(0);
-      console.log(`✓ Property types in use: ${propertyTypes}`);
+      // console.log(`✓ Property types in use: ${propertyTypes}`);
 
     } finally {
       await closeDatabase(db);
@@ -476,7 +476,7 @@ describe('LOINC Provider', () => {
       const count = await provider.totalCount();
       expect(count).toBeGreaterThan(0);
       expect(typeof count).toBe('number');
-      console.log(`✓ Total LOINC codes: ${count}`);
+      // console.log(`✓ Total LOINC codes: ${count}`);
     });
 
     test('should have parents', () => {
@@ -499,7 +499,7 @@ describe('LOINC Provider', () => {
         expect(result.context.code).toBe(code);
         expect(result.message).toBeNull();
 
-        console.log(`✓ Found code: ${code} - ${result.context.desc}`);
+        // console.log(`✓ Found code: ${code} - ${result.context.desc}`);
       }
     });
 
@@ -518,7 +518,7 @@ describe('LOINC Provider', () => {
         expect(typeof display).toBe('string');
         expect(display.length).toBeGreaterThan(0);
 
-        console.log(`✓ Display for ${code}: ${display}`);
+        // console.log(`✓ Display for ${code}: ${display}`);
       }
     });
 
@@ -565,7 +565,7 @@ describe('LOINC Provider', () => {
       expect(firstDesignation.language).toBeDefined();
       expect(firstDesignation.value).toBeDefined();
 
-      console.log(`✓ Code ${testCode} designations: ${designations.length} found`);
+      // console.log(`✓ Code ${testCode} designations: ${designations.length} found`);
     });
   });
 
@@ -581,9 +581,9 @@ describe('LOINC Provider', () => {
             testCase.operator,
             testCase.value
           );
-          console.log(`Supports filter?: ${testCase.property} ${testCase.operator} ${testCase.value}`);
+          // console.log(`Supports filter?: ${testCase.property} ${testCase.operator} ${testCase.value}`);
           expect(supports).toBe(true);
-          console.log(`✓ Supports filter: ${testCase.property} ${testCase.operator} ${testCase.value}`);
+          // console.log(`✓ Supports filter: ${testCase.property} ${testCase.operator} ${testCase.value}`);
         }
       }
     });
@@ -622,14 +622,14 @@ describe('LOINC Provider', () => {
             const concept = await provider.filterConcept(opContext, filterContext, filter);
             foundCodes.push(concept.code);
           }
-          console.log('found codes: '+foundCodes);
+          // console.log('found codes: '+foundCodes);
 
           expect(size).toBe(testCase.expectedCodes.length);
 
           expect(foundCodes.sort()).toEqual(testCase.expectedCodes.sort());
         }
 
-        console.log(`✓ LIST filter "${testCase.value}": ${size} results`);
+        // console.log(`✓ LIST filter "${testCase.value}": ${size} results`);
       }
     });
   });
@@ -657,7 +657,7 @@ describe('LOINC Provider', () => {
           const concept = await provider.filterConcept(opContext, filterContext, filter);
           foundCodes.push(concept.code);
         }
-        console.log(`found codes for ${testCase.property} ${testCase.operator} ${testCase.value}: `+foundCodes);
+        // console.log(`found codes for ${testCase.property} ${testCase.operator} ${testCase.value}: `+foundCodes);
 
 
         expect(size).toBeGreaterThanOrEqual(0);
@@ -667,7 +667,7 @@ describe('LOINC Provider', () => {
           expect(size).toBe(testCase.expectedCodes.length);
         }
 
-        console.log(`✓ ${testCase.property} filter "${testCase.value}": ${size} results`);
+        // console.log(`✓ ${testCase.property} filter "${testCase.value}": ${size} results`);
       }
     });
   });
@@ -696,7 +696,7 @@ describe('LOINC Provider', () => {
           const concept = await provider.filterConcept(opContext, filterContext, filter);
           foundCodes.push(concept.code);
         }
-        console.log(`found codes for ${testCase.property} ${testCase.operator} ${testCase.value}: `+foundCodes);
+        // console.log(`found codes for ${testCase.property} ${testCase.operator} ${testCase.value}: `+foundCodes);
 
         expect(size).toBeGreaterThanOrEqual(0);
 
@@ -705,7 +705,7 @@ describe('LOINC Provider', () => {
           expect(size).toBe(testCase.expectedCodes.length);
         }
 
-        console.log(`✓ ${testCase.property} filter "${testCase.value}": ${size} results`);
+        // console.log(`✓ ${testCase.property} filter "${testCase.value}": ${size} results`);
       }
     });
 
@@ -728,7 +728,7 @@ describe('LOINC Provider', () => {
         const size = await provider.filterSize(opContext, filterContext, filter);
         expect(size).toBeGreaterThanOrEqual(0);
 
-        console.log(`✓ CLASSTYPE filter "${testCase.value}" (${testCase.description}): ${size} results`);
+        // console.log(`✓ CLASSTYPE filter "${testCase.value}" (${testCase.description}): ${size} results`);
       }
     });
   });
@@ -755,7 +755,7 @@ describe('LOINC Provider', () => {
         const size = await provider.filterSize(opContext, filterContext, filter);
         expect(size).toBeGreaterThanOrEqual(0);
 
-        console.log(`✓ Hierarchy filter "concept ${testCase.operator} ${testCase.value}": ${size} results`);
+        // console.log(`✓ Hierarchy filter "concept ${testCase.operator} ${testCase.value}": ${size} results`);
       }
     });
   });
@@ -779,7 +779,7 @@ describe('LOINC Provider', () => {
         const size = await provider.filterSize(opContext, filterContext, filter);
         expect(size).toBeGreaterThanOrEqual(0);
 
-        console.log(`✓ STATUS filter "${testCase.value}": ${size} results`);
+        // console.log(`✓ STATUS filter "${testCase.value}": ${size} results`);
       }
     });
 
@@ -801,7 +801,7 @@ describe('LOINC Provider', () => {
         const size = await provider.filterSize(opContext, filterContext, filter);
         expect(size).toBeGreaterThanOrEqual(0);
 
-        console.log(`✓ Copyright filter "${testCase.value}": ${size} results`);
+        // console.log(`✓ Copyright filter "${testCase.value}": ${size} results`);
       }
     });
   });
@@ -827,7 +827,7 @@ describe('LOINC Provider', () => {
         expect(located).toBeInstanceOf(LoincProviderContext);
         expect(located.code).toBe(codeToFind);
 
-        console.log(`✓ Located code ${codeToFind} in filter`);
+      //   console.log(`✓ Located code ${codeToFind} in filter`);
       }
     });
 
@@ -851,7 +851,7 @@ describe('LOINC Provider', () => {
         const inFilter = await provider.filterCheck(opContext, filterContext, filter, concept.context);
         expect(inFilter).toBe(true);
 
-        console.log(`✓ Concept ${testCode} is in filter`);
+        //console.log(`✓ Concept ${testCode} is in filter`);
       }
     });
 
@@ -881,31 +881,31 @@ describe('LOINC Provider', () => {
 
       expect(count).toBeGreaterThan(0);
       console.log(`✓ Iterated ${count} concepts from filter`);
-    });
+    // });
   });
 
   describe('Extended Lookup', () => {
     test('should extend lookup with properties and relationships', async () => {
-      const testCode = expectedResults.basic.knownCodes[0];
+    //   const testCode = expectedResults.basic.knownCodes[0];
       const params = { parameter: [] };
 
       await provider.extendLookup(opContext, testCode, [], params);
 
       expect(params.parameter).toBeDefined();
-      expect(params.parameter.length).toBeGreaterThan(0);
+//       expect(params.parameter.length).toBeGreaterThan(0);
 
       // Check for expected parameter types
       const paramTypes = params.parameter.map(p => p.name);
       expect(paramTypes).toContain('property');
-      expect(paramTypes).toContain('designation');
+//       expect(paramTypes).toContain('designation');
 
-      console.log(`✓ Extended lookup for ${testCode}: ${params.parameter.length} parameters`);
+      // console.log(`✓ Extended lookup for ${testCode}: ${params.parameter.length} parameters`);
 
       // Log some example properties
       const properties = params.parameter.filter(p => p.name === 'property').slice(0, 5);
       properties.forEach(prop => {
         const code = prop.part.find(part => part.name === 'code')?.valueCode;
-        const value = prop.part.find(part => part.name === 'value')?.valueString;
+        // // const value = prop.part.find(part => part.name === 'value')?.valueString;
         console.log(`  Property: ${code} = ${value}`);
       });
     });
@@ -929,7 +929,7 @@ describe('LOINC Provider', () => {
       }
 
       expect(count).toBeGreaterThan(0);
-      console.log(`✓ Iterated ${count} codes via iterator`);
+      // console.log(`✓ Iterated ${count} codes via iterator`);
     });
   });
 

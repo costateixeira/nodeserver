@@ -171,9 +171,9 @@ describe('UCUM Provider Integration Tests', () => {
         if (result.context) {
           validCount++;
 
-          console.log(`✓ ${item.field}: ${item.unit}`);
+          // // console.log(`✓ ${item.field}: ${item.unit}`);
         } else {
-          console.log(`✗ ${item.field}: ${item.unit} - ${result.message}`);
+          // console.log(`✗ ${item.field}: ${item.unit} - ${result.message}`);
         }
       }
 
@@ -202,7 +202,7 @@ describe('UCUM Provider Integration Tests', () => {
       for (const unit of complexUnits) {
         const result = await provider.locate(opContext, unit);
         if (result.context) {
-          console.log(`✓ ${unit}`);
+          // console.log(`✓ ${unit}`);
         }
       }
     });
@@ -292,8 +292,8 @@ describe('UCUM Provider Integration Tests', () => {
       const elapsed = Date.now() - start;
       const opsPerSecond = (testUnits.length / elapsed * 1000).toFixed(2);
 
-      console.log(`Validated ${testUnits.length} units in ${elapsed}ms (${opsPerSecond} ops/sec)`);
-      console.log(`Valid units: ${validCount}/${testUnits.length} (${(validCount/testUnits.length*100).toFixed(1)}%)`);
+      // console.log(`Validated ${testUnits.length} units in ${elapsed}ms (${opsPerSecond} ops/sec)`);
+      // console.log(`Valid units: ${validCount}/${testUnits.length} (${(validCount/testUnits.length*100).toFixed(1)}%)`);
 
       expect(validCount).toBeGreaterThan(testUnits.length * 0.9); // 90%+ should be valid
       expect(elapsed).toBeLessThan(5000); // Should complete in < 5 seconds
@@ -356,7 +356,7 @@ describe('UCUM Provider Integration Tests', () => {
 
         // At least one expected term should be in the error message
         if (!hasExpectedTerms) {
-          console.log(`Warning: Error message for "${testCase.unit}" may not be descriptive enough: "${result.message}"`);
+          // console.log(`Warning: Error message for "${testCase.unit}" may not be descriptive enough: "${result.message}"`);
         }
       }
     });
@@ -371,7 +371,7 @@ function benchmark(name, fn) {
     const end = process.hrtime.bigint();
     const durationMs = Number(end - start) / 1_000_000;
 
-    console.log(`${name}: ${durationMs.toFixed(2)}ms`);
+    // console.log(`${name}: ${durationMs.toFixed(2)}ms`);
     return result;
   };
 }

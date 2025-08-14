@@ -37,7 +37,7 @@ describe('UniiDataMigrator', () => {
       });
 
       expect(count).toBeGreaterThan(0);
-      console.log(`Unii table contains ${count} records`);
+      // console.log(`Unii table contains ${count} records`);
     } finally {
       await new Promise((resolve) => {
         db.close(() => resolve());

@@ -69,7 +69,7 @@ describe('SNOMED CT Module Import', () => {
       const filePath = path.join(testSourceDir, file);
       if (fs.existsSync(filePath)) {
         foundFiles++;
-        console.log(`✓ Found: ${file}`);
+        // console.log(`✓ Found: ${file}`);
       } else {
         // Try to find similar files with glob-like pattern
         const dir = path.dirname(path.join(testSourceDir, file));
@@ -85,9 +85,9 @@ describe('SNOMED CT Module Import', () => {
 
           if (similar.length > 0) {
             foundFiles++;
-            console.log(`✓ Found similar: ${similar[0]} (instead of ${file})`);
+            // console.log(`✓ Found similar: ${similar[0]} (instead of ${file})`);
           } else {
-            console.log(`✗ Missing: ${file}`);
+            // console.log(`✗ Missing: ${file}`);
           }
         }
       }
@@ -132,19 +132,19 @@ describe('SNOMED CT Module Import', () => {
     expect(data.edition).toBeDefined();
     expect(data.version).toBeDefined();
 
-    console.log('Cache Version:', data.cacheVersion);
-    console.log('Version URI:', data.versionUri);
-    console.log('Version Date:', data.versionDate);
-    console.log('Edition:', data.edition);
-    console.log('SNOMED Version:', data.version);
+    // console.log('Cache Version:', data.cacheVersion);
+    // console.log('Version URI:', data.versionUri);
+    // console.log('Version Date:', data.versionDate);
+    // console.log('Edition:', data.edition);
+    // console.log('SNOMED Version:', data.version);
 
     // Verify root concepts exist
     expect(Array.isArray(data.activeRoots)).toBe(true);
     expect(Array.isArray(data.inactiveRoots)).toBe(true);
     expect(data.activeRoots.length).toBeGreaterThan(0);
 
-    console.log('Active roots count:', data.activeRoots.length);
-    console.log('Inactive roots count:', data.inactiveRoots.length);
+    // console.log('Active roots count:', data.activeRoots.length);
+    // console.log('Inactive roots count:', data.inactiveRoots.length);
   });
 
   test('should have loaded core SNOMED structures', async () => {
@@ -167,11 +167,11 @@ describe('SNOMED CT Module Import', () => {
     expect(data.desc.length).toBeGreaterThan(0);
     expect(data.rel.length).toBeGreaterThan(0);
 
-    console.log('Strings size:', data.strings.length);
-    console.log('Concepts size:', data.concept.length);
-    console.log('Descriptions size:', data.desc.length);
-    console.log('Relationships size:', data.rel.length);
-    console.log('References size:', data.refs.length);
+    // console.log('Strings size:', data.strings.length);
+    // console.log('Concepts size:', data.concept.length);
+    // console.log('Descriptions size:', data.desc.length);
+    // console.log('Relationships size:', data.rel.length);
+    // console.log('References size:', data.refs.length);
   });
 
   test('should have proper file size and structure', () => {
@@ -183,8 +183,8 @@ describe('SNOMED CT Module Import', () => {
     // File should be readable
     expect(stats.mode & fs.constants.R_OK).toBeTruthy();
 
-    console.log('Cache file size:', (stats.size / (1024 * 1024)).toFixed(2), 'MB');
-    console.log('Cache file created:', stats.birthtime.toISOString());
+    // console.log('Cache file size:', (stats.size / (1024 * 1024)).toFixed(2), 'MB');
+    // console.log('Cache file created:', stats.birthtime.toISOString());
   });
 });
 
@@ -203,10 +203,10 @@ describe('SNOMED CT Expression Processing (File-based Tests)', () => {
 
     if (fs.existsSync(testCachePath)) {
       cacheFilePath = testCachePath;
-      console.log('Using test cache file');
+      // console.log('Using test cache file');
     } else if (fs.existsSync(fallbackCachePath)) {
       cacheFilePath = fallbackCachePath;
-      console.log('Using fallback cache file');
+      // console.log('Using fallback cache file');
     }
 
     if (!cacheFilePath) {
@@ -238,7 +238,7 @@ describe('SNOMED CT Expression Processing (File-based Tests)', () => {
       expressionServices = new SnomedExpressionServices(structures, isAIndex);
       parser = new SnomedExpressionParser();
     } catch (error) {
-      console.log('Failed to load SNOMED cache file:', error.message);
+      // console.log('Failed to load SNOMED cache file:', error.message);
       snomedData = null;
     }
   });
@@ -267,13 +267,13 @@ describe('SNOMED CT Expression Processing (File-based Tests)', () => {
     expect(snomedData.edition).toBeDefined();
     expect(snomedData.defaultLanguage).toBeDefined();
 
-    console.log('Cache Version:', snomedData.cacheVersion);
-    console.log('Version URI:', snomedData.versionUri);
-    console.log('Version Date:', snomedData.versionDate);
-    console.log('Edition:', snomedData.edition);
-    console.log('SNOMED Version:', snomedData.version);
-    console.log('Has Langs:', snomedData.hasLangs);
-    console.log('Default Language:', snomedData.defaultLanguage);
+    // // console.log('Cache Version:', snomedData.cacheVersion);
+    // console.log('Version URI:', snomedData.versionUri);
+    // console.log('Version Date:', snomedData.versionDate);
+    // console.log('Edition:', snomedData.edition);
+    // console.log('SNOMED Version:', snomedData.version);
+    // console.log('Has Langs:', snomedData.hasLangs);
+    // console.log('Default Language:', snomedData.defaultLanguage);
   });
 
   testWithCache('should have loaded string data', () => {
@@ -283,42 +283,42 @@ describe('SNOMED CT Expression Processing (File-based Tests)', () => {
     if (structures.strings.length > 5) {
       const firstString = structures.strings.getEntry(5); // Skip offset 0 due to the weird null case
       expect(typeof firstString).toBe('string');
-      console.log('Sample string:', firstString);
+      // console.log('Sample string:', firstString);
     }
   });
 
   testWithCache('should have loaded concept data', () => {
     const conceptCount = structures.concepts.count();
     expect(conceptCount).toBeGreaterThan(0);
-    console.log('Total concepts:', conceptCount);
+    // console.log('Total concepts:', conceptCount);
 
     // Test reading first concept
     if (conceptCount > 0) {
       const firstConcept = structures.concepts.getConcept(0);
       expect(firstConcept.identity).toBeDefined();
       expect(typeof firstConcept.flags).toBe('number');
-      console.log('First concept ID:', firstConcept.identity.toString());
+      // console.log('First concept ID:', firstConcept.identity.toString());
     }
   });
 
   testWithCache('should have loaded description data', () => {
     const descCount = structures.descriptions.count();
     expect(descCount).toBeGreaterThan(0);
-    console.log('Total descriptions:', descCount);
+    // console.log('Total descriptions:', descCount);
 
     // Test reading first description
     if (descCount > 0) {
       const firstDesc = structures.descriptions.getDescription(0);
       expect(firstDesc.id).toBeDefined();
       expect(firstDesc.concept).toBeDefined();
-      console.log('First description ID:', firstDesc.id.toString());
+      // console.log('First description ID:', firstDesc.id.toString());
     }
   });
 
   testWithCache('should have loaded relationship data', () => {
     const relCount = structures.relationships.count();
     expect(relCount).toBeGreaterThan(0);
-    console.log('Total relationships:', relCount);
+    // console.log('Total relationships:', relCount);
 
     // Test reading first relationship
     if (relCount > 0) {
@@ -326,21 +326,21 @@ describe('SNOMED CT Expression Processing (File-based Tests)', () => {
       expect(firstRel.source).toBeDefined();
       expect(firstRel.target).toBeDefined();
       expect(firstRel.relType).toBeDefined();
-      console.log('First relationship:', firstRel.source, '->', firstRel.target, '(type:', firstRel.relType, ')');
+      // console.log('First relationship:', firstRel.source, '->', firstRel.target, '(type:', firstRel.relType, ')');
     }
   });
 
   testWithCache('should have loaded reference set data', () => {
     const refSetCount = structures.refSetIndex.count();
     expect(refSetCount).toBeGreaterThan(0);
-    console.log('Total reference sets:', refSetCount);
+    // console.log('Total reference sets:', refSetCount);
 
     // Test reading first reference set
     if (refSetCount > 0) {
       const firstRefSet = structures.refSetIndex.getReferenceSet(0);
       expect(firstRefSet.definition).toBeDefined();
       expect(firstRefSet.name).toBeDefined();
-      console.log('First reference set definition:', firstRefSet.definition);
+      // console.log('First reference set definition:', firstRefSet.definition);
     }
   });
 
@@ -348,11 +348,11 @@ describe('SNOMED CT Expression Processing (File-based Tests)', () => {
     expect(Array.isArray(snomedData.activeRoots)).toBe(true);
     expect(Array.isArray(snomedData.inactiveRoots)).toBe(true);
 
-    console.log('Active roots count:', snomedData.activeRoots.length);
-    console.log('Inactive roots count:', snomedData.inactiveRoots.length);
+    // console.log('Active roots count:', snomedData.activeRoots.length);
+    // console.log('Inactive roots count:', snomedData.inactiveRoots.length);
 
     if (snomedData.activeRoots.length > 0) {
-      console.log('First active root:', snomedData.activeRoots[0].toString());
+      // console.log('First active root:', snomedData.activeRoots[0].toString());
     }
   });
 
@@ -362,11 +362,11 @@ describe('SNOMED CT Expression Processing (File-based Tests)', () => {
     const result = structures.concepts.findConcept(rootConceptId);
 
     if (result.found) {
-      console.log('Found SNOMED CT root concept at offset:', result.index);
+      // console.log('Found SNOMED CT root concept at offset:', result.index);
       const concept = structures.concepts.getConcept(result.index);
       expect(concept.identity).toBe(rootConceptId);
     } else {
-      console.log('SNOMED CT root concept not found (this might be normal depending on the dataset)');
+      // console.log('SNOMED CT root concept not found (this might be normal depending on the dataset)');
     }
   });
 
@@ -376,7 +376,7 @@ describe('SNOMED CT Expression Processing (File-based Tests)', () => {
       expect(expressionServices.concepts).toBeDefined();
       expect(expressionServices.relationships).toBeDefined();
       expect(expressionServices.strings).toBeDefined();
-      console.log('Expression services initialized successfully');
+      // console.log('Expression services initialized successfully');
     });
 
     test('should validate expressions with real concept data', () => {
@@ -386,7 +386,7 @@ describe('SNOMED CT Expression Processing (File-based Tests)', () => {
       for (const conceptId of commonConcepts) {
         const result = structures.concepts.findConcept(BigInt(conceptId));
         if (result.found) {
-          console.log(`Found concept ${conceptId} at index ${result.index}`);
+          // console.log(`Found concept ${conceptId} at index ${result.index}`);
 
           // Test parsing with this real concept
           const expression = conceptId;
@@ -394,10 +394,10 @@ describe('SNOMED CT Expression Processing (File-based Tests)', () => {
             const parsed = expressionServices.parseExpression(expression);
             expect(parsed.concepts).toHaveLength(1);
             expect(parsed.concepts[0].code).toBe(conceptId);
-            console.log(`✓ Successfully parsed and validated expression: ${expression}`);
+            // console.log(`✓ Successfully parsed and validated expression: ${expression}`);
             break; // Exit after first successful test
           } catch (error) {
-            console.log(`⚠ Failed to validate expression ${expression}: ${error.message}`);
+            // console.log(`⚠ Failed to validate expression ${expression}: ${error.message}`);
           }
         }
       }
@@ -409,7 +409,7 @@ describe('SNOMED CT Expression Processing (File-based Tests)', () => {
 
       const equivalent = expressionServices.expressionsEquivalent(expr1, expr2);
       expect(equivalent).toBe(true);
-      console.log('✓ Expression equivalence checking works correctly');
+      // console.log('✓ Expression equivalence checking works correctly');
     });
 
     test('should render expressions in different formats', () => {
@@ -422,9 +422,9 @@ describe('SNOMED CT Expression Processing (File-based Tests)', () => {
       expect(asIs).toBeDefined();
       expect(asIs.length).toBeGreaterThanOrEqual(minimal.length); // AsIs should include terms
 
-      console.log('Minimal render:', minimal);
-      console.log('AsIs render:', asIs);
-      console.log('✓ Expression rendering works correctly');
+      // console.log('Minimal render:', minimal);
+      // console.log('AsIs render:', asIs);
+      // console.log('✓ Expression rendering works correctly');
     });
 
     test('should create expression contexts', () => {
@@ -437,7 +437,7 @@ describe('SNOMED CT Expression Processing (File-based Tests)', () => {
       expect(context2.source).toBe('test source');
       expect(context2.isComplex()).toBe(true);
 
-      console.log('✓ Expression contexts work correctly');
+      // console.log('✓ Expression contexts work correctly');
     });
   });
 });
@@ -457,7 +457,7 @@ describe('SNOMED CT Expression Parser (Standalone Tests)', () => {
     const result = parser.parse(expression);
     expect(result).toBeDefined();
     expect(result).not.toBeNull();
-    console.log(`Parsed ${testName}: ${expression}`);
+    // console.log(`Parsed ${testName}: ${expression}`);
     return result;
   }
 
