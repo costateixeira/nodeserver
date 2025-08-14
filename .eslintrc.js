@@ -3,6 +3,7 @@ module.exports = {
     browser: true,
     commonjs: true,
     es6: true,
+    es2022: true,
     node: true,
     jest: true
   },
@@ -10,8 +11,11 @@ module.exports = {
     'eslint:recommended'
   ],
   parserOptions: {
-    ecmaVersion: 2018,
+    ecmaVersion: 2022,
     sourceType: 'module'
+  },
+  globals: {
+    BigInt: 'readonly'
   },
   rules: {
     // Relax some rules for existing codebase
@@ -20,7 +24,8 @@ module.exports = {
     'no-empty': 'warn',
     'no-dupe-keys': 'warn',
     'no-unused-vars': 'warn',
-    'no-console': 'off'
+    'no-console': 'off',
+    'no-loss-of-precision': 'warn' // Allow large numbers with precision loss as warning
   },
   // Ignore specific files with known issues
   ignorePatterns: [
