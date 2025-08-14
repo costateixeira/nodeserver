@@ -325,11 +325,12 @@ describe('IETF Language CodeSystem Provider', () => {
     });
 
     test('debug what error we actually get', async () => {
+      console.log('debug what error we actually get');
 
       const filter = new IETFLanguageCodeFilter(LanguageComponent.LANG, true);
       try {
         await provider.filterMore(opContext, null, filter);
-        fail('Should have thrown an error');
+        console.fail('Should have thrown an error');
       } catch (error) {
         console.log('Caught error message:', error.message);
         console.log('Caught error stack:', error.stack);
