@@ -119,20 +119,6 @@ class BaseTerminologyModule {
       });
     }
 
-    // Version
-    if (!options.version) {
-      questions.push({
-        type: 'input',
-        name: 'version',
-        message: 'Data version:',
-        default: smartDefaults.version || (() => {
-          const date = new Date().toISOString().split('T')[0];
-          return `${terminology.toUpperCase()}-${date}`;
-        })(),
-        validate: (input) => input ? true : 'Version is required'
-      });
-    }
-
     // Overwrite confirmation
     questions.push({
       type: 'confirm',
@@ -162,27 +148,6 @@ class BaseTerminologyModule {
     };
 
     return finalConfig;
-  }
-
-  async confirmImport(config) {
-    console.log(chalk.cyan(`\\n📋 ${this.getName()} Import Configuration:`));
-    console.log(`  Source: ${chalk.white(config.source)}`);
-    console.log(`  Destination: ${chalk.white(config.dest)}`);
-    console.log(`  Version: ${chalk.white(config.version)}`);
-    console.log(`  Overwrite: ${chalk.white(config.overwrite ? 'Yes' : 'No')}`);
-
-    if (config.estimatedDuration) {
-      console.log(`  Estimated Duration: ${chalk.white(config.estimatedDuration)}`);
-    }
-
-    const { confirmed } = await inquirer.prompt({
-      type: 'confirm',
-      name: 'confirmed',
-      message: 'Proceed with import?',
-      default: true
-    });
-
-    return confirmed;
   }
 
   createProgressBar(format = null) {
@@ -296,7 +261,7 @@ class BaseTerminologyModule {
   // Common import workflow
   async runImport(config) {
     try {
-      console.log(chalk.blue.bold(`🏥 Starting ${this.getName()} Import...\\n`));
+      console.log(chalk.blue.bold(`🏥 Starting ${this.getName()} Import...\n`));
 
       // Pre-flight checks
       this.logInfo('Running pre-flight checks...');

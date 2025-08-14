@@ -10,7 +10,7 @@ class TxOperationContext {
 
   _ensureLanguages(param) {
     assert(typeof param === 'string' || param instanceof Languages, 'Parameter must be string or Languages object');
-    return typeof param === 'string' ? this.parseLanguages(param) : param;
+    return typeof param === 'string' ? Languages.fromAcceptLanguage(param) : param;
   }
 
   /**

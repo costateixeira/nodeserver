@@ -1,0 +1,194 @@
+{
+  "basic": {
+    "knownCodes": ["LP190769-2", "10332-5", "11704-4", "LL6136-7", "LA32971-6"]
+  },
+  "filters": {
+    "LIST": [
+      {
+        "property": "LIST",
+        "operator": "equal",
+        "value": "LL6136-7",
+        "expectedCodes": ["LA32971-6", "LA32972-4", "LA9040-2", "LA10105-7"]
+      }
+    ],
+    "relationships": [
+      {
+        "property": "COMPONENT",
+        "operator": "equal",
+        "value": "LP14082-9",
+        "expectedCodes": ["100906-7","10352-3","10353-1","10354-9","104865-1","105051-7","105052-5","105610-0","105907-0","105908-8","105917-9","105924-5","105925-2","105932-8","105933-6","106016-9","106018-5","106032-6","106033-4","106042-5","107188-5","11101-3","11261-5","12178-0","12281-2","13314-0","13315-7","14093-9","14124-2","14320-6","14325-5","14475-8","14477-4","14478-2","17279-1","17898-8","17909-3","17915-0","17925-9","17928-3","17934-1","17956-4","17969-7","18192-5","19126-2","19127-0","19128-8","20474-3","20693-8","20694-6","20695-3","20877-7","20878-5","20879-3","21020-3","23667-9","25145-4","32355-0","32367-5","32763-5","32810-4","33218-9","41598-4","41599-2","41600-8","41601-6","41602-4","41603-2","41741-0","42661-9","42803-7","42806-0","43214-6","43307-8","43407-6","43408-4","43409-2","43410-0","43411-8","43426-6","43441-5","43442-3","44022-2","44023-0","44038-8","44039-6","44243-4","45275-5","45276-3","50221-1","51480-2","52966-9","52967-7","52973-5","53558-3","53617-7","53908-0","53911-4","56714-9","56715-6","5769-5","58940-8","595-9","596-7","597-5","598-3","599-1","60032-0","600-7","602-3","60257-3","60258-1","603-1","604-9","605-6","606-4","607-2","608-0","609-8","610-6","611-4","616-3","617-1","618-9","619-7","620-5","621-3","622-1","623-9","624-7","625-4","626-2","627-0","628-8","629-6","630-4","631-2","632-0","633-8","634-6","635-3","636-1","6459-2","6460-0","6461-8","6462-6","6463-4","68366-4","72340-3","73960-7","74348-4","74355-9","74356-7","74816-0","75269-1","75357-4","75358-2","75359-0","75518-1","75756-7","76693-1","77193-1","78356-3","79425-5","87829-8","87929-6","87930-4","87931-2","87932-0","87933-8","87934-6","87935-3","87936-1","87937-9","87938-7","87939-5","87940-3","87941-1","87942-9","87943-7","87944-5","87954-4","87955-1","88139-1","88141-7","88142-5","88236-5","88683-8","89643-1","89644-9","90270-0","90271-8","90273-4","90274-2","90276-7","90277-5","90278-3","90279-1","90280-9","90281-7","91062-0","91063-8","91818-5","91819-3","91865-6","91866-4","95074-1","9822-8","99932-6"]
+      },
+      {
+        "property": "PROPERTY",
+        "operator": "equal",
+        "value": "LP217195-9",
+        "expectedCodes": ["100865-5","101421-6","102820-8","102896-8","102896-8","1039-7","1099-1","3105-4","31750-3","36921-5","90324-5","95675-5"]
+      },
+      {
+        "property": "SYSTEM",
+        "operator": "equal",
+        "value": "LP7255-5",
+        "expectedCodes": ["14402-2","14407-1"]
+      },
+      {
+        "property": "SCALE_TYP",
+        "operator": "equal",
+        "value": "LP7753-9",
+        "expectedCodes": ["10332-5","10391-1","104597-0","104684-6","10550-2","11702-","11704-4","12814-0","14394-1","14396-","14402-2","14407-","31157-","31219-9","34703-9","38292-","75940-","85818-3","89344-","90444-1","93429-9","93432-3","95084-0","95095-6","95594-8"]
+      },
+      {
+        "property": "METHOD_TYP",
+        "operator": "equal",
+        "value": "LP6477-6",
+        "expectedCodes": ["102820-8","102896-8"]
+      },
+      {
+        "property": "TIME_ASPCT",
+        "operator": "equal",
+        "value": "LP70420-2",
+        "expectedCodes": ["15508-5"]
+      },
+      {
+        "property": "CLASS",
+        "operator": "equal",
+        "value": "LP7786-9",
+        "expectedCodes": ["104597-0","104684-6","12814-0","14172-1","14394-1","14396-6","14402-2","14407-1","15202-5","17795-","18372-","19096-7","21476-7","22760-3","25506-7","27441-5","2819-1","2820-9","2821-7","2822-5","2823-3","2824-1","2825-8","2826-6","2827-4","2828-2","2829-0","2830-8","30549-0","3105-4","31157-1","32336-0","32550-6","32713-0","35677-4","39785-1","39789-3","39790-1","41656-0","42569-4","49788-3","49789-1","50902-6","51720-1","53123-6","57355-0","57379-0","57380-8","58996-0","59162-8","5927-9","60218-5","6298-4","6792-","6940-1","75940-7","77142-8","79710-0","82722-0","87454-5","87455-2","9482-1","94841-4","95594-8"]
+      }
+    ],
+    "properties": [
+      {
+        "property": "ORDER_OBS",
+        "operator": "equal",
+        "value": "Observation",
+        "expectedCodes": ["100007-4","100008-2","102820-8","102896-8","10332-5","10333-3","10390-3","10391-1","1039-7","104865-1","105610-0","105917-9","105924-5","105925-2","105932-8","105933-6","106016-9","106018-5","106032-6","106033-4","106042-5","1099-1","11101-3","11702-8","11704-","14124-","19096-7","25145-4","33218-","38292-9","50221-1","51480-2","54148-2","5769-5","73960-","74355-9","74816-0","75269-1","75359-0","78356-3","87454-5","87455-2","89248-9","94841-4","95074-1","95084-0","95095-6","95594-8"]
+      },
+      {
+        "property": "ORDER_OBS",
+        "operator": "equal",
+        "value": "Order",
+        "expectedCodes": []
+      },
+      {
+        "property": "UNITSREQUIRED",
+        "operator": "equal",
+        "value": "Y",
+        "expectedCodes": ["10332-5","10391-1","11101-3","11702-8","11704-4","12814-0","14172-1","14394-1","14396-6","14402-2","14407-1","15202-5","17795-6","18372-3","20695-3","21476-7","22760-3","25506-7","27441-5","2819-1","2820-9","2821-7","2822-5","2823-3","2824-1","2825-8","2826-6","2827-4","2828-2","2829-0","2830-8","5769-5","6298-4","6792-6","6940-1","9482-1"]
+      },
+      {
+        "property": "EXAMPLE_UNITS",
+        "operator": "equal",
+        "value": "#/mL",
+        "expectedCodes": ["100906-7"]
+      }
+    ],
+    "classType": [
+      {
+        "property": "CLASSTYPE",
+        "operator": "equal",
+        "value": "1",
+        "description": "Laboratory class",
+        "expectedCodes": ["TODO: Add lab class codes"]
+      },
+      {
+        "property": "CLASSTYPE",
+        "operator": "equal",
+        "value": "2",
+        "description": "Clinical class",
+        "expectedCodes": ["TODO: Add clinical class codes"]
+      },
+      {
+        "property": "CLASSTYPE",
+        "operator": "equal",
+        "value": "3",
+        "description": "Claims attachments",
+        "expectedCodes": ["TODO: Add claims codes"]
+      },
+      {
+        "property": "CLASSTYPE",
+        "operator": "equal",
+        "value": "4",
+        "description": "Surveys",
+        "expectedCodes": ["TODO: Add survey codes"]
+      }
+    ],
+    "hierarchy": [
+      {
+        "property": "concept",
+        "operator": "is-a",
+        "value": "TODO: Add parent part code",
+        "expectedCodes": ["TODO: Add descendant codes"]
+      },
+      {
+        "property": "concept",
+        "operator": "descendent-of",
+        "value": "TODO: Add ancestor part code",
+        "expectedCodes": ["TODO: Add descendant codes"]
+      }
+    ],
+    "status": [
+      {
+        "property": "STATUS",
+        "operator": "equal",
+        "value": "ACTIVE",
+        "expectedCodes": ["TODO: Add active codes"]
+      },
+      {
+        "property": "STATUS",
+        "operator": "equal",
+        "value": "DEPRECATED",
+        "expectedCodes": ["TODO: Add deprecated codes if any"]
+      },
+      {
+        "property": "STATUS",
+        "operator": "equal",
+        "value": "TRIAL",
+        "expectedCodes": ["TODO: Add trial codes if any"]
+      }
+    ],
+    "copyright": [
+      {
+        "property": "copyright",
+        "operator": "equal",
+        "value": "LOINC",
+        "expectedCodes": ["TODO: Add LOINC copyrighted codes"]
+      },
+      {
+        "property": "copyright",
+        "operator": "equal",
+        "value": "3rdParty",
+        "expectedCodes": ["TODO: Add 3rd party copyrighted codes"]
+      }
+    ],
+    "answersList": [
+      {
+        "property": "answers-for",
+        "operator": "equal",
+        "value": "TODO: Add LOINC code that has answers",
+        "expectedCodes": ["TODO: Add answer codes"]
+      },
+      {
+        "property": "answers-for",
+        "operator": "equal",
+        "value": "TODO: Add LL code",
+        "expectedCodes": ["TODO: Add answer codes for this list"]
+      }
+    ]
+  },
+  "instructions": {
+    "README": "This template needs to be populated with actual codes from your LOINC subset.",
+    "steps": [
+      "1. Run the LOINC tests to see which filters return results",
+      "2. For each filter that returns results, add the actual codes to expectedCodes arrays",
+      "3. For filters that return no results, you may need to regenerate your subset with additional codes",
+      "4. Replace all 'TODO:' entries with actual values from your subset",
+      "5. The 'basic.knownCodes' should be populated with representative codes from different categories"
+    ],
+    "notes": [
+      "Some filters may legitimately return 0 results in a subset - that's OK",
+      "Focus on getting a few representative test cases working for each filter type",
+      "You can add more test cases once the basic structure is working",
+      "Part codes (LP* codes) should be used for relationship filters",
+      "Main LOINC codes should be used for most other tests"
+    ]
+  }
+}

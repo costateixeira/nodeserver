@@ -77,6 +77,32 @@ class UniiModule extends BaseTerminologyModule {
     await this.runImport(config);
   }
 
+  async confirmImport(config) {
+    const inquirer = require('inquirer');
+    const chalk = require('chalk');
+
+    console.log(chalk.cyan(`\n📋 ${this.getName()} Import Configuration:`));
+    console.log(`  Source: ${chalk.white(config.source)}`);
+    console.log(`  Destination: ${chalk.white(config.dest)}`);
+    console.log(`  Version: ${chalk.white(config.version)}`);
+    console.log(`  Create Indexes: ${chalk.white(config.createIndexes ? 'Yes' : 'No')}`);
+    console.log(`  Overwrite: ${chalk.white(config.overwrite ? 'Yes' : 'No')}`);
+    console.log(`  Verbose: ${chalk.white(config.verbose ? 'Yes' : 'No')}`);
+
+    if (config.estimatedDuration) {
+      console.log(`  Estimated Duration: ${chalk.white(config.estimatedDuration)}`);
+    }
+
+    const { confirmed } = await inquirer.prompt({
+      type: 'confirm',
+      name: 'confirmed',
+      message: 'Proceed with import?',
+      default: true
+    });
+
+    return confirmed;
+  }
+
   async handleValidateCommand(options) {
     if (!options.source) {
       const answers = await require('inquirer').prompt({
