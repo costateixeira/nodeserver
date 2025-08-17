@@ -5,7 +5,7 @@ const {
   IETFLanguageCodeFilter,
   LanguageComponent 
 } = require('../../tx/cs/cs-lang');
-const { LanguageDefinitions, Languages, Language } = require('../../tx/library/languages');
+const { LanguageDefinitions, Languages, Language } = require('../../library/languages');
 const { TxOperationContext, FilterExecutionContext} = require('../../tx/cs/cs-api');
 const CodeSystem = require('../../tx/library/codesystem');
 

@@ -1,0 +1,26 @@
+// // Convert input to Languages instance if needed
+// const langs = languages instanceof Languages ? languages :
+//   Array.isArray(languages) ? Languages.fromAcceptLanguage(languages.join(',')) :
+//     Languages.fromAcceptLanguage(languages || '');
+
+// code instanceof CodeSystemProviderContext ? this.code
+
+
+// const {Language} = require("./languages");
+// if (designation.language) {
+//   const designationLang = new Language(designation.language);
+//   for (const requestedLang of langs) {
+//     if (designationLang.matchesForDisplay(requestedLang)) {
+
+const Utilities = {
+  noString: (str) => str == null || str.trim() === '',
+  existsInList: (item, ...list) => list.includes(item),
+  isInteger: (str) => {
+    if (typeof str !== 'string' || str === '') return false;
+    const num = parseInt(str, 10);
+    return num.toString() === str && !isNaN(num);
+  }
+};
+
+
+module.exports = { Utilities };

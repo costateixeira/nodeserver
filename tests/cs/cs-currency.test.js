@@ -1,6 +1,6 @@
 const { TxOperationContext } = require('../../tx/cs/cs-api');
 const { Iso4217Services, Iso4217FactoryProvider } = require('../../tx/cs/cs-currency');
-const { LanguageDefinitions, Languages, Language } = require('../../tx/library/languages');
+const { LanguageDefinitions, Languages, Language } = require('../../library/languages');
 
 describe('Iso4217Services', () => {
   let factory;

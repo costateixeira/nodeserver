@@ -1,6 +1,6 @@
 const { CountryCodeServices, CountryCodeFactoryProvider } = require('../../tx/cs/cs-country');
 const { TxOperationContext } = require('../../tx/cs/cs-api');
-const {Languages} = require("../../tx/library/languages");
+const {Languages} = require("../../library/languages");
 
 describe('CountryCodeServices', () => {
   let factory;
