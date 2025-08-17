@@ -1,5 +1,5 @@
 const { UriServices, UriServicesFactory } = require('../../tx/cs/cs-uri');
-const { Languages, Language } = require('../../tx/library/languages');
+const { Languages, Language } = require('../../library/languages');
 const CodeSystem = require('../../tx/library/codesystem');
 const {TxOperationContext} = require("../../tx/cs/cs-api");
 

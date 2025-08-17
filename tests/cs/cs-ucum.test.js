@@ -16,7 +16,7 @@ const {
 } = require('../../tx/cs/cs-api');
 
 const { UcumService } = require('../../tx/library/ucum-service');
-const { Languages, Language } = require('../../tx/library/languages');
+const { Languages, Language } = require('../../library/languages');
 
 describe('UCUM Provider Integration Tests', () => {
   let ucumService;

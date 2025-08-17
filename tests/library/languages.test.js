@@ -8,7 +8,7 @@ const {
   LanguageScript,
   LanguageRegion,
   LanguageVariant
-} = require('../../tx/library/languages');
+} = require('../../library/languages');
 
 const fs = require('fs');
 const path = require('path');

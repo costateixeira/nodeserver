@@ -1,5 +1,5 @@
 const CodeSystem = require('../library/codesystem');
-const {Languages, Language} = require("../library/languages");
+const {Languages, Language} = require("../../library/languages");
 const assert = require('assert');
 
 const CodeSystemContentMode = Object.freeze({Complete: 'complete'});

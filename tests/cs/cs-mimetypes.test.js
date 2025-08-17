@@ -1,6 +1,6 @@
 const { TxOperationContext } = require('../../tx/cs/cs-api');
 const { MimeTypeServices, MimeTypeServicesFactory, MimeTypeConcept } = require('../../tx/cs/cs-mimetypes');
-const { Languages, Language } = require('../../tx/library/languages');
+const { Languages, Language } = require('../../library/languages');
 const CodeSystem = require('../../tx/library/codesystem');
 
 describe('MimeTypeServices', () => {
