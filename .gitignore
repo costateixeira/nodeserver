@@ -17,3 +17,7 @@ xig/xig-download.log
 logs/
 
 registry/registry-data.json
+
+xig-download.log
+
+locator/
