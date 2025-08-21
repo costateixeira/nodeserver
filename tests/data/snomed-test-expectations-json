@@ -1,0 +1,269 @@
+{
+  "basic": {
+    "knownCodes": [
+      "1539003",
+      "1204474000",
+      "86299006",
+      "430983003",
+      "608785007",
+      "370049004",
+      "370050004",
+      "174826008",
+      "11687002",
+      "897148007",
+      "816080008",
+      "303248007",
+      "162980001",
+      "297250002",
+      "162001003"
+    ],
+    "knownExpressions": [
+      "64572001:116676008=128045006",
+      "28012007:{363698007=52687003,116676008=20946005}"
+    ],
+    "invalidCodes": [
+      "99999999999",
+      "invalid-code",
+      "123"
+    ]
+  },
+  "filters": {
+    "concept": [
+      {
+        "property": "concept",
+        "operator": "is-a",
+        "value": "64572001",
+        "description": "Disease (disorder) and descendants",
+        "expectedMinResults": 5
+      },
+      {
+        "property": "concept",
+        "operator": "descendent-of",
+        "value": "128241005",
+        "description": "Inflammatory disease of liver descendants only",
+        "expectedMinResults": 0
+      },
+      {
+        "property": "concept",
+        "operator": "equal",
+        "value": "86299006",
+        "description": "Exact match for Tetralogy of Fallot",
+        "expectedCodes": ["86299006"]
+      }
+    ],
+    "referenceSet": [
+      {
+        "property": "concept",
+        "operator": "in",
+        "value": "900000000000526001",
+        "description": "REPLACED BY association reference set members",
+        "expectedMinResults": 0
+      }
+    ]
+  },
+  "expressions": {
+    "simple": [
+      {
+        "expression": "64572001",
+        "description": "Disease (disorder)",
+        "expectedCode": "64572001"
+      },
+      {
+        "expression": "86299006",
+        "description": "Tetralogy of Fallot (disorder)",
+        "expectedCode": "86299006"
+      }
+    ],
+    "complex": [
+      {
+        "expression": "64572001:116676008=128045006",
+        "description": "Disease with associated morphology of cellulitis",
+        "isComplex": true
+      },
+      {
+        "expression": "28012007:{363698007=52687003,116676008=20946005}",
+        "description": "Closed fracture of shaft of tibia with grouped attributes",
+        "isComplex": true
+      }
+    ]
+  },
+  "hierarchy": {
+    "parents": [
+      {
+        "code": "1539003",
+        "description": "Acquired trigger finger should have parent disorders",
+        "expectedMinParents": 1
+      },
+      {
+        "code": "86299006",
+        "description": "Tetralogy of Fallot should have parent heart disorders",
+        "expectedMinParents": 1
+      }
+    ],
+    "children": [
+      {
+        "code": "64572001",
+        "description": "Disease should have child disorders",
+        "expectedMinChildren": 3
+      },
+      {
+        "code": "128241005",
+        "description": "Inflammatory disease of liver should have child conditions",
+        "expectedMinChildren": 0
+      }
+    ],
+    "subsumption": [
+      {
+        "parent": "64572001",
+        "child": "86299006",
+        "expected": "subsumes",
+        "description": "Disease subsumes Tetralogy of Fallot"
+      },
+      {
+        "parent": "86299006",
+        "child": "64572001",
+        "expected": "subsumed-by",
+        "description": "Tetralogy of Fallot is subsumed by Disease"
+      },
+      {
+        "parent": "86299006",
+        "child": "86299006",
+        "expected": "equivalent",
+        "description": "Concept is equivalent to itself"
+      },
+      {
+        "parent": "1539003",
+        "child": "86299006",
+        "expected": "not-subsumed",
+        "description": "Unrelated concepts should not subsume"
+      }
+    ]
+  },
+  "designations": {
+    "withDesignations": [
+      {
+        "code": "64572001",
+        "expectedMinDesignations": 1,
+        "expectedLanguages": ["en-US"]
+      },
+      {
+        "code": "86299006",
+        "expectedMinDesignations": 1,
+        "expectedLanguages": ["en-US"]
+      }
+    ]
+  },
+  "search": {
+    "textSearch": [
+      {
+        "searchTerm": "diabetes",
+        "expectedMinResults": 1,
+        "expectedCodes": ["11687002"]
+      },
+      {
+        "searchTerm": "fracture",
+        "expectedMinResults": 2,
+        "expectedCodes": ["28012007", "608785007"]
+      },
+      {
+        "searchTerm": "liver",
+        "expectedMinResults": 1,
+        "expectedCodes": ["128241005"]
+      },
+      {
+        "searchTerm": "appendicitis",
+        "expectedMinResults": 3,
+        "expectedCodes": ["155728006", "74400008", "155729003"]
+      }
+    ]
+  },
+  "status": {
+    "activeCodes": [
+      "64572001",
+      "86299006",
+      "1539003",
+      "11687002"
+    ],
+    "inactiveCodes": [
+    ]
+  },
+  "metadata": {
+    "expectedSystem": "http://snomed.info/sct",
+    "expectedMinTotalCount": 50,
+    "hasParents": true,
+    "hasDisplays": true
+  },
+  "languages": {
+    "supportedLanguages": ["en-US", "en-GB", "en"],
+    "defaultLanguage": "en-US"
+  },
+  "referenceSetConcepts": [
+    "900000000000526001"
+  ],
+  "observableEntities": [
+    "897148007",
+    "364159005"
+  ],
+  "procedures": [
+    "608785007",
+    "174826008",
+    "441802002"
+  ],
+  "findings": [
+    "370049004",
+    "370050004",
+    "162980001",
+    "297250002",
+    "162001003",
+    "281302008",
+    "281300000",
+    "281301001",
+    "249565005"
+  ],
+  "disorders": [
+    "1539003",
+    "86299006",
+    "11687002",
+    "268677005",
+    "155728006",
+    "74400008",
+    "155729003",
+    "307530000",
+    "128045006",
+    "28012007",
+    "447139008",
+    "64572001",
+    "6990005",
+    "128241005"
+  ],
+  "bodyStructures": [
+    "52687003",
+    "56459004",
+    "10200004"
+  ],
+  "substances": [
+    "227014008",
+    "406459008",
+    "776168003"
+  ],
+  "organisms": [
+    "430983003",
+    "421813008"
+  ],
+  "specimens": [
+    "303248007",
+    "119383005"
+  ],
+  "attributes": [
+    "116676008",
+    "363698007"
+  ],
+  "morphologies": [
+    "20946005"
+  ],
+  "qualifiers": [
+    "281302008",
+    "281300000",
+    "281301001"
+  ]
+}

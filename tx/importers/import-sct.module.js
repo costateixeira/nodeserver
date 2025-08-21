@@ -162,6 +162,7 @@ class SnomedModule extends BaseTerminologyModule {
       "731000124108": { name: "US Edition", needsBase: true, lang: "en-US" },
       "32506021000036107": { name: "Australian Edition", needsBase: true, lang: "en-AU" },
       "449081005": { name: "Spanish Edition (International)", needsBase: true, lang: "es" },
+      "11000279109": { name: "Czech Edition", needsBase: true, lang: "cs-CZ" },
       "554471000005108": { name: "Danish Edition", needsBase: true, lang: "da-DK" },
       "11000146104": { name: "Dutch Edition", needsBase: true, lang: "nl-NL" },
       "45991000052106": { name: "Swedish Edition", needsBase: true, lang: "sv-SE" },
@@ -2293,7 +2294,7 @@ class SnomedImporter {
       refSetMembers: this.refsetMembers.master,
       descRef: this.descriptionIndex.master,
 
-      isAIndex: 0, // Simplified
+      isAIndex: this.isAIndex, // Simplified
       inactiveRoots: this.inactiveRoots || [],
       activeRoots: this.activeRoots || [],
       defaultLanguage: 1

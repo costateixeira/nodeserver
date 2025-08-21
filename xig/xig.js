@@ -417,96 +417,6 @@ function buildSecureResourceCountQuery(queryParams) {
   return { query: fullQuery, params };
 }
 
-// Safe file download function
-function downloadFile(url, destination, maxRedirects = 5) {
-  return new Promise((resolve, reject) => {
-    xigLog.info(`Starting download from ${url}`);
-    
-    function attemptDownload(currentUrl, redirectCount = 0) {
-      if (redirectCount > maxRedirects) {
-        reject(new Error(`Too many redirects (${maxRedirects})`));
-        return;
-      }
-      
-      try {
-        const validatedUrl = validateExternalUrl(currentUrl);
-        const protocol = validatedUrl.protocol === 'https:' ? https : http;
-        
-        const request = protocol.get(validatedUrl, (response) => {
-          // Handle redirects
-          if (response.statusCode >= 300 && response.statusCode < 400 && response.headers.location) {
-            let redirectUrl = response.headers.location;
-            if (!redirectUrl.startsWith('http')) {
-              const urlObj = new URL(currentUrl);
-              if (redirectUrl.startsWith('/')) {
-                redirectUrl = `${urlObj.protocol}//${urlObj.host}${redirectUrl}`;
-              } else {
-                redirectUrl = `${urlObj.protocol}//${urlObj.host}${urlObj.pathname}/${redirectUrl}`;
-              }
-            }
-            
-            attemptDownload(redirectUrl, redirectCount + 1);
-            return;
-          }
-          
-          if (response.statusCode !== 200) {
-            reject(new Error(`Download failed with status code: ${response.statusCode}`));
-            return;
-          }
-          
-          // Check content length
-          const contentLength = parseInt(response.headers['content-length'] || '0');
-          const maxSize = 100 * 1024 * 1024; // 100MB limit
-          if (contentLength > maxSize) {
-            reject(new Error('File too large'));
-            return;
-          }
-          
-          const fileStream = fs.createWriteStream(destination);
-          let downloadedBytes = 0;
-          
-          response.on('data', (chunk) => {
-            downloadedBytes += chunk.length;
-            if (downloadedBytes > maxSize) {
-              request.destroy();
-              fs.unlink(destination, () => {}); // Clean up
-              reject(new Error('File too large'));
-              return;
-            }
-          });
-          
-          response.pipe(fileStream);
-          
-          fileStream.on('finish', () => {
-            fileStream.close();
-            xigLog.info(`Download completed successfully. Downloaded ${downloadedBytes} bytes to ${destination}`);
-            resolve();
-          });
-          
-          fileStream.on('error', (err) => {
-            fs.unlink(destination, () => {}); // Delete partial file
-            reject(err);
-          });
-        });
-        
-        request.on('error', (err) => {
-          reject(err);
-        });
-        
-        request.setTimeout(300000, () => { // 5 minutes timeout
-          request.destroy();
-          reject(new Error('Download timeout'));
-        });
-        
-      } catch (error) {
-        reject(error);
-      }
-    }
-    
-    attemptDownload(url);
-  });
-}
-
 // Template Functions
 
 function loadTemplate() {
@@ -705,7 +615,7 @@ function buildSqlFilter(queryParams) {
         filter += ` and ResourceKey in (Select ResourceKey from Categories where Mode = 1 and Code = '${sqlEscapeString(rt)}')`;
       }
       break;
-      
+
     case 'cm': // ConceptMaps
       filter += " and ResourceType = 'ConceptMap'";
       if (rt && rt !== '' && hasTerminologySource(rt)) {
@@ -895,25 +805,40 @@ async function buildResourceTable(queryParams, resourceCount, offset = 0) {
   if (!xigDb || resourceCount === 0) {
     return '<p>No resources to display.</p>';
   }
-  
+
   const { ver, realm, auth, type, rt } = queryParams;
   const parts = []; // Use array instead of string concatenation
-  
+
   try {
     // Add pagination controls
     parts.push(buildPaginationControls(resourceCount, offset, '/xig', queryParams));
-    
+
+    // Get resource data with pagination
+    const { query: resourceQuery, params: qp } = buildSecureResourceQuery(queryParams, offset, 200);
+
+    // Add SQL query as HTML comment for debugging/transparency
+    const escapedQuery = resourceQuery
+      .replace(/--/g, '&#45;&#45;')  // Escape double hyphens
+      .replace(/>/g, '&gt;')         // Escape greater than
+      .replace(/</g, '&lt;');        // Escape less than
+    const escapedParams = JSON.stringify(qp)
+      .replace(/--/g, '&#45;&#45;')
+      .replace(/>/g, '&gt;')
+      .replace(/</g, '&lt;');
+
+    parts.push(`<!-- SQL Query: ${escapedQuery} -->`);
+    parts.push(`<!-- Parameters: ${escapedParams} -->`);
     // Build table start and headers
     parts.push(
       '<table class="table table-striped table-bordered">',
       '<tr>',
       '<th>Package</th>'
     );
-    
+
     if (!ver || ver === '') {
       parts.push('<th>Version</th>');
     }
-    
+
     parts.push(
       '<th>Identity</th>',
       '<th>Name/Title</th>',
@@ -922,15 +847,15 @@ async function buildResourceTable(queryParams, resourceCount, offset = 0) {
       '<th>WG</th>',
       '<th>Date</th>'
     );
-    
+
     if (!realm || realm === '') {
       parts.push('<th>Realm</th>');
     }
-    
+
     if (!auth || auth === '') {
       parts.push('<th>Auth</th>');
     }
-    
+
     // Type-specific columns
     switch (type) {
       case 'cs': // CodeSystem
@@ -959,18 +884,16 @@ async function buildResourceTable(queryParams, resourceCount, offset = 0) {
         parts.push('<th>Type</th>');
         break;
     }
-    
+
     parts.push('</tr>');
-    
-    // Get resource data with pagination
-    const { query: resourceQuery, params: qp } = buildSecureResourceQuery(queryParams, offset, 200);
+
     const resourceRows = await new Promise((resolve, reject) => {
       xigDb.all(resourceQuery, qp, (err, rows) => {
         if (err) reject(err);
         else resolve(rows || []);
       });
     });
-    
+
     // Determine resource type prefix for links
     let resourceTypePrefix = '';
     switch (type) {
@@ -993,11 +916,11 @@ async function buildResourceTable(queryParams, resourceCount, offset = 0) {
         resourceTypePrefix = '';
         break;
     }
-    
+
     // Render each row
     for (const row of resourceRows) {
       parts.push('<tr>');
-      
+
       // Package column
       const packageObj = getPackage(row.PackageKey);
       if (packageObj && packageObj.Web) {
@@ -1007,12 +930,12 @@ async function buildResourceTable(queryParams, resourceCount, offset = 0) {
       } else {
         parts.push(`<td>Package ${escapeHtml(String(row.PackageKey))}</td>`);
       }
-      
+
       // Version column (if not filtered)
       if (!ver || ver === '') {
         parts.push(`<td>${escapeHtml(showVersion(row))}</td>`);
       }
-      
+
       // Identity column with complex link logic
       let identityLink = '';
       if (packageObj && packageObj.PID) {
@@ -1022,38 +945,38 @@ async function buildResourceTable(queryParams, resourceCount, offset = 0) {
         // Fallback for missing package info
         identityLink = `/xig/resource/unknown/${encodeURIComponent(row.ResourceType)}/${encodeURIComponent(row.Id)}`;
       }
-      
+
       const identityText = (row.ResourceType + '/').replace(resourceTypePrefix, '') + row.Id;
       parts.push(`<td><a href="${identityLink}">${escapeHtml(identityText)}</a></td>`);
 
       // Name/Title column
       const displayName = row.Title || row.Name || '';
       parts.push(`<td>${escapeHtml(displayName)}</td>`);
-      
+
       // Status column
       if (row.StandardsStatus) {
         parts.push(`<td>${escapeHtml(row.StandardsStatus || '')}</td>`);
       } else {
         parts.push(`<td>${escapeHtml(row.Status || '')}</td>`);
       }
-      
+
       // FMM/WG Columns
       parts.push(`<td>${escapeHtml(row.FMM || '')}</td>`);
       parts.push(`<td>${escapeHtml(row.WG || '')}</td>`);
-      
+
       // Date column
       parts.push(`<td>${formatDate(row.Date)}</td>`);
-      
+
       // Realm column (if not filtered)
       if (!realm || realm === '') {
         parts.push(`<td>${escapeHtml(row.Realm || '')}</td>`);
       }
-      
+
       // Authority column (if not filtered)
       if (!auth || auth === '') {
         parts.push(`<td>${escapeHtml(row.Authority || '')}</td>`);
       }
-      
+
       // Type-specific columns
       switch (type) {
         case 'cs': // CodeSystem
@@ -1077,25 +1000,27 @@ async function buildResourceTable(queryParams, resourceCount, offset = 0) {
           parts.push(renderExtension(row.Details));
           break;
         case 'vs': // ValueSets
-        case 'cm': // ConceptMaps
+        case 'cm': { // ConceptMaps
           const details = (row.Details || '').replace(/,/g, ' ');
           parts.push(`<td>${escapeHtml(details)}</td>`);
           break;
-        case 'lm': // Logical Models
+        }
+        case 'lm': { // Logical Models
           const packageCanonical = packageObj ? packageObj.Canonical : '';
           const typeText = (row.Type || '').replace(packageCanonical + 'StructureDefinition/', '');
           parts.push(`<td>${escapeHtml(typeText)}</td>`);
           break;
+        }
       }
-      
+
       parts.push('</tr>');
     }
-    
+
     parts.push('</table>');
-    
+
     // Single join operation at the end
     return parts.join('');
-    
+
   } catch (error) {
     xigLog.error(`Error building resource table: ${error.message}`);
     return `<p class="text-danger">Error loading resource list: ${escapeHtml(error.message)}</p>`;
@@ -1312,35 +1237,35 @@ function buildAdditionalForm(queryParams) {
       html += '<input type="hidden" name="type" value="cs"/>';
       break;
       
-    case 'rp': // Resource Profiles
+    case 'rp': { // Resource Profiles
       html += '<input type="hidden" name="type" value="rp"/>';
       const profileResources = getCachedSet('profileResources');
       if (profileResources.length > 0) {
         html += 'Type: ' + makeSelect(rt, profileResources) + ' ';
       }
       break;
-      
-    case 'dp': // Datatype Profiles
+    }
+    case 'dp': { // Datatype Profiles
       html += '<input type="hidden" name="type" value="dp"/>';
       const profileTypes = getCachedSet('profileTypes');
       if (profileTypes.length > 0) {
         html += 'Type: ' + makeSelect(rt, profileTypes) + ' ';
       }
       break;
-      
+    }
     case 'lm': // Logical Models
       html += '<input type="hidden" name="type" value="lm"/>';
       break;
       
-    case 'ext': // Extensions
+    case 'ext': {// Extensions
       html += '<input type="hidden" name="type" value="ext"/>';
       const extensionContexts = getCachedSet('extensionContexts');
       if (extensionContexts.length > 0) {
         html += 'Context: ' + makeSelect(rt, extensionContexts) + ' ';
       }
       break;
-      
-    case 'vs': // ValueSets
+    }
+    case 'vs': {// ValueSets
       html += '<input type="hidden" name="type" value="vs"/>';
       const txSources = getCachedMap('txSources');
       if (Object.keys(txSources).length > 0) {
@@ -1349,8 +1274,8 @@ function buildAdditionalForm(queryParams) {
         html += 'Source: ' + makeSelect(rt, sourceOptions) + ' ';
       }
       break;
-      
-    case 'cm': // ConceptMaps
+    }
+    case 'cm': { // ConceptMaps
       html += '<input type="hidden" name="type" value="cm"/>';
       const txSourcesCM = getCachedMap('txSources');
       if (Object.keys(txSourcesCM).length > 0) {
@@ -1359,14 +1284,15 @@ function buildAdditionalForm(queryParams) {
         html += 'Source: ' + makeSelect(rt, sourceOptionsCM) + ' ';
       }
       break;
-      
-    default:
+    }
+    default: {
       // Default case - show resource types
       const resourceTypes = getCachedSet('resourceTypes');
       if (resourceTypes.length > 0) {
         html += 'Type: ' + makeSelect(rt, resourceTypes);
       }
       break;
+    }
   }
   
   // Add text search field
@@ -1674,75 +1600,89 @@ function getMetadata(key) {
 
 function downloadFile(url, destination, maxRedirects = 5) {
   return new Promise((resolve, reject) => {
-    xigLog.error(`Starting download from ${url}`);
-    
+    xigLog.info(`Starting download from ${url}`);
+
     function attemptDownload(currentUrl, redirectCount = 0) {
       if (redirectCount > maxRedirects) {
         reject(new Error(`Too many redirects (${maxRedirects})`));
         return;
       }
-      
-      const protocol = currentUrl.startsWith('https:') ? https : http;
-      
-      const request = protocol.get(currentUrl, (response) => {
-        // Handle redirects
-        if (response.statusCode >= 300 && response.statusCode < 400 && response.headers.location) {
 
-          // Resolve relative URLs
-          let redirectUrl = response.headers.location;
-          if (!redirectUrl.startsWith('http')) {
-            const urlObj = new URL(currentUrl);
-            if (redirectUrl.startsWith('/')) {
-              redirectUrl = `${urlObj.protocol}//${urlObj.host}${redirectUrl}`;
-            } else {
-              redirectUrl = `${urlObj.protocol}//${urlObj.host}${urlObj.pathname}/${redirectUrl}`;
+      try {
+        const validatedUrl = validateExternalUrl(currentUrl);
+        const protocol = validatedUrl.protocol === 'https:' ? https : http;
+
+        const request = protocol.get(validatedUrl, (response) => {
+          // Handle redirects
+          if (response.statusCode >= 300 && response.statusCode < 400 && response.headers.location) {
+            let redirectUrl = response.headers.location;
+            if (!redirectUrl.startsWith('http')) {
+              const urlObj = new URL(currentUrl);
+              if (redirectUrl.startsWith('/')) {
+                redirectUrl = `${urlObj.protocol}//${urlObj.host}${redirectUrl}`;
+              } else {
+                redirectUrl = `${urlObj.protocol}//${urlObj.host}${urlObj.pathname}/${redirectUrl}`;
+              }
             }
+
+            attemptDownload(redirectUrl, redirectCount + 1);
+            return;
           }
-          
-          // Follow the redirect
-          attemptDownload(redirectUrl, redirectCount + 1);
-          return;
-        }
-        
-        // Check if response is successful
-        if (response.statusCode !== 200) {
-          reject(new Error(`Download failed with status code: ${response.statusCode}`));
-          return;
-        }
-        
-        // Create write stream
-        const fileStream = fs.createWriteStream(destination);
-        let downloadedBytes = 0;
-        
-        response.on('data', (chunk) => {
-          downloadedBytes += chunk.length;
+
+          if (response.statusCode !== 200) {
+            reject(new Error(`Download failed with status code: ${response.statusCode}`));
+            return;
+          }
+
+          // Check content length
+          const contentLength = parseInt(response.headers['content-length'] || '0');
+          const maxSize = 10 * 1024 * 1024 * 1024; // 10GB limit
+          if (contentLength > maxSize) {
+            reject(new Error('File too large'));
+            return;
+          }
+
+          const fileStream = fs.createWriteStream(destination);
+          let downloadedBytes = 0;
+
+          response.on('data', (chunk) => {
+            downloadedBytes += chunk.length;
+            if (downloadedBytes > maxSize) {
+              request.destroy();
+              fs.unlink(destination, () => {}); // Clean up
+              reject(new Error('File too large'));
+              return;
+            }
+          });
+
+          response.pipe(fileStream);
+
+          fileStream.on('finish', () => {
+            fileStream.close();
+            xigLog.info(`Download completed successfully. Downloaded ${downloadedBytes} bytes to ${destination}`);
+            resolve();
+          });
+
+          fileStream.on('error', (err) => {
+            fs.unlink(destination, () => {}); // Delete partial file
+            reject(err);
+          });
         });
-        
-        response.pipe(fileStream);
-        
-        fileStream.on('finish', () => {
-          fileStream.close();
-          xigLog.error(`Download completed successfully. Downloaded ${downloadedBytes} bytes to ${destination}`);
-          resolve();
-        });
-        
-        fileStream.on('error', (err) => {
-          fs.unlink(destination, () => {}); // Delete partial file
+
+        request.on('error', (err) => {
           reject(err);
         });
-      });
-      
-      request.on('error', (err) => {
-        reject(err);
-      });
-      
-      // Set timeout for the request
-      request.setTimeout(300000, () => { // 5 minutes timeout
-        request.destroy();
-        reject(new Error('Download timeout'));
-      });
+
+        request.setTimeout(300000, () => { // 5 minutes timeout
+          request.destroy();
+          reject(new Error('Download timeout'));
+        });
+
+      } catch (error) {
+        reject(error);
+      }
     }
-    
+
     attemptDownload(url);
   });
 }

@@ -13,12 +13,57 @@ const rimraf = require('rimraf').sync;
  * Tests FHIR package fetching, caching, and content loading
  */
 
-describe('Package Management', () => {
-    const CACHE_FOLDER = path.join(process.cwd(), 'packages');
+// Timestamp management for slow tests
+const TIMESTAMP_FILE = path.join(__dirname, '.last-integration-test-run');
+const MIN_HOURS_BETWEEN_RUNS = 2;
+
+function shouldRunSlowTests() {
+    try {
+        const stats = require('fs').statSync(TIMESTAMP_FILE);
+        const lastRun = stats.mtime.getTime();
+        const hoursAgo = (Date.now() - lastRun) / (1000 * 60 * 60);
+
+        if (hoursAgo < MIN_HOURS_BETWEEN_RUNS) {
+            const remainingHours = (MIN_HOURS_BETWEEN_RUNS - hoursAgo).toFixed(1);
+            console.log(`⏰ Skipping slow integration tests. Last run was ${hoursAgo.toFixed(1)} hours ago.`);
+            console.log(`   Tests will run again in ${remainingHours} hours.`);
+            console.log(`   To force run: rm ${TIMESTAMP_FILE}`);
+            return false;
+        }
+    } catch (error) {
+        // File doesn't exist, first run
+        console.log('🚀 Running integration tests for the first time...');
+    }
+
+    return true;
+}
+
+async function markTestsAsRun() {
+    try {
+        await fs.writeFile(TIMESTAMP_FILE, new Date().toISOString());
+        console.log('✅ Integration tests completed. Timestamp updated.');
+    } catch (error) {
+        console.warn('⚠️  Could not update timestamp file:', error.message);
+    }
+}
+
+// Check if we should run the tests
+const runTests = shouldRunSlowTests();
+
+// Conditional describe - only run if enough time has passed
+(runTests ? describe : describe.skip)('Package Management', () => {
+    const CACHE_FOLDER = path.join(process.cwd(), 'package-cache');
     const SERVERS = [
         'http://packages2.fhir.org/packages',
         'http://packages.fhir.org'
     ];
+
+    // Mark tests as run after all tests complete
+    afterAll(async () => {
+        if (runTests) {
+            await markTestsAsRun();
+        }
+    });
 
     describe('PackageManager', () => {
         const TEST_PACKAGE = 'hl7.fhir.us.core';
@@ -174,19 +219,19 @@ describe('Package Management', () => {
         describe('Error handling', () => {
             test('should throw error for non-existent package', async () => {
                 await expect(
-                    packageManager.fetch('non.existent.package', '1.0.0')
+                  packageManager.fetch('non.existent.package', '1.0.0')
                 ).rejects.toThrow(/Failed to fetch non\.existent\.package/);
             }, 30000);
 
             test('should throw error for non-existent version', async () => {
                 await expect(
-                    packageManager.fetch(TEST_PACKAGE, '99.99.99')
+                  packageManager.fetch(TEST_PACKAGE, '99.99.99')
                 ).rejects.toThrow(/Failed to fetch hl7\.fhir\.us\.core#99\.99\.99/);
             }, 30000);
 
             test('should throw error for wildcard with no matches', async () => {
                 await expect(
-                    packageManager.fetch(TEST_PACKAGE, '99?')
+                  packageManager.fetch(TEST_PACKAGE, '99?')
                 ).rejects.toThrow(/Could not resolve version 99\?/);
             }, 30000);
         });
@@ -195,8 +240,8 @@ describe('Package Management', () => {
             test('should fall back to second server if first fails', async () => {
                 // Create manager with bad first server
                 const fallbackManager = new PackageManager(
-                    ['http://invalid.server.example', 'http://packages.fhir.org'],
-                    CACHE_FOLDER
+                  ['http://invalid.server.example', 'http://packages.fhir.org'],
+                  CACHE_FOLDER
                 );
 
                 // Should still work using second server
@@ -207,12 +252,12 @@ describe('Package Management', () => {
             test('should throw error if all servers fail', async () => {
                 // Create manager with all bad servers
                 const failManager = new PackageManager(
-                    ['http://invalid1.example', 'http://invalid2.example'],
-                    CACHE_FOLDER
+                  ['http://invalid1.example', 'http://invalid2.example'],
+                  CACHE_FOLDER
                 );
 
                 await expect(
-                    failManager.fetch(TEST_PACKAGE, '1.0.0')
+                  failManager.fetch(TEST_PACKAGE, '1.0.0')
                 ).rejects.toThrow(/Failed to fetch hl7\.fhir\.us\.core#1\.0\.0 from any server/);
             }, 30000);
         });
@@ -248,12 +293,12 @@ describe('Package Management', () => {
         describe('Constructor validation', () => {
             test('should throw error if no servers provided', () => {
                 expect(() => new PackageManager([], CACHE_FOLDER))
-                    .toThrow('At least one package server must be provided');
+                  .toThrow('At least one package server must be provided');
             });
 
             test('should throw error if servers is null', () => {
                 expect(() => new PackageManager(null, CACHE_FOLDER))
-                    .toThrow('At least one package server must be provided');
+                  .toThrow('At least one package server must be provided');
             });
         });
     });
@@ -456,8 +501,8 @@ describe('Package Management', () => {
 
             test('should load Extensions (StructureDefinitions with type Extension)', async () => {
                 const filter = (entry) =>
-                    entry.resourceType === 'StructureDefinition' &&
-                    entry.type === 'Extension';
+                  entry.resourceType === 'StructureDefinition' &&
+                  entry.type === 'Extension';
                 const resources = await loader.loadByFilter(filter);
 
                 expect(resources).toBeDefined();
@@ -472,8 +517,8 @@ describe('Package Management', () => {
 
             test('should load logical models', async () => {
                 const filter = (entry) =>
-                    entry.resourceType === 'StructureDefinition' &&
-                    entry.kind === 'logical';
+                  entry.resourceType === 'StructureDefinition' &&
+                  entry.kind === 'logical';
                 const resources = await loader.loadByFilter(filter);
 
                 expect(resources).toBeDefined();
@@ -496,7 +541,7 @@ describe('Package Management', () => {
 
             test('should handle complex filters', async () => {
                 const filter = (entry) =>
-                    entry.url && entry.url.includes('/CodeSystem/');
+                  entry.url && entry.url.includes('/CodeSystem/');
                 const resources = await loader.loadByFilter(filter);
 
                 expect(resources).toBeDefined();

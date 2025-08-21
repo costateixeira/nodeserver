@@ -1,8 +1,0 @@
-The snomed-subset.txt is input for the Snomed team's subset generator. 
-
-To use it, download a snapshot and then:
-
-java -jar --add-opens java.base/java.lang=ALL-UNNAMED snomed-owl-toolkit-5.3.0-executable.jar -rf2-to-owl -rf2-snapshot-archives {zip-download} -version 20250801
-java -jar --add-opens java.base/java.lang=ALL-UNNAMED snomed-subontology-extraction-2.1.0-executable.jar -source-ontology ontology-20250801.owl -input-subset {subset.txt} -output-rf2 -rf2-snapshot-archive {zip-download}
-
-

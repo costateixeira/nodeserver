@@ -747,6 +747,7 @@ class RegistryModule {
       case '11000267109': edition = 'KR'; break;
       case '900000001000122104': edition = 'ES-ES'; break;
       case '2011000195101': edition = 'CH'; break;
+      case '11000279109': edition = 'CX'; break;
       case '999000021000000109': edition = 'UK+Clinical'; break;
       case '5631000179106': edition = 'UY'; break;
       case '5991000124107': edition = 'US+ICD10CM'; break;
