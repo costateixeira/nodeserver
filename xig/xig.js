@@ -615,51 +615,6 @@ function buildSqlFilter(queryParams) {
         filter += ` and ResourceKey in (Select ResourceKey from Categories where Mode = 1 and Code = '${sqlEscapeString(rt)}')`;
       }
       break;
-      //
-// Copyright 2025, Health Intersections Pty Ltd (http://www.healthintersections.com.au)
-//
-// Licensed under BSD-3: https://opensource.org/license/bsd-3-clause
-//
-
-      const express = require('express');
-      const fs = require('fs');
-      const path = require('path');
-      const https = require('https');
-      const http = require('http');
-      const cron = require('node-cron');
-      const sqlite3 = require('sqlite3').verbose();
-      const { EventEmitter } = require('events');
-      const zlib = require('zlib');
-      const htmlServer = require('../common/html-server');
-
-      const Logger = require('../common/logger');
-      const xigLog = Logger.getInstance().child({ module: 'xig' });
-
-      const router = express.Router();
-
-// Configuration
-      const XIG_DB_URL = 'http://fhir.org/guides/stats/xig.db';
-      const XIG_DB_PATH = path.join(__dirname, 'data', 'xig.db');
-      const TEMPLATE_PATH = path.join(__dirname, 'xig-template.html');
-
-// Global database instance
-      let xigDb = null;
-
-// Template cache
-      let htmlTemplate = null;
-
-// Request tracking
-      let requestStats = {
-        total: 0,
-        startTime: new Date(),
-        dailyCounts: new Map() // date string -> count
-      };
-
-// Event emitter for cache updates
-      const cacheEmitter = new EventEmitter();
-
-// Cache loading lock to prevent concurrent loads
-      let cacheLoadInProgress = false;
 
     case 'cm': // ConceptMaps
       filter += " and ResourceType = 'ConceptMap'";
