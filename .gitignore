@@ -21,3 +21,5 @@ registry/registry-data.json
 xig-download.log
 
 locator/
+
+tests/library/.last-integration-test-run

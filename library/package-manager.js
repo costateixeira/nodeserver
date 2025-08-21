@@ -10,6 +10,7 @@ const http = require('http');
 const { URL } = require('url');
 const zlib = require('zlib');
 const tar = require('tar');
+const axios = require('axios');
 const { VersionUtilities } = require('../library/version-utilities');
 
 class PackageManager {
@@ -58,7 +59,7 @@ class PackageManager {
      */
     async resolveVersion(packageId, version) {
         // If no wildcards, return as-is
-        if (!VersionUtilities.versionHasWildcards(version)) {
+        if (!VersionUtilities.versionHasWildcards(version) && version != null) {
             return version;
         }
 
@@ -132,8 +133,19 @@ class PackageManager {
      * @returns {string|null} Best matching version or null if none match
      */
     selectBestVersion(availableVersions, criteria) {
+        const sortedVersions = [...availableVersions].sort((a, b) => {
+            try {
+                return -VersionUtilities.compareVersions(a, b);
+            } catch (error) {
+                return 0;
+            }
+        });
+
+        if (criteria == null) {
+            return sortedVersions.length == 0 ? null : sortedVersions[0];
+        }
         // Filter versions that match the criteria
-        const matchingVersions = availableVersions.filter(v => {
+        const matchingVersions = sortedVersions.filter(v => {
             try {
                 return VersionUtilities.versionMatches(criteria, v);
             } catch (error) {
@@ -212,35 +224,22 @@ class PackageManager {
     async fetchFromServer(server, packageId, version) {
         const url = `${server}/${packageId}/${version}`;
 
-        return new Promise((resolve, reject) => {
-            const parsedUrl = new URL(url);
-            const client = parsedUrl.protocol === 'https:' ? https : http;
-
-            const req = client.get(url, {
+        try {
+            const response = await axios.get(url, {
                 headers: {
                     'Accept': 'application/tar+gzip'
-                }
-            }, (res) => {
-                if (res.statusCode === 404) {
-                    reject(new Error(`Package ${packageId}#${version} not found on ${server}`));
-                    return;
-                }
-
-                if (res.statusCode !== 200) {
-                    reject(new Error(`HTTP ${res.statusCode} from ${server}`));
-                    return;
-                }
-
-                const chunks = [];
-                res.on('data', chunk => chunks.push(chunk));
-                res.on('end', () => {
-                    resolve(Buffer.concat(chunks));
-                });
+                },
+                responseType: 'arraybuffer',
+                maxRedirects: 5
             });
 
-            req.on('error', reject);
-            req.end();
-        });
+            return Buffer.from(response.data);
+        } catch (error) {
+            if (error.response?.status === 404) {
+                throw new Error(`Package ${packageId}#${version} not found on ${server}`);
+            }
+            throw new Error(`HTTP ${error.response?.status || 'error'} from ${server}: ${error.message}`);
+        }
     }
 
     /**
