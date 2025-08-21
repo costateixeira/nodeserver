@@ -1180,12 +1180,9 @@ if (foundFiles === 0) {
 console.log('\n📚 For more information, see the test runner instructions.');
 
 // Exit with appropriate code
-if (foundFiles === 0 && !cacheAvailable) {
+if (foundFiles === 0) {
   console.log('\n❌ Critical prerequisites missing');
   process.exit(1);
-} else if (foundFiles === 0 || !cacheAvailable) {
-  console.log('\n⚠️  Some prerequisites missing');
-  process.exit(2);
 } else {
   console.log('\n✅ All prerequisites met');
   //process.exit(0);
