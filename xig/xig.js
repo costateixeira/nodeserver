@@ -1000,15 +1000,17 @@ async function buildResourceTable(queryParams, resourceCount, offset = 0) {
           parts.push(renderExtension(row.Details));
           break;
         case 'vs': // ValueSets
-        case 'cm': // ConceptMaps
+        case 'cm': { // ConceptMaps
           const details = (row.Details || '').replace(/,/g, ' ');
           parts.push(`<td>${escapeHtml(details)}</td>`);
           break;
-        case 'lm': // Logical Models
+        }
+        case 'lm': { // Logical Models
           const packageCanonical = packageObj ? packageObj.Canonical : '';
           const typeText = (row.Type || '').replace(packageCanonical + 'StructureDefinition/', '');
           parts.push(`<td>${escapeHtml(typeText)}</td>`);
           break;
+        }
       }
 
       parts.push('</tr>');
@@ -1235,35 +1237,35 @@ function buildAdditionalForm(queryParams) {
       html += '<input type="hidden" name="type" value="cs"/>';
       break;
       
-    case 'rp': // Resource Profiles
+    case 'rp': { // Resource Profiles
       html += '<input type="hidden" name="type" value="rp"/>';
       const profileResources = getCachedSet('profileResources');
       if (profileResources.length > 0) {
         html += 'Type: ' + makeSelect(rt, profileResources) + ' ';
       }
       break;
-      
-    case 'dp': // Datatype Profiles
+    }
+    case 'dp': { // Datatype Profiles
       html += '<input type="hidden" name="type" value="dp"/>';
       const profileTypes = getCachedSet('profileTypes');
       if (profileTypes.length > 0) {
         html += 'Type: ' + makeSelect(rt, profileTypes) + ' ';
       }
       break;
-      
+    }
     case 'lm': // Logical Models
       html += '<input type="hidden" name="type" value="lm"/>';
       break;
       
-    case 'ext': // Extensions
+    case 'ext': {// Extensions
       html += '<input type="hidden" name="type" value="ext"/>';
       const extensionContexts = getCachedSet('extensionContexts');
       if (extensionContexts.length > 0) {
         html += 'Context: ' + makeSelect(rt, extensionContexts) + ' ';
       }
       break;
-      
-    case 'vs': // ValueSets
+    }
+    case 'vs': {// ValueSets
       html += '<input type="hidden" name="type" value="vs"/>';
       const txSources = getCachedMap('txSources');
       if (Object.keys(txSources).length > 0) {
@@ -1272,8 +1274,8 @@ function buildAdditionalForm(queryParams) {
         html += 'Source: ' + makeSelect(rt, sourceOptions) + ' ';
       }
       break;
-      
-    case 'cm': // ConceptMaps
+    }
+    case 'cm': { // ConceptMaps
       html += '<input type="hidden" name="type" value="cm"/>';
       const txSourcesCM = getCachedMap('txSources');
       if (Object.keys(txSourcesCM).length > 0) {
@@ -1282,14 +1284,15 @@ function buildAdditionalForm(queryParams) {
         html += 'Source: ' + makeSelect(rt, sourceOptionsCM) + ' ';
       }
       break;
-      
-    default:
+    }
+    default: {
       // Default case - show resource types
       const resourceTypes = getCachedSet('resourceTypes');
       if (resourceTypes.length > 0) {
         html += 'Type: ' + makeSelect(rt, resourceTypes);
       }
       break;
+    }
   }
   
   // Add text search field
