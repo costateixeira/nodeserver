@@ -2,12 +2,7 @@ Things todo:
 
 CodeSystem Providers for 
  - CodeSystem
- - LOINC
- - SNOMED 
  - RxNorm
- - hgvs
- - cpt
- - omop
 
  Core Operations Logic
  Zero Config Support 
