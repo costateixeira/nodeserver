@@ -23,7 +23,7 @@ describe('UCUM Library Tests', () => {
   });
 
   afterEach(() => {
-    global.console = jestConsole;
+    // global.console = jestConsole;
   });
 
   beforeAll(async () => {

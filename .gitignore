@@ -25,3 +25,9 @@ locator/
 tests/library/.last-integration-test-run
 
 package-cache/
+
+passwords.ini
+
+test-cache/
+
+tests/vs/.vsac-last-run
