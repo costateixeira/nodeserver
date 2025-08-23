@@ -5,7 +5,9 @@ const path = require('path');
 beforeAll(() => {
   // Set NODE_ENV to test
   process.env.NODE_ENV = 'test';
-  
+
+  global.console = require('console');
+
   // Suppress console.log during tests (optional)
   if (process.env.SUPPRESS_LOGS === 'true') {
     console.log = jest.fn();
@@ -13,6 +15,18 @@ beforeAll(() => {
     console.warn = jest.fn();
   }
 });
+
+const testDirs = [
+  path.join(__dirname, '../package-cache'),
+  path.join(__dirname, '../test-cache'),
+  path.join(__dirname, '../test-cache/vsac')
+];
+
+for (const dir of testDirs) {
+  if (!fs.existsSync(dir)) {
+    fs.mkdirSync(dir, { recursive: true });
+  }
+}
 
 afterAll(async () => {
   // Clean up any test files or connections
@@ -28,12 +42,13 @@ jest.mock('node-cron', () => ({
 }));
 
 // Global test utilities
+global.TEST_TIMEOUT = 120000;
 global.TestUtils = {
   createTempDir: () => {
     const tmp = require('tmp');
     return tmp.dirSync({ unsafeCleanup: true });
   },
-  
+
   createTempFile: (content = '') => {
     const tmp = require('tmp');
     const tmpFile = tmp.fileSync();
@@ -42,9 +57,9 @@ global.TestUtils = {
     }
     return tmpFile;
   },
-  
+
   delay: (ms) => new Promise(resolve => setTimeout(resolve, ms)),
-  
+
   // Helper to wait for a condition
   waitFor: async (condition, timeout = 5000) => {
     const start = Date.now();

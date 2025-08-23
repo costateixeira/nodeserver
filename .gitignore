@@ -27,3 +27,5 @@ tests/library/.last-integration-test-run
 package-cache/
 
 passwords.ini
+
+test-cache/
