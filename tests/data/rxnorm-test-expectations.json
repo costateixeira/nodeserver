@@ -1,0 +1,165 @@
+{
+  "basic": {
+    "knownCodes": [
+      "1191",
+      "1192",
+      "1193",
+      "1194",
+      "1195",
+      "313782",
+      "198440"
+    ],
+    "knownNames": [
+      "aspirin",
+      "ibuprofen",
+      "acetaminophen",
+      "warfarin",
+      "metformin"
+    ]
+  },
+  "filters": {
+    "TTY": [
+      {
+        "property": "TTY",
+        "operator": "equal",
+        "value": "IN",
+        "description": "Ingredient",
+        "expectedMinResults": 1
+      },
+      {
+        "property": "TTY",
+        "operator": "equal",
+        "value": "PIN",
+        "description": "Precise Ingredient",
+        "expectedMinResults": 0
+      },
+      {
+        "property": "TTY",
+        "operator": "equal",
+        "value": "BN",
+        "description": "Brand Name",
+        "expectedMinResults": 0
+      },
+      {
+        "property": "TTY",
+        "operator": "in",
+        "value": "IN,PIN,BN",
+        "description": "Multiple term types",
+        "expectedMinResults": 1
+      }
+    ],
+    "STY": [
+      {
+        "property": "STY",
+        "operator": "equal",
+        "value": "T109",
+        "description": "Organic Chemical",
+        "expectedMinResults": 0
+      },
+      {
+        "property": "STY",
+        "operator": "equal",
+        "value": "T121",
+        "description": "Pharmacologic Substance",
+        "expectedMinResults": 0
+      }
+    ],
+    "SAB": [
+      {
+        "property": "SAB",
+        "operator": "equal",
+        "value": "RXNORM",
+        "description": "RxNorm source",
+        "expectedMinResults": 1
+      },
+      {
+        "property": "SAB",
+        "operator": "equal",
+        "value": "MMSL",
+        "description": "Multum MediSource Lexicon",
+        "expectedMinResults": 0
+      }
+    ],
+    "relationships": [
+      {
+        "property": "RN",
+        "operator": "equal",
+        "value": "CUI:1191",
+        "description": "Related name to aspirin CUI",
+        "expectedMinResults": 0
+      },
+      {
+        "property": "RB",
+        "operator": "equal",
+        "value": "CUI:1191",
+        "description": "Synonym to aspirin CUI",
+        "expectedMinResults": 0
+      }
+    ],
+    "relationshipTypes": [
+      {
+        "property": "has_ingredient",
+        "operator": "equal",
+        "value": "CUI:1191",
+        "description": "Has ingredient aspirin",
+        "expectedMinResults": 0
+      }
+    ]
+  },
+  "termTypes": {
+    "expected": ["IN", "PIN", "BN", "SCD", "SBD", "GPCK", "BPCK"],
+    "descriptions": {
+      "IN": "Ingredient",
+      "PIN": "Precise Ingredient",
+      "BN": "Brand Name",
+      "SCD": "Semantic Clinical Drug",
+      "SBD": "Semantic Branded Drug",
+      "GPCK": "Generic Pack",
+      "BPCK": "Branded Pack"
+    }
+  },
+  "sources": {
+    "expected": ["RXNORM", "MMSL", "MSH", "MDDB", "MTHSPL"],
+    "descriptions": {
+      "RXNORM": "RxNorm",
+      "MMSL": "Multum MediSource Lexicon",
+      "MSH": "Medical Subject Headings",
+      "MDDB": "Master Drug Data Base",
+      "MTHSPL": "FDA Structured Product Labels"
+    }
+  },
+  "relationships": {
+    "expected": ["SY", "RN", "RO", "RB", "RT"],
+    "descriptions": {
+      "SY": "Synonymous with",
+      "RN": "Related, narrower",
+      "RO": "Related, other",
+      "RB": "Related, broader",
+      "RT": "Related, other"
+    }
+  },
+  "semanticTypes": {
+    "expected": ["T109", "T121", "T200"],
+    "descriptions": {
+      "T109": "Organic Chemical",
+      "T121": "Pharmacologic Substance",
+      "T200": "Clinical Drug"
+    }
+  },
+  "textSearch": {
+    "testTerms": [
+      {
+        "term": "aspirin",
+        "expectedMinResults": 1
+      },
+      {
+        "term": "acetaminophen",
+        "expectedMinResults": 1
+      },
+      {
+        "term": "ibuprofen",
+        "expectedMinResults": 1
+      }
+    ]
+  }
+}

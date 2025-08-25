@@ -1,6 +1,6 @@
 const { CodeSystemProvider, TxOperationContext, Designation, FilterExecutionContext } = require('./cs-api');
 const assert = require('assert');
-const CodeSystem = require("../library/codesystem");
+const { CodeSystem } = require("../library/codesystem");
 
 class AreaCodeConcept {
   constructor(code, display, abbrev, class_) {

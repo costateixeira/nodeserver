@@ -2,7 +2,7 @@ const fs = require('fs');
 const path = require('path');
 const sqlite3 = require('sqlite3').verbose();
 const assert = require('assert');
-const CodeSystem = require('../library/codesystem');
+const { CodeSystem } = require('../library/codesystem');
 const { Languages, Language } = require('../../library/languages');
 const { CodeSystemProvider, Designation, FilterExecutionContext, CodeSystemFactoryProvider } = require('./cs-api');
 

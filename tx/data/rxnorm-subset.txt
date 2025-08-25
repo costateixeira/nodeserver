@@ -1,0 +1,22 @@
+# 161 # acetaminophen
+2556  # citalopram
+7980 # penicillin G
+# 8591 # potassium chloride
+66955 # vancomycin hydrochloride 
+82063 # oxyCODONE hydrochloride 
+200371 # citalopram 20 MG Oral Tablet 
+203134 # piperacillin sodium
+203151 # fenoldopam mesylate
+204520 # potassium chloride 2 MEQ/ML Injectable Solution
+221167 # tazobactam sodium
+285018 # Lantus 100 UNT/ML Injectable Solution 
+308047 # ALPRAZolam 0.25 MG Oral Tablet
+# 313002 # sodium chloride 9 MG/ML Injectable Solution
+# 315266 # acetaminophen 500 MG
+562721 # amylase / cellulase / hyoscyamine / lipase / phenyltoloxamine / protease Oral Capsule - Obsolete 
+855302 # warfarin sodium 2 MG Oral Tablet
+# 901813 # diphenhydrAMINE hydrochloride 25 MG 
+1155608 # alteplase Injectable Product
+1160593 # cashew nut allergenic extract Injectable Product
+1594660 # alemtuzumab 10 MG/ML [Lemtrada]
+1797865 # mometasone furoate 0.05 MG/ACTUAT Metered Dose Nasal Spray

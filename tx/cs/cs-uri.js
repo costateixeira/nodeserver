@@ -1,4 +1,4 @@
-const CodeSystem = require('../library/codesystem');
+const { CodeSystem } = require('../library/codesystem');
 const { CodeSystemProvider, CodeSystemFactoryProvider, TxOperationContext, Designation} = require('./cs-api');
 const { Language, Languages } = require('../../library/languages');
 const assert = require('assert');

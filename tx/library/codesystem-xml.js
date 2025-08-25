@@ -5,7 +5,7 @@
 
 // Import the XMLParser and XMLBuilder from fast-xml-parser
 const { XMLParser, XMLBuilder } = require('fast-xml-parser');
-const CodeSystem = require('./codesystem');
+const { CodeSystem } = require('./codesystem');
 
 /**
  * XML support for FHIR CodeSystem resources
