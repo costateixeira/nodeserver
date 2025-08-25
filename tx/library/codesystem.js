@@ -1,3 +1,12 @@
+const { Language } = require("../../library/languages");
+
+const CodeSystemContentMode = Object.freeze({
+  Complete: 'complete',
+  NotPresent: 'not-present',
+  Example: 'example',
+  Fragment : 'fragment',
+  Supplement : 'supplement'
+});
 
 /**
  * Represents a FHIR CodeSystem resource with version conversion support
@@ -40,6 +49,11 @@ class CodeSystem {
    */
   childToParentsMap = new Map();
 
+  /**
+   * The source package the CodeSystem was loaded from
+   * @type {String}
+   */
+  sourcePackage = null;
   /**
    * Static factory method for convenience
    * @param {string} jsonString - JSON string representation of CodeSystem
@@ -741,6 +755,21 @@ class CodeSystem {
     return null;
   }
 
+  /**
+   * Gets the language for this CodeSystem as a Language object
+   * @returns {Language|null} Parsed language or null if not specified
+   */
+  language() {
+    return this.jsonObj.language ? new Language(this.jsonObj.language) : null;
+  }
+
+  contentMode() {
+    return this.jsonObj.content;
+  }
+
+  hasHierarchy() {
+    return this.parentToChildrenMap.size > 0 || this.childToParentsMap.size > 0;
+  }
 }
 
-module.exports = CodeSystem;
+module.exports = { CodeSystem, CodeSystemContentMode };

@@ -2,7 +2,7 @@ const fs = require('fs').promises;
 const path = require('path');
 const yaml = require('yaml'); // npm install yaml
 const { PackageManager, PackageContentLoader } = require('../library/package-manager');
-const CodeSystem = require("./library/codesystem"); // Update this path
+const { CodeSystem } = require("./library/codesystem"); // Update this path
 
 async function loadPackagesAndMeasure() {
   const startTime = Date.now();

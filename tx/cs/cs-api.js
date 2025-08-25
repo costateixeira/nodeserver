@@ -1,8 +1,7 @@
-const CodeSystem = require('../library/codesystem');
 const {Languages, Language} = require("../../library/languages");
 const assert = require('assert');
+const {CodeSystem, CodeSystemContentMode} = require("../library/codesystem");
 
-const CodeSystemContentMode = Object.freeze({Complete: 'complete'});
 
 
 class TxOperationContext {

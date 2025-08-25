@@ -2,7 +2,7 @@ const fs = require('fs');
 const path = require('path');
 const sqlite3 = require('sqlite3').verbose();
 const assert = require('assert');
-const CodeSystem = require('../library/codesystem');
+const { CodeSystem } = require('../library/codesystem');
 const { Languages, Language } = require('../../library/languages');
 const { CodeSystemProvider, Designation, TxOperationContext, FilterExecutionContext, CodeSystemFactoryProvider } = require('./cs-api');
 
@@ -249,7 +249,7 @@ class RxNormServices extends CodeSystemProvider {
     concept.archived = archived;
 
     for (const row of rows) {
-      if (row.TTY === 'SY' || concept.display !== '') {
+      if (row.TTY === 'SY' || concept.display && concept.display !== '') {
         concept.others.push(row.STR.trim());
       } else {
         concept.display = row.STR.trim();
@@ -649,7 +649,7 @@ class RxNormServices extends CodeSystemProvider {
   }
 }
 
-class RxNormServicesFactory extends CodeSystemFactoryProvider {
+class RxNormTypeServicesFactory extends CodeSystemFactoryProvider {
   constructor(dbPath, isNCI = false) {
     super();
     this.dbPath = dbPath;
@@ -759,14 +759,14 @@ class RxNormServicesFactory extends CodeSystemFactoryProvider {
 }
 
 // Specific RxNorm implementation
-class RxNormServicesFactory extends RxNormServicesFactory {
+class RxNormServicesFactory extends RxNormTypeServicesFactory {
   constructor(dbPath) {
     super(dbPath, false);
   }
 }
 
 // NCI Meta implementation
-class NCIServicesFactory extends RxNormServicesFactory {
+class NCIServicesFactory extends RxNormTypeServicesFactory {
   constructor(dbPath) {
     super(dbPath, true);
   }

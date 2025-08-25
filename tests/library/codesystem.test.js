@@ -2,7 +2,7 @@
  * Test cases for CodeSystem class
  * These tests can be run with Jest, Mocha, or any similar testing framework
  */
-const CodeSystem = require('../../tx/library/codesystem');
+const { CodeSystem } = require('../../tx/library/codesystem');
 const CodeSystemXML = require('../../tx/library/codesystem-xml');
 
 describe('CodeSystem', () => {

@@ -89,7 +89,7 @@
         "expectedMinResults": 0
       },
       {
-        "property": "SY",
+        "property": "RB",
         "operator": "equal",
         "value": "CUI:1191",
         "description": "Synonym to aspirin CUI",

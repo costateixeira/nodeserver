@@ -1,6 +1,6 @@
 const { CodeSystemProvider, TxOperationContext, Designation, FilterExecutionContext } = require('../../tx/cs/cs-api');
 const assert = require('assert');
-const CodeSystem = require("../library/codesystem");
+const { CodeSystem } = require("../library/codesystem");
 
 class CountryCodeConcept {
   constructor(code, display) {
