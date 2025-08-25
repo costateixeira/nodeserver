@@ -584,7 +584,7 @@ class RxNormServices extends CodeSystemProvider {
 
     // Build array in correct order
     paramOrder.forEach(paramName => {
-      if (params.hasOwnProperty(paramName)) {
+      if (Object.prototype.hasOwnProperty.call(params, paramName)) {
         paramArray.push(params[paramName]);
       }
     });
