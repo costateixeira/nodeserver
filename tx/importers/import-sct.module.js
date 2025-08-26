@@ -15,6 +15,37 @@ const {SnomedExpressionServices} = require("../cs/cs-snomed-expressions");
 
 class SnomedModule extends BaseTerminologyModule {
 
+  static EDITIONS = {
+    "900000000000207008": { name: "International", needsBase: false, lang: "en-US" },
+    "731000124108": { name: "US Edition", needsBase: true, lang: "en-US" },
+    "32506021000036107": { name: "Australian Edition", needsBase: true, lang: "en-AU" },
+    "449081005": { name: "Spanish Edition (International)", needsBase: true, lang: "es" },
+    "11000279109": { name: "Czech Edition", needsBase: true, lang: "cs-CZ" },
+    "554471000005108": { name: "Danish Edition", needsBase: true, lang: "da-DK" },
+    "11000146104": { name: "Dutch Edition", needsBase: true, lang: "nl-NL" },
+    "45991000052106": { name: "Swedish Edition", needsBase: true, lang: "sv-SE" },
+    "83821000000107": { name: "UK Edition", needsBase: true, lang: "en-GB" },
+    "11000172109": { name: "Belgian Edition", needsBase: true, lang: "fr-BE" },
+    "11000221109": { name: "Argentinian Edition", needsBase: true, lang: "es-AR" },
+    "11000234105": { name: "Austrian Edition", needsBase: true, lang: "de-AT" },
+    "20621000087109": { name: "Canadian Edition (English)", needsBase: true, lang: "en-CA" },
+    "20611000087101": { name: "Canadian Edition (French)", needsBase: true, lang: "fr-CA" },
+    "11000181102": { name: "Estonian Edition", needsBase: true, lang: "et-EE" },
+    "11000229106": { name: "Finnish Edition", needsBase: true, lang: "fi-FI" },
+    "11000274103": { name: "German Edition", needsBase: true, lang: "de-DE" },
+    "1121000189102": { name: "Indian Edition", needsBase: true, lang: "en-IN" },
+    "11000220105": { name: "Irish Edition", needsBase: true, lang: "en-IE" },
+    "21000210109": { name: "New Zealand Edition", needsBase: true, lang: "en-NZ" },
+    "51000202101": { name: "Norwegian Edition", needsBase: true, lang: "no-NO" },
+    "11000267109": { name: "Korean Edition", needsBase: true, lang: "ko-KR" },
+    "900000001000122104": { name: "Spanish Edition (Spain)", needsBase: true, lang: "es-ES" },
+    "2011000195101": { name: "Swiss Edition", needsBase: true, lang: "de-CH" },
+    "999000021000000109": { name: "UK Clinical Edition", needsBase: true, lang: "en-GB" },
+    "5631000179106": { name: "Uruguayan Edition", needsBase: true, lang: "es-UY" },
+    "5991000124107": { name: "US Edition + ICD10CM", needsBase: true, lang: "en-US" }
+  };
+
+
   constructor() {
     super();
   }
@@ -57,10 +88,24 @@ class SnomedModule extends BaseTerminologyModule {
       .option('-v, --version <version>', 'Version in YYYYMMDD format (e.g., 20250801)')
       .option('-u, --uri <uri>', 'Version URI (overrides edition/version if provided)')
       .option('-l, --language <code>', 'Default language code (overrides edition default if provided)')
+      .option('-c, --config <file>', 'Configuration file (JSON or YAML)')  // ADD THIS LINE
       .option('-y, --yes', 'Skip confirmations')
+      .option('--non-interactive', 'Run in non-interactive mode (fail if required options missing)')
       .action(async (options) => {
         await this.handleImportCommand({...globalOptions, ...options});
       });
+  
+
+  // Generate config command
+    terminologyCommand
+      .command('generate-config')
+      .description('Generate a sample configuration file')
+      .option('-o, --output <file>', 'Output config file path', './snomed-config.json')
+      .option('--format <format>', 'Config format (json|yaml)', 'json')
+      .action(async (options) => {
+        await this.handleGenerateConfigCommand({...globalOptions, ...options});
+      });
+  
 
     // Validate command
     terminologyCommand
@@ -83,23 +128,32 @@ class SnomedModule extends BaseTerminologyModule {
 
   async handleImportCommand(options) {
     try {
-      // Gather configuration
-      const config = await this.gatherSnomedConfig(options);
-
-      // Show confirmation unless --yes is specified
-      if (!options.yes) {
-        const confirmed = await this.confirmImport(config);
+      // Load config file FIRST, before any other processing
+      let config = { ...options };
+      
+      if (options.config) {
+        const fileConfig = await this.loadConfigFile(options.config);
+        // Config file values as base, CLI options override
+        config = { ...fileConfig, ...options };
+      }
+  
+      // Now gather the complete configuration
+      const finalConfig = await this.gatherSnomedConfig(config);
+  
+      // Show confirmation unless --yes is specified or in config
+      const shouldSkipConfirmation = finalConfig.yes || options.yes || options.nonInteractive;
+      
+      if (!shouldSkipConfirmation) {
+        const confirmed = await this.confirmImport(finalConfig);
         if (!confirmed) {
           this.logInfo('Import cancelled');
           return;
         }
       }
-
-      // Save configuration immediately after confirmation
-      this.rememberSuccessfulConfig(config);
-
-      // Run the import
-      await this.runImportWithoutConfigSaving(config);
+  
+      // Save configuration and run import
+      this.rememberSuccessfulConfig(finalConfig);
+      await this.runImportWithoutConfigSaving(finalConfig);
     } catch (error) {
       this.logError(`Import command failed: ${error.message}`);
       if (options.verbose) {
@@ -109,19 +163,60 @@ class SnomedModule extends BaseTerminologyModule {
     }
   }
 
+
+  hasRequiredSnomedArgs(options) {
+    // Check if we have either edition+version OR uri, plus source
+    const hasEditionVersion = options.edition && options.version;
+    const hasUri = options.uri;
+    const hasSource = options.source;
+    
+    return hasSource && (hasEditionVersion || hasUri);
+  }
+  
+  buildConfigFromOptions(baseConfig, options) {
+    const editions = SnomedModule.EDITIONS;
+    
+    let config = {
+      ...baseConfig,
+      ...options,
+      estimatedDuration: this.getEstimatedDuration()
+    };
+  
+    // Apply edition defaults AFTER base config but BEFORE explicit options
+    if (options.edition && editions[options.edition]) {
+      const editionDefaults = editions[options.edition];
+      
+      // Apply edition defaults only for unspecified values
+      if (!options.language) {
+        config.language = editionDefaults.lang;
+      }
+      
+      // Auto-generate URI if not provided
+      if (!options.uri && options.edition && options.version) {
+        config.uri = `http://snomed.info/sct/${options.edition}/version/${options.version}`;
+      }
+      
+      // Check base requirement
+      if (editionDefaults.needsBase && !options.base) {
+        throw new Error(`Base edition directory is required for edition ${options.edition}`);
+      }
+    }
+  
+    return config;
+  }
+
   async confirmImport(config) {
+
+    if (config.yes || config.nonInteractive) {
+      return true;
+    }    
     console.log(chalk.cyan(`\n📋 ${this.getName()} Import Configuration:`));
     console.log(`  Source: ${chalk.white(config.source)}`);
     console.log(`  Destination: ${chalk.white(config.dest)}`);
 
     if (config.edition) {
-      const editions = {
-        "900000000000207008": "International",
-        "731000124108": "US Edition",
-        "32506021000036107": "Australian Edition",
-        // ... other editions
-      };
-      const editionName = editions[config.edition] || `Edition ${config.edition}`;
+      const editions = SnomedModule.EDITIONS;
+      const editionName = editions[config.edition]?.name || `Edition ${config.edition}`;
       console.log(`  Edition: ${chalk.white(editionName)} (${config.edition})`);
     }
 
@@ -154,9 +249,57 @@ class SnomedModule extends BaseTerminologyModule {
     return confirmed;
   }
 
-  async gatherSnomedConfig(options) {
-    const baseConfig = await this.gatherCommonConfig(options);
 
+  async loadConfigFile(configPath) {
+    if (!fs.existsSync(configPath)) {
+      throw new Error(`Configuration file not found: ${configPath}`);
+    }
+  
+    try {
+      const content = fs.readFileSync(configPath, 'utf8');
+      const ext = path.extname(configPath).toLowerCase();
+      
+      let config;
+      if (ext === '.json') {
+        config = JSON.parse(content);
+      } else if (ext === '.yaml' || ext === '.yml') {
+        const yaml = require('js-yaml');
+        config = yaml.load(content);
+      } else {
+        // Try to parse as JSON first, then YAML
+        try {
+          config = JSON.parse(content);
+        } catch {
+          const yaml = require('js-yaml');
+          config = yaml.load(content);
+        }
+      }
+  
+      this.logInfo(`Loaded configuration from: ${configPath}`);
+      return config;
+    } catch (error) {
+      throw new Error(`Failed to parse configuration file: ${error.message}`);
+    }
+  }
+  
+  extractCliOptions(options) {
+    const cliConfig = {};
+    
+    // Map CLI options to config properties
+    if (options.source) cliConfig.source = options.source;
+    if (options.dest) cliConfig.dest = options.dest;
+    if (options.base) cliConfig.base = options.base;
+    if (options.edition) cliConfig.edition = options.edition;
+    if (options.version) cliConfig.version = options.version;
+    if (options.uri) cliConfig.uri = options.uri;
+    if (options.language) cliConfig.language = options.language;
+    if (options.verbose !== undefined) cliConfig.verbose = options.verbose;
+    if (options.overwrite !== undefined) cliConfig.overwrite = options.overwrite;
+  
+    return cliConfig;
+  }
+  
+  async completeConfiguration(config, options) {
     const editions = {
       "900000000000207008": { name: "International", needsBase: false, lang: "en-US" },
       "731000124108": { name: "US Edition", needsBase: true, lang: "en-US" },
@@ -186,90 +329,37 @@ class SnomedModule extends BaseTerminologyModule {
       "5631000179106": { name: "Uruguayan Edition", needsBase: true, lang: "es-UY" },
       "5991000124107": { name: "US Edition + ICD10CM", needsBase: true, lang: "en-US" }
     };
-
-    const questions = [];
-    const inquirer = require('inquirer');
-
-    // Edition selection (if not provided via options and no URI override)
-    if (!options.edition && !options.uri) {
-      const editionChoices = Object.entries(editions).map(([id, info]) => ({
-        name: info.name,
-        value: id
-      }));
-
-      questions.push({
-        type: 'list',
-        name: 'edition',
-        message: 'Select SNOMED CT Edition:',
-        choices: editionChoices,
-        default: '900000000000207008' // International edition
-      });
-    }
-
-    // Version in YYYYMMDD format (if not provided and no URI override)
-    if (!options.version && !options.uri) {
-      questions.push({
-        type: 'input',
-        name: 'version',
-        message: 'Version (YYYYMMDD format, e.g., 20250801):',
-        validate: (input) => {
-          if (!input) return 'Version is required';
-          if (!/^\d{8}$/.test(input)) return 'Version must be in YYYYMMDD format (8 digits)';
-
-          // Basic date validation
-          const year = parseInt(input.substring(0, 4));
-          const month = parseInt(input.substring(4, 6));
-          const day = parseInt(input.substring(6, 8));
-
-          if (year < 1900 || year > 2100) return 'Invalid year';
-          if (month < 1 || month > 12) return 'Invalid month';
-          if (day < 1 || day > 31) return 'Invalid day';
-
-          return true;
-        }
-      });
-    }
-
-    // Get answers for edition and version first
-    const primaryAnswers = await inquirer.prompt(questions);
-
-    // Determine the selected edition and version
-    const selectedEdition = options.edition || primaryAnswers.edition;
-    const selectedVersion = options.version || primaryAnswers.version;
-
-    let editionInfo = null;
-    let needsBase = false;
-    let autoLanguage = 'en-US';
-    let autoUri = options.uri;
-
-    // If we have edition/version (not using URI override), determine settings
-    if (selectedEdition && selectedVersion && !options.uri) {
-      editionInfo = editions[selectedEdition];
-      if (!editionInfo) {
-        throw new Error(`Unknown edition: ${selectedEdition}`);
+  
+    // Validate required fields
+    const requiredFields = ['source'];
+    const missingFields = requiredFields.filter(field => !config[field]);
+    
+    if (missingFields.length > 0) {
+      if (options.nonInteractive) {
+        throw new Error(`Missing required configuration: ${missingFields.join(', ')}`);
       }
-      needsBase = editionInfo.needsBase;
-      autoLanguage = editionInfo.lang;
-      autoUri = `http://snomed.info/sct/${selectedEdition}/version/${selectedVersion}`;
-    } else if (options.uri) {
-      // Try to extract edition from URI to determine if base is needed
-      const uriMatch = options.uri.match(/sct\/(\d+)\/version/);
-      if (uriMatch) {
-        const extractedEdition = uriMatch[1];
-        editionInfo = editions[extractedEdition];
-        if (editionInfo) {
-          needsBase = editionInfo.needsBase;
-          autoLanguage = editionInfo.lang;
-        }
-      }
+      
+      // Prompt for missing fields
+      config = await this.promptForMissingConfig(config, missingFields);
     }
-
-    // Additional questions based on edition requirements
-    const additionalQuestions = [];
-
-    // Base directory for extensions (only if edition needs base and not already provided)
-    if (needsBase && !options.base) {
-      additionalQuestions.push({
+  
+    // Auto-generate URI if edition and version are provided
+    if (!config.uri && config.edition && config.version) {
+      config.uri = `http://snomed.info/sct/${config.edition}/version/${config.version}`;
+    }
+  
+    // Set default language based on edition
+    if (!config.language && config.edition && editions[config.edition]) {
+      config.language = editions[config.edition].lang;
+    }
+  
+    // Check if base directory is needed
+    if (config.edition && editions[config.edition]?.needsBase && !config.base) {
+      if (options.nonInteractive) {
+        throw new Error(`Base edition directory is required for edition ${config.edition}`);
+      }
+      
+      const { base } = await inquirer.prompt({
         type: 'input',
         name: 'base',
         message: 'Base edition directory (required for this edition):',
@@ -279,45 +369,175 @@ class SnomedModule extends BaseTerminologyModule {
           return true;
         }
       });
+      config.base = base;
     }
+  
+    config.estimatedDuration = this.getEstimatedDuration();
+    return config;
+  }
+  
+  async handleGenerateConfigCommand(options) {
+    const sampleConfig = {
+      // Basic settings
+      source: "./path/to/snomed/rf2/files",
+      dest: "./data/snomed.cache",
+      verbose: true,
+      overwrite: false,
+      
+      // Edition settings
+      edition: "900000000000207008",  // International Edition
+      version: "20250801",           // YYYYMMDD format
+      // OR use URI directly:
+      // uri: "http://snomed.info/sct/900000000000207008/version/20250801",
+      
+      // Language settings
+      language: "en-US",
+      
+      // For extension editions only
+      // base: "./path/to/base/edition",
+    };
+  
+    const content = options.format === 'yaml' 
+      ? require('js-yaml').dump(sampleConfig)
+      : JSON.stringify(sampleConfig, null, 2);
+  
+    fs.writeFileSync(options.output, content, 'utf8');
+    this.logSuccess(`Generated sample configuration: ${options.output}`);
+  }
 
-    // Manual URI input if neither edition/version nor URI was provided
-    if (!autoUri && !options.uri) {
-      additionalQuestions.push({
+
+  async gatherSnomedConfig(options) {
+    // If all required parameters are provided, build config directly
+    if (this.hasAllRequiredArgs(options)) {
+      return this.buildCompleteConfig(options);
+    }
+  
+    // Otherwise, we need to prompt for missing values
+    const editions = SnomedModule.EDITIONS;
+    const questions = [];
+  
+    // Only add questions for missing required parameters
+    if (!options.source) {
+      questions.push({
         type: 'input',
-        name: 'uri',
-        message: 'Version URI (e.g., http://snomed.info/sct/900000000000207008/version/20240301):',
+        name: 'source',
+        message: 'Source directory containing RF2 files:',
         validate: (input) => {
-          if (!input) return 'Version URI is required';
-          if (!input.includes('snomed.info/sct')) return 'Invalid SNOMED CT URI format';
+          if (!input) return 'Source directory is required';
+          if (!fs.existsSync(input)) return 'Directory does not exist';
           return true;
         }
       });
     }
-
-    const additionalAnswers = additionalQuestions.length > 0 ?
-      await inquirer.prompt(additionalQuestions) : {};
-
-    // Build the final configuration
-    const config = {
-      ...baseConfig,
-      ...options,
-      ...primaryAnswers,
-      ...additionalAnswers,
-      edition: selectedEdition,
-      version: selectedVersion,
-      language: options.language || autoLanguage, // Allow language override
-      uri: options.uri || autoUri || additionalAnswers.uri,
-      estimatedDuration: this.getEstimatedDuration()
-    };
-
-    // Validate that we have all required fields
-    if (!config.uri) {
-      throw new Error('Version URI could not be determined');
+  
+    if (!options.dest) {
+      questions.push({
+        type: 'input',
+        name: 'dest',
+        message: 'Destination cache file:',
+        default: './data/snomed.cache'
+      });
     }
-
-    return config;
+  
+    if (!options.edition && !options.uri) {
+      questions.push({
+        type: 'list',
+        name: 'edition',
+        message: 'Select SNOMED CT Edition:',
+        choices: Object.entries(editions).map(([id, info]) => ({
+          name: info.name,
+          value: id
+        })),
+        default: '900000000000207008'
+      });
+    }
+  
+    if (!options.version && !options.uri) {
+      questions.push({
+        type: 'input',
+        name: 'version',
+        message: 'Version (YYYYMMDD format):',
+        validate: (input) => {
+          if (!input) return 'Version is required';
+          if (!/^\d{8}$/.test(input)) return 'Version must be in YYYYMMDD format';
+          return true;
+        }
+      });
+    }
+  
+    // If we're in non-interactive mode and missing required args, fail
+    if (options.nonInteractive && questions.length > 0) {
+      const missingArgs = questions.map(q => q.name).join(', ');
+      throw new Error(`Missing required arguments in non-interactive mode: ${missingArgs}`);
+    }
+  
+    // Prompt for missing values
+    const answers = questions.length > 0 ? await require('inquirer').prompt(questions) : {};
+    
+    // Merge answers with options
+    const completeOptions = { ...options, ...answers };
+    
+    return this.buildCompleteConfig(completeOptions);
   }
+
+
+  hasAllRequiredArgs(options) {
+    // Must have source and either (edition + version) or uri
+    const hasSource = !!options.source;
+    const hasEditionVersion = !!(options.edition && options.version);
+    const hasUri = !!options.uri;
+    
+    return hasSource && (hasEditionVersion || hasUri);
+  }
+  
+  async buildCompleteConfig(options) {
+    const editions = SnomedModule.EDITIONS;
+    let config = { ...options };
+  
+    // Apply edition defaults
+    if (options.edition && editions[options.edition]) {
+      const editionInfo = editions[options.edition];
+      
+      // Set language from edition if not explicitly provided
+      if (!options.language) {
+        config.language = editionInfo.lang;
+      }
+      
+      // Generate URI if not provided
+      if (!options.uri && options.edition && options.version) {
+        config.uri = `http://snomed.info/sct/${options.edition}/version/${options.version}`;
+      }
+      
+      // Check base requirement
+      if (editionInfo.needsBase && !options.base) {
+        if (options.nonInteractive) {
+          throw new Error(`Base edition directory required for ${editionInfo.name}`);
+        }
+        
+        // Prompt for base directory
+        const inquirer = require('inquirer');
+        const { base } = await inquirer.prompt({
+          type: 'input',
+          name: 'base',
+          message: `Base edition directory (required for ${editionInfo.name}):`,
+          validate: (input) => {
+            if (!input) return 'Base directory is required';
+            if (!fs.existsSync(input)) return 'Directory does not exist';
+            return true;
+          }
+        });
+        config.base = base;
+      }
+    }
+  
+    // Set defaults for missing values
+    config.dest = config.dest || './data/snomed.cache';
+    config.verbose = config.verbose !== undefined ? config.verbose : true;
+    config.overwrite = config.overwrite !== undefined ? config.overwrite : false;
+    config.estimatedDuration = this.getEstimatedDuration();
+  
+    return config;
+  }  
 
   async runImportWithoutConfigSaving(config) {
     try {
