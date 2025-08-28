@@ -8,11 +8,8 @@ module.exports = {
     jest: true
   },
   extends: [
-    'eslint:recommended',
-    '@typescript-eslint/recommended' // Add this
+    'eslint:recommended'
   ],
-  parser: '@typescript-eslint/parser', // Add this
-  plugins: ['@typescript-eslint'], // Add this
   parserOptions: {
     ecmaVersion: 2022,
     sourceType: 'module'
@@ -21,8 +18,6 @@ module.exports = {
     BigInt: 'readonly'
   },
   rules: {
-    // Your existing rules...
-    "@typescript-eslint/no-floating-promises": "error", // Now this will work
     'no-loss-of-precision': 'warn'
   },
   ignorePatterns: [

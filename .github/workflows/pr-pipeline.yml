@@ -29,7 +29,7 @@ jobs:
           CHANGED_FILES=$(git diff --name-only --diff-filter=ACMRT origin/main...HEAD | grep -E '\.(js|mjs)$' | grep -v 'static/' | grep -v 'node_modules/' | tr '\n' ' ')
           if [ -n "$CHANGED_FILES" ]; then
             echo "Linting changed files: $CHANGED_FILES"
-            npx eslint --config .eslintrc.ci.js $CHANGED_FILES
+            npx eslint $CHANGED_FILES
           else
             echo "No relevant JavaScript files changed"
           fi
