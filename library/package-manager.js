@@ -14,6 +14,8 @@ const axios = require('axios');
 const { VersionUtilities } = require('../library/version-utilities');
 
 class PackageManager {
+    totalDownloaded = 0;
+
     /**
      * @param {string[]} packageServers - Ordered list of package server URLs
      * @param {string} cacheFolder - Local folder for cached content
@@ -42,9 +44,11 @@ class PackageManager {
             return cachedPath;
         }
 
+        console.log("Fetch Package "+packageId+"#"+version);
         // Not in cache, fetch from servers
         const packageData = await this.fetchFromServers(packageId, resolvedVersion);
 
+        this.totalDownloaded = this.totalDownloaded + packageData.length;
         // Extract to cache
         const extractedPath = await this.extractToCache(packageId, resolvedVersion, packageData);
 
@@ -306,6 +310,10 @@ class PackageContentLoader {
             return;
         }
 
+        const packageSource = path.join(this.packageFolder, 'package', 'package.json');
+        const packageContent = await fs.readFile(packageSource, 'utf8');
+        this.package = JSON.parse(packageContent);
+
         try {
             const indexContent = await fs.readFile(this.indexPath, 'utf8');
             this.index = JSON.parse(indexContent);
@@ -505,6 +513,18 @@ class PackageContentLoader {
         }
 
         return stats;
+    }
+
+    fhirVersion() {
+        return this.package.fhirVersions[0];
+    }
+
+    id() {
+        return this.package.name;
+    }
+
+    version() {
+        return this.package.version;
     }
 }
 

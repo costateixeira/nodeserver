@@ -1,14 +1,14 @@
 const fs = require('fs').promises;
 const path = require('path');
 const { describe, beforeAll, afterAll, test, expect } = require('@jest/globals');
-const { PackageManager } = require('../../library/package-manager');
+const { PackageManager, PackageContentLoader} = require('../../library/package-manager');
 const { PackageValueSetProvider } = require('../../tx/vs/vs-package');
 
 describe('PackageValueSetProvider', () => {
   let packageManager;
   let packagePath;
   let provider;
-  const packageCacheDir = path.join(__dirname, '../../package-cache');
+  const packageCacheDir = path.join(__dirname, '../../.package-cache');
   const packageId = 'hl7.fhir.uv.tools';
   const packageVersion = '0.8.0';
 
@@ -27,7 +27,8 @@ describe('PackageValueSetProvider', () => {
 
       // Create provider
       const fullPackagePath = path.join(packageCacheDir, packagePath);
-      provider = new PackageValueSetProvider(fullPackagePath);
+      const loader = new PackageContentLoader(fullPackagePath);
+      provider = new PackageValueSetProvider(loader);
 
       // Initialize provider (this creates the database if needed)
       await provider.initialize();

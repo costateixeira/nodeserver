@@ -281,7 +281,6 @@ describe('NDC Provider', () => {
   const testDbPath = path.resolve(__dirname, '../../data/ndc-testing.db');
   let factory;
   let provider;
-  let opContext;
 
   beforeAll(async () => {
     // Verify test database exists (should be created by import tests)
@@ -289,8 +288,8 @@ describe('NDC Provider', () => {
 
     // Create factory and provider
     factory = new NdcServicesFactory(testDbPath);
-    provider = await factory.build(null, []);
-    opContext = new TxOperationContext('en');
+    await factory.load();
+    provider = await factory.build(new TxOperationContext('en'), []);
   });
 
   afterAll(() => {
@@ -334,7 +333,7 @@ describe('NDC Provider', () => {
 
   describe('Product Code Lookup', () => {
     test('should locate product 0002-0152 (Zepbound)', async () => {
-      const result = await provider.locate(opContext, '0002-0152');
+      const result = await provider.locate('0002-0152');
 
       expect(result.context).toBeDefined();
       expect(result.context).toBeInstanceOf(NdcConcept);
@@ -346,7 +345,7 @@ describe('NDC Provider', () => {
     });
 
     test('should get display for product 0002-0152', async () => {
-      const display = await provider.display(opContext, '0002-0152');
+      const display = await provider.display('0002-0152');
 
       expect(display).toBeDefined();
       expect(display).toContain('Zepbound');
@@ -356,13 +355,13 @@ describe('NDC Provider', () => {
     });
 
     test('should locate product 0002-0213 (Humulin R)', async () => {
-      const result = await provider.locate(opContext, '0002-0213');
+      const result = await provider.locate('0002-0213');
 
       expect(result.context).toBeDefined();
       expect(result.context.code).toBe('0002-0213');
       expect(result.context.isPackage).toBe(false);
 
-      const display = await provider.display(opContext, result.context);
+      const display = await provider.display(result.context);
       expect(display).toContain('Humulin');
       expect(display).toContain('(product)');
 
@@ -370,7 +369,7 @@ describe('NDC Provider', () => {
     });
 
     test('should return null for non-existent product', async () => {
-      const result = await provider.locate(opContext, '9999-9999');
+      const result = await provider.locate('9999-9999');
 
       expect(result.context).toBeNull();
       expect(result.message).toContain('not found');
@@ -379,7 +378,7 @@ describe('NDC Provider', () => {
 
   describe('Package Code Lookup', () => {
     test('should locate package 0002-0152-01 (10-digit format)', async () => {
-      const result = await provider.locate(opContext, '0002-0152-01');
+      const result = await provider.locate('0002-0152-01');
 
       expect(result.context).toBeDefined();
       expect(result.context).toBeInstanceOf(NdcConcept);
@@ -391,7 +390,7 @@ describe('NDC Provider', () => {
     });
 
     test('should get display for package 0002-0152-01', async () => {
-      const display = await provider.display(opContext, '0002-0152-01');
+      const display = await provider.display('0002-0152-01');
 
       expect(display).toBeDefined();
       expect(display).toContain('Zepbound');
@@ -402,7 +401,7 @@ describe('NDC Provider', () => {
     });
 
     test('should locate package by 11-digit code 00002121404', async () => {
-      const result = await provider.locate(opContext, '00002121404');
+      const result = await provider.locate('00002121404');
 
       expect(result.context).toBeDefined();
       expect(result.context.isPackage).toBe(true);
@@ -413,12 +412,12 @@ describe('NDC Provider', () => {
     });
 
     test('should locate package 0002-4312-08 (blister pack)', async () => {
-      const result = await provider.locate(opContext, '0002-4312-08');
+      const result = await provider.locate('0002-4312-08');
 
       expect(result.context).toBeDefined();
       expect(result.context.isPackage).toBe(true);
 
-      const display = await provider.display(opContext, result.context);
+      const display = await provider.display(result.context);
       expect(display).toContain('BLISTER PACK');
       expect(display).toContain('(package)');
 
@@ -428,15 +427,15 @@ describe('NDC Provider', () => {
 
   describe('Code Properties and Methods', () => {
     test('should return correct code for context', async () => {
-      const result = await provider.locate(opContext, '0002-0152');
-      const code = await provider.code(opContext, result.context);
+      const result = await provider.locate('0002-0152');
+      const code = await provider.code(result.context);
 
       expect(code).toBe('0002-0152');
     });
 
     test('should check if code is active', async () => {
-      const result = await provider.locate(opContext, '0002-0152');
-      const isInactive = await provider.isInactive(opContext, result.context);
+      const result = await provider.locate('0002-0152');
+      const isInactive = await provider.isInactive(result.context);
 
       expect(typeof isInactive).toBe('boolean');
       // Based on test data, most codes should be active
@@ -444,22 +443,22 @@ describe('NDC Provider', () => {
     });
 
     test('should return false for abstract concepts', async () => {
-      const result = await provider.locate(opContext, '0002-0152');
-      const isAbstract = await provider.isAbstract(opContext, result.context);
+      const result = await provider.locate('0002-0152');
+      const isAbstract = await provider.isAbstract(result.context);
 
       expect(isAbstract).toBe(false);
     });
 
     test('should return false for deprecated concepts', async () => {
-      const result = await provider.locate(opContext, '0002-0152');
-      const isDeprecated = await provider.isDeprecated(opContext, result.context);
+      const result = await provider.locate('0002-0152');
+      const isDeprecated = await provider.isDeprecated(result.context);
 
       expect(isDeprecated).toBe(false);
     });
 
     test('should return null for definition', async () => {
-      const result = await provider.locate(opContext, '0002-0152');
-      const definition = await provider.definition(opContext, result.context);
+      const result = await provider.locate('0002-0152');
+      const definition = await provider.definition(result.context);
 
       expect(definition).toBeNull();
     });
@@ -467,7 +466,7 @@ describe('NDC Provider', () => {
 
   describe('Designations', () => {
     test('should return designations for product', async () => {
-      const designations = await provider.designations(opContext, '0002-0152');
+      const designations = await provider.designations('0002-0152');
 
       expect(Array.isArray(designations)).toBe(true);
       expect(designations.length).toBeGreaterThan(0);
@@ -480,7 +479,7 @@ describe('NDC Provider', () => {
     });
 
     test('should return designations for package', async () => {
-      const designations = await provider.designations(opContext, '0002-0152-01');
+      const designations = await provider.designations('0002-0152-01');
 
       expect(Array.isArray(designations)).toBe(true);
       expect(designations.length).toBeGreaterThan(0);
@@ -496,7 +495,7 @@ describe('NDC Provider', () => {
   describe('Extended Lookup', () => {
     test('should extend lookup for product with properties', async () => {
       const params = { parameter: [] };
-      await provider.extendLookup(opContext, '0002-0152', [], params);
+      await provider.extendLookup('0002-0152', [], params);
 
       expect(params.parameter).toBeDefined();
       expect(params.parameter.length).toBeGreaterThan(0);
@@ -524,7 +523,7 @@ describe('NDC Provider', () => {
 
     test('should extend lookup for 10-digit package with properties', async () => {
       const params = { parameter: [] };
-      await provider.extendLookup(opContext, '0002-0152-01', [], params);
+      await provider.extendLookup('0002-0152-01', [], params);
 
       expect(params.parameter).toBeDefined();
       expect(params.parameter.length).toBeGreaterThan(0);
@@ -556,7 +555,7 @@ describe('NDC Provider', () => {
 
     test('should extend lookup for 11-digit package with properties', async () => {
       const params = { parameter: [] };
-      await provider.extendLookup(opContext, '00002121404', [], params);
+      await provider.extendLookup('00002121404', [], params);
 
       expect(params.parameter).toBeDefined();
       expect(params.parameter.length).toBeGreaterThan(0);
@@ -580,52 +579,52 @@ describe('NDC Provider', () => {
 
   describe('Filtering', () => {
     test('should support code-type filters', async () => {
-      expect(await provider.doesFilter(opContext, 'code-type', 'equal', 'product')).toBe(true);
-      expect(await provider.doesFilter(opContext, 'code-type', 'equal', '10-digit')).toBe(true);
-      expect(await provider.doesFilter(opContext, 'code-type', 'equal', '11-digit')).toBe(true);
-      expect(await provider.doesFilter(opContext, 'code-type', 'equal', 'invalid')).toBe(false);
-      expect(await provider.doesFilter(opContext, 'other-prop', 'equal', 'value')).toBe(false);
+      expect(await provider.doesFilter('code-type', 'equal', 'product')).toBe(true);
+      expect(await provider.doesFilter('code-type', 'equal', '10-digit')).toBe(true);
+      expect(await provider.doesFilter('code-type', 'equal', '11-digit')).toBe(true);
+      expect(await provider.doesFilter('code-type', 'equal', 'invalid')).toBe(false);
+      expect(await provider.doesFilter('other-prop', 'equal', 'value')).toBe(false);
     });
 
     test('should create filter context', async () => {
-      const filterContext = await provider.getPrepContext(opContext, true);
+      const filterContext = await provider.getPrepContext(true);
       expect(filterContext).toBeDefined();
       expect(filterContext.filters).toBeDefined();
       expect(Array.isArray(filterContext.filters)).toBe(true);
     });
 
     test('should filter by product code-type', async () => {
-      const filterContext = await provider.getPrepContext(opContext, true);
-      const filter = await provider.filter(opContext, filterContext, 'code-type', 'equal', 'product');
+      const filterContext = await provider.getPrepContext(true);
+      const filter = await provider.filter(filterContext, 'code-type', 'equal', 'product');
 
       expect(filter).toBeDefined();
       expect(filter.type).toBe('code-type');
       expect(filter.value).toBe('product');
 
-      const filterSets = await provider.executeFilters(opContext, filterContext);
+      const filterSets = await provider.executeFilters(filterContext);
       expect(filterSets).toContain(filter);
 
-      const size = await provider.filterSize(opContext, filterContext, filter);
+      const size = await provider.filterSize(filterContext, filter);
       expect(size).toBeGreaterThan(0);
 
       // (`✓ Product filter size: ${size}`);
     });
 
     test('should filter by 10-digit code-type', async () => {
-      const filterContext = await provider.getPrepContext(opContext, true);
-      const filter = await provider.filter(opContext, filterContext, 'code-type', 'equal', '10-digit');
+      const filterContext = await provider.getPrepContext(true);
+      const filter = await provider.filter(filterContext, 'code-type', 'equal', '10-digit');
 
-      const size = await provider.filterSize(opContext, filterContext, filter);
+      const size = await provider.filterSize(filterContext, filter);
       expect(size).toBeGreaterThan(0);
 
       // (`✓ 10-digit filter size: ${size}`);
     });
 
     test('should locate code within filter', async () => {
-      const filterContext = await provider.getPrepContext(opContext, true);
-      const filter = await provider.filter(opContext, filterContext, 'code-type', 'equal', 'product');
+      const filterContext = await provider.getPrepContext(true);
+      const filter = await provider.filter(filterContext, 'code-type', 'equal', 'product');
 
-      const located = await provider.filterLocate(opContext, filterContext, filter, '0002-0152');
+      const located = await provider.filterLocate(filterContext, filter, '0002-0152');
       expect(located).toBeInstanceOf(NdcConcept);
       expect(located.isPackage).toBe(false);
 
@@ -633,14 +632,14 @@ describe('NDC Provider', () => {
     });
 
     test('should check if concept is in filter', async () => {
-      const filterContext = await provider.getPrepContext(opContext, true);
-      const productFilter = await provider.filter(opContext, filterContext, 'code-type', 'equal', 'product');
+      const filterContext = await provider.getPrepContext(true);
+      const productFilter = await provider.filter(filterContext, 'code-type', 'equal', 'product');
 
-      const productResult = await provider.locate(opContext, '0002-0152');
-      const packageResult = await provider.locate(opContext, '0002-0152-01');
+      const productResult = await provider.locate('0002-0152');
+      const packageResult = await provider.locate('0002-0152-01');
 
-      const productInFilter = await provider.filterCheck(opContext, filterContext, productFilter, productResult.context);
-      const packageInFilter = await provider.filterCheck(opContext, filterContext, productFilter, packageResult.context);
+      const productInFilter = await provider.filterCheck(filterContext, productFilter, productResult.context);
+      const packageInFilter = await provider.filterCheck(filterContext, productFilter, packageResult.context);
 
       expect(productInFilter).toBe(true);
       expect(packageInFilter).toBe(false);
@@ -649,19 +648,19 @@ describe('NDC Provider', () => {
     });
 
     test('should iterate filter results', async () => {
-      const filterContext = await provider.getPrepContext(opContext, true);
-      const filter = await provider.filter(opContext, filterContext, 'code-type', 'equal', 'product');
+      const filterContext = await provider.getPrepContext(true);
+      const filter = await provider.filter(filterContext, 'code-type', 'equal', 'product');
 
-      let hasMore = await provider.filterMore(opContext, filterContext, filter);
+      let hasMore = await provider.filterMore(filterContext, filter);
       expect(hasMore).toBe(true);
 
       let count = 0;
       while (hasMore && count < 5) { // Limit iterations for test
-        const concept = await provider.filterConcept(opContext, filterContext, filter);
+        const concept = await provider.filterConcept(filterContext, filter);
         expect(concept).toBeInstanceOf(NdcConcept);
         expect(concept.isPackage).toBe(false);
 
-        hasMore = await provider.filterMore(opContext, filterContext, filter);
+        hasMore = await provider.filterMore(filterContext, filter);
         count++;
       }
 
@@ -671,16 +670,12 @@ describe('NDC Provider', () => {
   });
 
   describe('Error Handling', () => {
-    test('should handle invalid operation context', async () => {
-      expect(async () => await provider.locate(null, '0002-0152')).rejects.toThrow();
-      expect(async () => await provider.locate('invalid', '0002-0152')).rejects.toThrow();
-    });
 
     test('should handle unsupported filters', async () => {
-      const filterContext = await provider.getPrepContext(opContext, true);
+      const filterContext = await provider.getPrepContext(true);
 
       await expect(
-        provider.filter(opContext, filterContext, 'unsupported', 'equal', 'value')
+        provider.filter(filterContext, 'unsupported', 'equal', 'value')
       ).rejects.toThrow('not supported');
     });
 
@@ -688,7 +683,7 @@ describe('NDC Provider', () => {
       const params = { parameter: [] };
 
       await expect(
-        provider.extendLookup(opContext, 'invalid-code', [], params)
+        provider.extendLookup('invalid-code', [], params)
       ).rejects.toThrow();
     });
   });
@@ -699,9 +694,9 @@ describe('NDC Provider', () => {
       const productCodes = ['0002-4462', '0002-4463', '0002-4464'];
 
       for (const code of productCodes) {
-        const result = await provider.locate(opContext, code);
+        const result = await provider.locate(code);
         if (result.context) {
-          const display = await provider.display(opContext, result.context);
+          const display = await provider.display(result.context);
           expect(display).toContain('Cialis');
           expect(display).toContain('(product)');
           // console.log(`✓ Found Cialis product: ${code} - ${display}`);
@@ -714,9 +709,9 @@ describe('NDC Provider', () => {
       const productCodes = ['0002-2980', '0002-3977'];
 
       for (const code of productCodes) {
-        const result = await provider.locate(opContext, code);
+        const result = await provider.locate(code);
         if (result.context) {
-          const display = await provider.display(opContext, result.context);
+          const display = await provider.display(result.context);
           expect(display).toContain('RETEVMO');
           expect(display).toContain('(product)');
           // console.log(`✓ Found RETEVMO: ${code} - ${display}`);
@@ -729,9 +724,9 @@ describe('NDC Provider', () => {
       const packageCodes = ['0002-1433-61', '0002-1434-61'];
 
       for (const code of packageCodes) {
-        const result = await provider.locate(opContext, code);
+        const result = await provider.locate(code);
         if (result.context) {
-          const display = await provider.display(opContext, result.context);
+          const display = await provider.display(result.context);
           expect(display).toContain('Trulicity');
           expect(display).toContain('SYRINGE');
           expect(display).toContain('(package)');

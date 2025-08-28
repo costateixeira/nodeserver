@@ -4,8 +4,8 @@ const { CodeSystem } = require('../../tx/library/codesystem');
 const {TxOperationContext} = require("../../tx/cs/cs-api");
 
 describe('Enhanced UriServices with Language Support', () => {
-  let uriServices;
-  let opContext;
+  let uriServicesEn;
+  let uriServicesFr;
 
   beforeEach(() => {
     const supplData = {
@@ -36,58 +36,58 @@ describe('Enhanced UriServices with Language Support', () => {
     };
 
     const supplement = new CodeSystem(supplData);
-    opContext = new TxOperationContext(new Languages());
-    uriServices = new UriServices([supplement]);
+    uriServicesEn = new UriServices(new TxOperationContext(new Languages()), [supplement]);
+    uriServicesFr = new UriServices(new TxOperationContext(Languages.fromAcceptLanguage('fr')), [supplement]);
   });
 
   describe('Language-aware Display Detection', () => {
     test('should detect displays when supplement language matches requested language', () => {
       const frenchLanguages = Languages.fromAcceptLanguage('fr');
-      expect(uriServices.hasAnyDisplays(frenchLanguages)).toBe(true);
+      expect(uriServicesEn.hasAnyDisplays(frenchLanguages)).toBe(true);
     });
 
     test('should detect displays when supplement language matches more specific requested language', () => {
       const frenchCanadianLanguages = Languages.fromAcceptLanguage('fr-CA');
-      expect(uriServices.hasAnyDisplays(frenchCanadianLanguages)).toBe(true);
+      expect(uriServicesEn.hasAnyDisplays(frenchCanadianLanguages)).toBe(true);
     });
 
     test('should not detect displays when supplement language does not match', () => {
       const germanLanguages = Languages.fromAcceptLanguage('de');
-      expect(uriServices.hasAnyDisplays(germanLanguages)).toBe(false);
+      expect(uriServicesEn.hasAnyDisplays(germanLanguages)).toBe(false);
     });
 
     test('should detect displays from designations in requested language', () => {
       const spanishLanguages = Languages.fromAcceptLanguage('es');
-      expect(uriServices.hasAnyDisplays(spanishLanguages)).toBe(true);
+      expect(uriServicesEn.hasAnyDisplays(spanishLanguages)).toBe(true);
     });
 
     test('should detect displays from designations with more specific language', () => {
       const frenchLanguages = Languages.fromAcceptLanguage('fr');
-      expect(uriServices.hasAnyDisplays(frenchLanguages)).toBe(true);
+      expect(uriServicesEn.hasAnyDisplays(frenchLanguages)).toBe(true);
 
       // fr-CA designation should match fr request
-      const result = uriServices.hasAnyDisplays(frenchLanguages);
+      const result = uriServicesEn.hasAnyDisplays(frenchLanguages);
       expect(result).toBe(true);
     });
 
     test('should handle English fallback rules', () => {
       const englishLanguages = Languages.fromAcceptLanguage('en');
-      expect(uriServices.hasAnyDisplays(englishLanguages)).toBe(true);
+      expect(uriServicesEn.hasAnyDisplays(englishLanguages)).toBe(true);
     });
 
     test('should handle multiple language preferences', () => {
       const multiLanguages = Languages.fromAcceptLanguage('de,fr;q=0.9,en;q=0.8');
-      expect(uriServices.hasAnyDisplays(multiLanguages)).toBe(true);
+      expect(uriServicesEn.hasAnyDisplays(multiLanguages)).toBe(true);
     });
 
     test('should handle array input for backward compatibility', () => {
-      expect(uriServices.hasAnyDisplays(['fr', 'en'])).toBe(true);
-      expect(uriServices.hasAnyDisplays(['de', 'zh'])).toBe(false);
+      expect(uriServicesEn.hasAnyDisplays(['fr', 'en'])).toBe(true);
+      expect(uriServicesEn.hasAnyDisplays(['de', 'zh'])).toBe(false);
     });
 
     test('should handle string input for single language', () => {
-      expect(uriServices.hasAnyDisplays('fr')).toBe(true);
-      expect(uriServices.hasAnyDisplays('de')).toBe(false);
+      expect(uriServicesEn.hasAnyDisplays('fr')).toBe(true);
+      expect(uriServicesEn.hasAnyDisplays('de')).toBe(false);
     });
   });
 
@@ -95,28 +95,23 @@ describe('Enhanced UriServices with Language Support', () => {
     test('should return display from supplement when language matches', async () => {
       const testUri = 'https://example.com/different';
 
-      // Set up operation context with French language preference
-      const frenchContext = new TxOperationContext(Languages.fromAcceptLanguage('fr'));
-
-      const display = await uriServices.display(frenchContext, testUri);
+      const display = await uriServicesFr.display(testUri);
       expect(display).toBe('Example Different URL');
     });
 
     test('should return designation when it matches language preference', async () => {
       const testUri = 'https://example.com/different';
 
-      // Set up operation context with French language preference
-      const frenchContext = new TxOperationContext(Languages.fromAcceptLanguage('fr'));
 
       // Test that designations are considered in display method
       // (This would require enhancing the display method to check designations)
-      const display = await uriServices.display(frenchContext, testUri);
+      const display = await uriServicesFr.display(testUri);
       expect(display).toBe('Example Different URL');
     });
 
     test('should return empty string for URI not in supplement', async () => {
       const unknownUri = 'https://unknown.example.com/test';
-      const display = await uriServices.display(opContext, unknownUri);
+      const display = await uriServicesEn.display(unknownUri);
       expect(display).toBe(null);
     });
   });
@@ -124,7 +119,7 @@ describe('Enhanced UriServices with Language Support', () => {
   describe('Enhanced Designations Method', () => {
     test('should return all designations from all supplements', async () => {
       const testUri = 'https://example.com/different';
-      const designations = await uriServices.designations(opContext, testUri);
+      const designations = await uriServicesEn.designations(testUri);
 
       expect(designations).toHaveLength(4);
 
@@ -140,7 +135,7 @@ describe('Enhanced UriServices with Language Support', () => {
 
     test('should return null for URI with no designations', async () => {
       const testUri = 'https://example.com/another2';
-      const designations = await uriServices.designations(opContext, testUri);
+      const designations = await uriServicesEn.designations(testUri);
       expect(designations).toHaveLength(0);
     });
   });
@@ -170,7 +165,7 @@ describe('Enhanced UriServices with Language Support', () => {
       const validSupplement = new CodeSystem(validSupplementData);
 
       expect(() => {
-        new UriServices([validSupplement]);
+        new UriServices(new TxOperationContext(new Languages()), [validSupplement]);
       }).not.toThrow();
     });
 
@@ -181,7 +176,7 @@ describe('Enhanced UriServices with Language Support', () => {
       };
 
       expect(() => {
-        new UriServices([rawObject]);
+        new UriServices(new TxOperationContext(new Languages()), [rawObject]);
       }).toThrow('Supplement 0 must be a CodeSystem instance, got object');
     });
 
@@ -194,7 +189,7 @@ describe('Enhanced UriServices with Language Support', () => {
       });
 
       expect(() => {
-        new UriServices(singleSupplement);  // Not wrapped in array
+        new UriServices(new TxOperationContext(new Languages()), singleSupplement);  // Not wrapped in array
       }).toThrow('Supplements must be an array');
     });
 
@@ -211,19 +206,19 @@ describe('Enhanced UriServices with Language Support', () => {
       const supplNoConcepts = new CodeSystem(supplNoConceptsData);
 
       expect(() => {
-        new UriServices([supplNoConcepts]);
+        new UriServices(new TxOperationContext(new Languages()), [supplNoConcepts]);
       }).not.toThrow();
     });
 
     test('should handle empty supplements array', () => {
       expect(() => {
-        new UriServices([]);
+        new UriServices(new TxOperationContext(new Languages()), []);
       }).not.toThrow();
     });
 
     test('should handle null supplements', () => {
       expect(() => {
-        new UriServices(null);
+        new UriServices(new TxOperationContext(new Languages()), null);
       }).not.toThrow();
     });
 
@@ -240,7 +235,7 @@ describe('Enhanced UriServices with Language Support', () => {
       };
 
       const supplWithoutLang = new CodeSystem(supplWithoutLangData);
-      const services = new UriServices([supplWithoutLang]);
+      const services = new UriServices(new TxOperationContext(new Languages()), [supplWithoutLang]);
       const languages = Languages.fromAcceptLanguage('en');
 
       // Should still work by checking designations
@@ -258,7 +253,7 @@ describe('Enhanced UriServices with Language Support', () => {
       };
 
       const supplEmpty = new CodeSystem(supplEmptyData);
-      const services = new UriServices([supplEmpty]);
+      const services = new UriServices(new TxOperationContext(new Languages()), [supplEmpty]);
       const languages = Languages.fromAcceptLanguage('en');
 
       expect(services.hasAnyDisplays(languages)).toBe(false);

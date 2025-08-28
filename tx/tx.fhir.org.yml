@@ -1,7 +1,15 @@
 base:
   url: https://storage.googleapis.com/tx-fhir-org
 
-rX:
+sources:
+  - internal:lang
+  - internal:country
+  - internal:currency
+  - internal:areacode
+  - internal:mimetypes
+  - internal:usstates
+  - internal:hgvs
+  - ucum:tx/data/ucum-essence.xml
   - loinc:loinc-2.80-a.db
   - rxnorm:rxnorm_02032025-a.db
   - ndc:ndc-20211101.db
@@ -20,7 +28,6 @@ rX:
   - snomed:sct_se_20231130.cache
   - snomed:sct_uk_20230412.cache
   - snomed:sct_us_20250301.cache
-  - ucum:ucum-essence-2.2.xml
   - cpt:cpt-2023-fragment-0.1.db
   - omop:omop_v20250227.db
   - npm:hl7.terminology

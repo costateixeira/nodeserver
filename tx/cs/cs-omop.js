@@ -125,8 +125,8 @@ function getLang(langConcept) {
 }
 
 class OMOPServices extends CodeSystemProvider {
-  constructor(db, supplements, sharedData) {
-    super(supplements);
+  constructor(opContext, supplements, db, sharedData) {
+    super(opContext, supplements);
     this.db = db;
     this._version = sharedData._version;
   }
@@ -143,7 +143,7 @@ class OMOPServices extends CodeSystemProvider {
     return 'https://fhir-terminology.ohdsi.org';
   }
 
-  async version() {
+  version() {
     return this._version;
   }
 
@@ -161,22 +161,22 @@ class OMOPServices extends CodeSystemProvider {
   }
 
   // Core concept methods
-  async code(opContext, context) {
-    this._ensureOpContext(opContext);
-    const ctxt = await this.#ensureContext(opContext, context);
+  async code(context) {
+    
+    const ctxt = await this.#ensureContext(context);
     return ctxt ? ctxt.code : null;
   }
 
-  async display(opContext, context) {
-    this._ensureOpContext(opContext);
-    const ctxt = await this.#ensureContext(opContext, context);
+  async display(context) {
+    
+    const ctxt = await this.#ensureContext(context);
 
     if (!ctxt) {
       return null;
     }
 
     // Check supplements first
-    let disp = this._displayFromSupplements(opContext, ctxt.code);
+    let disp = this._displayFromSupplements(ctxt.code);
     if (disp) {
       return disp;
     }
@@ -184,29 +184,29 @@ class OMOPServices extends CodeSystemProvider {
     return ctxt.display || '';
   }
 
-  async definition(opContext, context) {
-    this._ensureOpContext(opContext);
+  async definition(context) {
+    
     return ''; // OMOP doesn't provide definitions
   }
 
-  async isAbstract(opContext, context) {
-    this._ensureOpContext(opContext);
+  async isAbstract(context) {
+    
     return false; // OMOP concepts are not abstract
   }
 
-  async isInactive(opContext, context) {
-    this._ensureOpContext(opContext);
+  async isInactive(context) {
+    
     return false; // Handle via standard_concept if needed
   }
 
-  async isDeprecated(opContext, context) {
-    this._ensureOpContext(opContext);
+  async isDeprecated(context) {
+    
     return false; // Handle via invalid_reason if needed
   }
 
-  async designations(opContext, context) {
-    this._ensureOpContext(opContext);
-    const ctxt = await this.#ensureContext(opContext, context);
+  async designations(context) {
+    
+    const ctxt = await this.#ensureContext(context);
     let designations = [];
 
     if (ctxt) {
@@ -249,11 +249,11 @@ class OMOPServices extends CodeSystemProvider {
     });
   }
 
-  async extendLookup(opContext, ctxt, props, params) {
-    this._ensureOpContext(opContext);
+  async extendLookup(ctxt, props, params) {
+    
 
     if (typeof ctxt === 'string') {
-      const located = await this.locate(opContext, ctxt);
+      const located = await this.locate(ctxt);
       if (!located.context) {
         throw new Error(located.message);
       }
@@ -410,12 +410,12 @@ class OMOPServices extends CodeSystemProvider {
     return props.includes(name);
   }
 
-  async #ensureContext(opContext, context) {
+  async #ensureContext(context) {
     if (context == null) {
       return null;
     }
     if (typeof context === 'string') {
-      const ctxt = await this.locate(opContext, context);
+      const ctxt = await this.locate(context);
       if (ctxt.context == null) {
         throw new Error(ctxt.message);
       } else {
@@ -429,8 +429,8 @@ class OMOPServices extends CodeSystemProvider {
   }
 
   // Lookup methods
-  async locate(opContext, code) {
-    this._ensureOpContext(opContext);
+  async locate(code) {
+    
     assert(code == null || typeof code === 'string', 'code must be string');
     if (!code) return { context: null, message: 'Empty code' };
 
@@ -467,19 +467,19 @@ class OMOPServices extends CodeSystemProvider {
   }
 
   // Iterator methods - not supported for OMOP due to size
-  async iterator(opContext, context) {
-    this._ensureOpContext(opContext);
+  async iterator(context) {
+    
     throw new Error('getNextContext not supported by OMOP - too large to iterate');
   }
 
-  async nextContext(opContext, iteratorContext) {
-    this._ensureOpContext(opContext);
+  async nextContext(iteratorContext) {
+    
     throw new Error('getNextContext not supported by OMOP - too large to iterate');
   }
 
   // Filter support
-  async doesFilter(opContext, prop, op, value) {
-    this._ensureOpContext(opContext);
+  async doesFilter(prop, op, value) {
+    
 
     if (prop === 'domain' && op === 'equal') {
       return true;
@@ -488,13 +488,13 @@ class OMOPServices extends CodeSystemProvider {
     return false;
   }
 
-  async getPrepContext(opContext, iterate) {
-    this._ensureOpContext(opContext);
+  async getPrepContext(iterate) {
+    
     return new OMOPPrep();
   }
 
-  async filter(opContext, filterContext, prop, op, value) {
-    this._ensureOpContext(opContext);
+  async filter(filterContext, prop, op, value) {
+    
 
     if (prop === 'domain' && op === 'equal') {
       const sql = `
@@ -516,23 +516,23 @@ class OMOPServices extends CodeSystemProvider {
     }
   }
 
-  async executeFilters(opContext, filterContext) {
-    this._ensureOpContext(opContext);
+  async executeFilters(filterContext) {
+    
     return filterContext.filters;
   }
 
-  async filterSize(opContext, filterContext, set) {
-    this._ensureOpContext(opContext);
+  async filterSize(filterContext, set) {
+    
     return set.rows.length;
   }
 
-  async filterMore(opContext, filterContext, set) {
-    this._ensureOpContext(opContext);
+  async filterMore(filterContext, set) {
+    
     return set.cursor < set.rows.length;
   }
 
-  async filterConcept(opContext, filterContext, set) {
-    this._ensureOpContext(opContext);
+  async filterConcept(filterContext, set) {
+    
 
     if (set.cursor >= set.rows.length) {
       return null;
@@ -551,8 +551,8 @@ class OMOPServices extends CodeSystemProvider {
     );
   }
 
-  async filterLocate(opContext, filterContext, set, code) {
-    this._ensureOpContext(opContext);
+  async filterLocate(filterContext, set, code) {
+    
 
     if (!set.prepared) {
       return `Filter not configured for locate operations`;
@@ -573,8 +573,8 @@ class OMOPServices extends CodeSystemProvider {
     }
   }
 
-  async filterCheck(opContext, filterContext, set, concept) {
-    this._ensureOpContext(opContext);
+  async filterCheck(filterContext, set, concept) {
+    
 
     if (!(concept instanceof OMOPConcept)) {
       return false;
@@ -583,33 +583,33 @@ class OMOPServices extends CodeSystemProvider {
     return set.rows.some(row => row.concept_id.toString() === concept.code);
   }
 
-  async filterFinish(opContext, filterContext) {
-    this._ensureOpContext(opContext);
+  async filterFinish(filterContext) {
+    
     for (const filter of filterContext.filters) {
       filter.close();
     }
   }
 
-  async filtersNotClosed(opContext, filterContext) {
-    this._ensureOpContext(opContext);
+  async filtersNotClosed(filterContext) {
+    
     return false; // OMOP filters are closed
   }
 
   // Search filter - not implemented
-  async searchFilter(opContext, filterContext, filter, sort) {
-    this._ensureOpContext(opContext);
+  async searchFilter(filterContext, filter, sort) {
+    
     throw new Error('Search filter not implemented yet');
   }
 
   // Subsumption testing - not implemented
-  async subsumesTest(opContext, codeA, codeB) {
-    this._ensureOpContext(opContext);
+  async subsumesTest(codeA, codeB) {
+    
     return false;
   }
 
   // Translation support
-  async getTranslations(opContext, coding, target) {
-    this._ensureOpContext(opContext);
+  async getTranslations(coding, target) {
+    
 
     const vocabId = getVocabId(target);
     if (vocabId === -1) {
@@ -728,14 +728,21 @@ class OMOPServicesFactory extends CodeSystemFactoryProvider {
     this._sharedData = null;
   }
 
+  system() {
+    return 'https://fhir-terminology.ohdsi.org';
+  }
+
+  version() {
+    return this._sharedData._version;
+  }
+
   async #ensureLoaded() {
     if (!this._loaded) {
-      await this.#loadSharedData();
-      this._loaded = true;
+      await this.load();
     }
   }
 
-  async #loadSharedData() {
+  async load() {
     const db = new sqlite3.Database(this.dbPath);
 
     try {
@@ -749,6 +756,7 @@ class OMOPServicesFactory extends CodeSystemFactoryProvider {
     } finally {
       db.close();
     }
+    this._loaded = true;
   }
 
   async #loadVersion(db) {
@@ -788,7 +796,7 @@ class OMOPServicesFactory extends CodeSystemFactoryProvider {
     // Create fresh database connection for this provider instance
     const db = new sqlite3.Database(this.dbPath);
 
-    return new OMOPServices(db, supplements, this._sharedData);
+    return new OMOPServices(opContext, supplements, db, this._sharedData);
   }
 
   static checkDB(dbPath) {

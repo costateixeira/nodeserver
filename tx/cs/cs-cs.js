@@ -103,8 +103,8 @@ class FhirCodeSystemProvider extends CodeSystemProvider {
    * @param {CodeSystem} codeSystem - The primary CodeSystem
    * @param {CodeSystem[]} supplements - Array of supplement CodeSystems
    */
-  constructor(codeSystem, supplements = []) {
-    super(supplements);
+  constructor(opContext, supplements, codeSystem) {
+    super(opContext, supplements);
 
     this.codeSystem = codeSystem;
     this.hasHierarchyFlag = codeSystem.hasHierarchy();
@@ -258,23 +258,21 @@ class FhirCodeSystemProvider extends CodeSystemProvider {
   }
 
   /**
-   * @param {TxOperationContext} opContext - Operation context
    * @param {string|FhirCodeSystemProviderContext} context - Code or context
    * @returns {Promise<string|null>} The correct code for the concept
    */
-  async code(opContext, context) {
-    this._ensureOpContext(opContext);
-    const ctxt = await this.#ensureContext(opContext, context);
+  async code(context) {
+    
+    const ctxt = await this.#ensureContext(context);
     return ctxt ? ctxt.code : null;
   }
 
   /**
-   * @param {TxOperationContext} opContext - Operation context
    * @param {string} code - The code to locate
    * @returns {Promise<{context: FhirCodeSystemProviderContext|null, message: string|null}>} Locate result
    */
-  async locate(opContext, code) {
-    this._ensureOpContext(opContext);
+  async locate(code) {
+    
 
     if (!code || typeof code !== 'string') {
       return { context: null, message: 'Empty or invalid code' };
@@ -296,18 +294,17 @@ class FhirCodeSystemProvider extends CodeSystemProvider {
 
   /**
    * Helper method to ensure we have a proper context object
-   * @param {TxOperationContext} opContext - Operation context
    * @param {string|FhirCodeSystemProviderContext} context - Code or context
    * @returns {Promise<FhirCodeSystemProviderContext|null>} Resolved context
    * @private
    */
-  async #ensureContext(opContext, context) {
+  async #ensureContext(context) {
     if (context == null) {
       return null;
     }
 
     if (typeof context === 'string') {
-      const result = await this.locate(opContext, context);
+      const result = await this.locate(context);
       if (result.context == null) {
         throw new Error(result.message);
       }
@@ -321,28 +318,27 @@ class FhirCodeSystemProvider extends CodeSystemProvider {
     throw new Error("Unknown Type at #ensureContext: " + (typeof context));
   }
   /**
-   * @param {TxOperationContext} opContext - Operation context
    * @param {string|FhirCodeSystemProviderContext} context - Code or context
    * @returns {Promise<string|null>} The best display given the languages in the operation context
    */
-  async display(opContext, context) {
-    this._ensureOpContext(opContext);
-    const ctxt = await this.#ensureContext(opContext, context);
+  async display(context) {
+    
+    const ctxt = await this.#ensureContext(context);
     if (!ctxt) {
       return null;
     }
 
     // Check supplements first
-    const supplementDisplay = this._displayFromSupplements(opContext, ctxt.code);
+    const supplementDisplay = this._displayFromSupplements(ctxt.code);
     if (supplementDisplay) {
       return supplementDisplay;
     }
 
     // Use language-aware display logic
-    if (opContext.langs && !opContext.langs.isEnglishOrNothing()) {
+    if (this.opContext.langs && !this.opContext.langs.isEnglishOrNothing()) {
       // Try to find exact language match in designations
       if (ctxt.concept.designation && Array.isArray(ctxt.concept.designation)) {
-        for (const lang of opContext.langs.languages) {
+        for (const lang of this.opContext.langs.languages) {
           for (const designation of ctxt.concept.designation) {
             if (designation.language) {
               const designationLang = new Language(designation.language);
@@ -356,7 +352,7 @@ class FhirCodeSystemProvider extends CodeSystemProvider {
 
       // Check if the CodeSystem's language matches requested languages
       if (this.defaultLanguage) {
-        for (const requestedLang of opContext.langs.languages) {
+        for (const requestedLang of this.opContext.langs.languages) {
           if (this.defaultLanguage.matchesForDisplay(requestedLang)) {
             return ctxt.concept.display?.trim() || '';
           }
@@ -369,24 +365,22 @@ class FhirCodeSystemProvider extends CodeSystemProvider {
   }
 
   /**
-   * @param {TxOperationContext} opContext - Operation context
    * @param {string|FhirCodeSystemProviderContext} context - Code or context
    * @returns {Promise<string|null>} The definition for the concept (if available)
    */
-  async definition(opContext, context) {
-    this._ensureOpContext(opContext);
-    const ctxt = await this.#ensureContext(opContext, context);
+  async definition(context) {
+    
+    const ctxt = await this.#ensureContext(context);
     return ctxt ? (ctxt.concept.definition || null) : null;
   }
 
   /**
-   * @param {TxOperationContext} opContext - Operation context
    * @param {string|FhirCodeSystemProviderContext} context - Code or context
    * @returns {Promise<boolean>} If the concept is abstract
    */
-  async isAbstract(opContext, context) {
-    this._ensureOpContext(opContext);
-    const ctxt = await this.#ensureContext(opContext, context);
+  async isAbstract(context) {
+    
+    const ctxt = await this.#ensureContext(context);
     if (!ctxt) {
       return false;
     }
@@ -407,13 +401,12 @@ class FhirCodeSystemProvider extends CodeSystemProvider {
   }
 
   /**
-   * @param {TxOperationContext} opContext - Operation context
    * @param {string|FhirCodeSystemProviderContext} context - Code or context
    * @returns {Promise<boolean>} If the concept is inactive
    */
-  async isInactive(opContext, context) {
-    this._ensureOpContext(opContext);
-    const ctxt = await this.#ensureContext(opContext, context);
+  async isInactive(context) {
+    
+    const ctxt = await this.#ensureContext(context);
     if (!ctxt) {
       return false;
     }
@@ -433,13 +426,12 @@ class FhirCodeSystemProvider extends CodeSystemProvider {
   }
 
   /**
-   * @param {TxOperationContext} opContext - Operation context
    * @param {string|FhirCodeSystemProviderContext} context - Code or context
    * @returns {Promise<boolean>} If the concept is deprecated
    */
-  async isDeprecated(opContext, context) {
-    this._ensureOpContext(opContext);
-    const ctxt = await this.#ensureContext(opContext, context);
+  async isDeprecated(context) {
+    
+    const ctxt = await this.#ensureContext(context);
     if (!ctxt) {
       return false;
     }
@@ -468,13 +460,12 @@ class FhirCodeSystemProvider extends CodeSystemProvider {
   }
 
   /**
-   * @param {TxOperationContext} opContext - Operation context
    * @param {string|FhirCodeSystemProviderContext} context - Code or context
    * @returns {Promise<string|null>} Status
    */
-  async getStatus(opContext, context) {
-    this._ensureOpContext(opContext);
-    const ctxt = await this.#ensureContext(opContext, context);
+  async getStatus(context) {
+    
+    const ctxt = await this.#ensureContext(context);
     if (!ctxt) {
       return null;
     }
@@ -494,13 +485,12 @@ class FhirCodeSystemProvider extends CodeSystemProvider {
   }
 
   /**
-   * @param {TxOperationContext} opContext - Operation context
    * @param {string|FhirCodeSystemProviderContext} context - Code or context
    * @returns {Promise<string|null>} Assigned itemWeight - if there is one
    */
-  async itemWeight(opContext, context) {
-    this._ensureOpContext(opContext);
-    const ctxt = await this.#ensureContext(opContext, context);
+  async itemWeight(context) {
+    
+    const ctxt = await this.#ensureContext(context);
     if (!ctxt) {
       return null;
     }
@@ -534,13 +524,12 @@ class FhirCodeSystemProvider extends CodeSystemProvider {
   }
 
   /**
-   * @param {TxOperationContext} opContext - Operation context
    * @param {string|FhirCodeSystemProviderContext} context - Code or context
    * @returns {Promise<Designation[]|null>} Whatever designations exist (in all languages)
    */
-  async designations(opContext, context) {
-    this._ensureOpContext(opContext);
-    const ctxt = await this.#ensureContext(opContext, context);
+  async designations(context) {
+    
+    const ctxt = await this.#ensureContext(context);
     if (!ctxt) {
       return null;
     }
@@ -572,13 +561,12 @@ class FhirCodeSystemProvider extends CodeSystemProvider {
   }
 
   /**
-   * @param {TxOperationContext} opContext - Operation context
    * @param {string|FhirCodeSystemProviderContext} context - Code or context
    * @returns {Promise<Object[]|null>} Extensions, if any
    */
-  async extensions(opContext, context) {
-    this._ensureOpContext(opContext);
-    const ctxt = await this.#ensureContext(opContext, context);
+  async extensions(context) {
+    
+    const ctxt = await this.#ensureContext(context);
     if (!ctxt) {
       return null;
     }
@@ -604,13 +592,12 @@ class FhirCodeSystemProvider extends CodeSystemProvider {
   }
 
   /**
-   * @param {TxOperationContext} opContext - Operation context
    * @param {string|FhirCodeSystemProviderContext} context - Code or context
    * @returns {Promise<Object[]|null>} Properties, if any
    */
-  async properties(opContext, context) {
-    this._ensureOpContext(opContext);
-    const ctxt = await this.#ensureContext(opContext, context);
+  async properties(context) {
+    
+    const ctxt = await this.#ensureContext(context);
     if (!ctxt) {
       return null;
     }
@@ -636,13 +623,12 @@ class FhirCodeSystemProvider extends CodeSystemProvider {
   }
 
   /**
-   * @param {TxOperationContext} opContext - Operation context
    * @param {string|FhirCodeSystemProviderContext} context - Code or context
    * @returns {Promise<string|null>} Parent, if there is one
    */
-  async parent(opContext, context) {
-    this._ensureOpContext(opContext);
-    const ctxt = await this.#ensureContext(opContext, context);
+  async parent(context) {
+    
+    const ctxt = await this.#ensureContext(context);
     if (!ctxt) {
       return null;
     }
@@ -653,16 +639,15 @@ class FhirCodeSystemProvider extends CodeSystemProvider {
   }
 
   /**
-   * @param {TxOperationContext} opContext - Operation context
    * @param {string|FhirCodeSystemProviderContext} a - First code or context
    * @param {string|FhirCodeSystemProviderContext} b - Second code or context
    * @returns {Promise<boolean>} True if they're the same
    */
-  async sameConcept(opContext, a, b) {
-    this._ensureOpContext(opContext);
+  async sameConcept(a, b) {
+    
 
-    const ctxtA = await this.#ensureContext(opContext, a);
-    const ctxtB = await this.#ensureContext(opContext, b);
+    const ctxtA = await this.#ensureContext(a);
+    const ctxtB = await this.#ensureContext(b);
 
     if (!ctxtA || !ctxtB) {
       return false;
@@ -672,14 +657,13 @@ class FhirCodeSystemProvider extends CodeSystemProvider {
   }
 
   /**
-   * @param {TxOperationContext} opContext - Operation context
    * @param {string} code - The code to locate
    * @param {string} parent - The parent code
    * @param {boolean} disallowSelf - Whether to disallow the code being the same as parent
    * @returns {Promise<{context: FhirCodeSystemProviderContext|null, message: string|null}>} Locate result
    */
-  async locateIsA(opContext, code, parent, disallowSelf = false) {
-    this._ensureOpContext(opContext);
+  async locateIsA(code, parent, disallowSelf = false) {
+    
 
     if (!this.hasParents()) {
       return {
@@ -689,12 +673,12 @@ class FhirCodeSystemProvider extends CodeSystemProvider {
     }
 
     // First check if both codes exist
-    const codeResult = await this.locate(opContext, code);
+    const codeResult = await this.locate(code);
     if (!codeResult.context) {
       return codeResult;
     }
 
-    const parentResult = await this.locate(opContext, parent);
+    const parentResult = await this.locate(parent);
     if (!parentResult.context) {
       return {
         context: null,
@@ -727,21 +711,20 @@ class FhirCodeSystemProvider extends CodeSystemProvider {
   }
 
   /**
-   * @param {TxOperationContext} opContext - Operation context
    * @param {string} codeA - First code
    * @param {string} codeB - Second code
    * @returns {Promise<string>} 'subsumes', 'subsumed-by', 'equivalent', or 'not-subsumed'
    */
-  async subsumesTest(opContext, codeA, codeB) {
-    this._ensureOpContext(opContext);
+  async subsumesTest(codeA, codeB) {
+    
 
     // Check if both codes exist
-    const resultA = await this.locate(opContext, codeA);
+    const resultA = await this.locate(codeA);
     if (!resultA.context) {
       throw new Error(`Unknown Code "${codeA}"`);
     }
 
-    const resultB = await this.locate(opContext, codeB);
+    const resultB = await this.locate(codeB);
     if (!resultB.context) {
       throw new Error(`Unknown Code "${codeB}"`);
     }
@@ -770,12 +753,11 @@ class FhirCodeSystemProvider extends CodeSystemProvider {
   }
 
   /**
-   * @param {TxOperationContext} opContext - Operation context
    * @param {string|FhirCodeSystemProviderContext} context - Code or context to iterate from
    * @returns {Promise<Object|null>} A handle that can be passed to nextContext (or null if can't be iterated)
    */
-  async iterator(opContext, context) {
-    this._ensureOpContext(opContext);
+  async iterator(context) {
+    
 
     if (context === null || context === undefined) {
       // Iterate all concepts starting from root concepts
@@ -787,7 +769,7 @@ class FhirCodeSystemProvider extends CodeSystemProvider {
         total: allCodes.length
       };
     } else {
-      const ctxt = await this.#ensureContext(opContext, context);
+      const ctxt = await this.#ensureContext(context);
       if (!ctxt) {
         return null;
       }
@@ -805,12 +787,11 @@ class FhirCodeSystemProvider extends CodeSystemProvider {
   }
 
   /**
-   * @param {TxOperationContext} opContext - Operation context
    * @param {Object} iteratorContext - Iterator context from iterator()
    * @returns {Promise<FhirCodeSystemProviderContext|null>} The next concept, or null
    */
-  async nextContext(opContext, iteratorContext) {
-    this._ensureOpContext(opContext);
+  async nextContext(iteratorContext) {
+    
 
     if (!iteratorContext || iteratorContext.current >= iteratorContext.total) {
       return null;
@@ -829,24 +810,23 @@ class FhirCodeSystemProvider extends CodeSystemProvider {
   }
 
   /**
-   * @param {TxOperationContext} opContext - Operation context
    * @param {FhirCodeSystemProviderContext} ctxt - The context to add properties for
    * @param {string[]} props - The properties requested
    * @param {Object} params - The parameters response to add to
    */
-  async extendLookup(opContext, ctxt, props, params) {
-    this._ensureOpContext(opContext);
+  async extendLookup(ctxt, props, params) {
+    
 
     if (!ctxt || !(ctxt instanceof FhirCodeSystemProviderContext)) {
       return;
     }
 
     // Set abstract status
-    params.abstract = await this.isAbstract(opContext, ctxt);
+    params.abstract = await this.isAbstract(ctxt);
 
     // Add designations if requested (or by default)
     if (!props || props.length === 0 || props.includes('*') || props.includes('designation')) {
-      const designations = await this.designations(opContext, ctxt);
+      const designations = await this.designations(ctxt);
       if (designations) {
         if (!params.designation) {
           params.designation = [];
@@ -866,7 +846,7 @@ class FhirCodeSystemProvider extends CodeSystemProvider {
 
     // Add properties if requested (or by default)
     if (!props || props.length === 0 || props.includes('*') || props.includes('property')) {
-      const properties = await this.properties(opContext, ctxt);
+      const properties = await this.properties(ctxt);
       if (properties) {
         if (!params.property) {
           params.property = [];
@@ -900,14 +880,14 @@ class FhirCodeSystemProvider extends CodeSystemProvider {
 
     // Add parent if requested and exists
     if (!props || props.length === 0 || props.includes('*') || props.includes('parent')) {
-      const parentCode = await this.parent(opContext, ctxt);
+      const parentCode = await this.parent(ctxt);
       if (parentCode) {
         if (!params.property) {
           params.property = [];
         }
 
         // Get parent's display for description
-        const parentDisplay = await this.display(opContext, parentCode);
+        const parentDisplay = await this.display(parentCode);
 
         params.property.push({
           code: 'parent',
@@ -926,7 +906,7 @@ class FhirCodeSystemProvider extends CodeSystemProvider {
         }
 
         for (const childCode of children) {
-          const childDisplay = await this.display(opContext, childCode);
+          const childDisplay = await this.display(childCode);
           params.property.push({
             code: 'child',
             valueCode: childCode,
@@ -938,35 +918,32 @@ class FhirCodeSystemProvider extends CodeSystemProvider {
   }
 
   /**
-   * @param {TxOperationContext} opContext - Operation context
    * @param {boolean} iterate - True if results will be iterated
    * @returns {FilterExecutionContext} Filter context
    */
-  async getPrepContext(opContext, iterate) {
-    this._ensureOpContext(opContext);
+  async getPrepContext(iterate) {
+    
     return new FilterExecutionContext();
   }
 
   /**
-   * @param {TxOperationContext} opContext - Operation context
    * @param {FilterExecutionContext} filterContext - Filter context
    * @returns {boolean} True if filters are not closed (infinite results possible)
    */
-  async filtersNotClosed(opContext, filterContext) {
-    this._ensureOpContext(opContext);
+  async filtersNotClosed(filterContext) {
+    
     return false; // FHIR CodeSystems are typically closed/finite
   }
 
   /**
    * Determines if a specific filter is supported
-   * @param {TxOperationContext} opContext - Operation context
    * @param {string} prop - Property name
    * @param {string} op - Filter operator (=, is-a, descendent-of, etc.)
    * @param {string} value - Filter value
    * @returns {Promise<boolean>} True if filter is supported
    */
-  async doesFilter(opContext, prop, op, value) {
-    this._ensureOpContext(opContext);
+  async doesFilter(prop, op, value) {
+    
 
     // Supported hierarchy filters
     if ((prop === 'concept' || prop === 'code') &&
@@ -999,12 +976,11 @@ class FhirCodeSystemProvider extends CodeSystemProvider {
 
   /**
    * Execute filter preparation - returns array of filter contexts
-   * @param {TxOperationContext} opContext - Operation context
    * @param {FilterExecutionContext} filterContext - Filter context
    * @returns {Promise<Array>} Array of filter result sets
    */
-  async executeFilters(opContext, filterContext) {
-    this._ensureOpContext(opContext);
+  async executeFilters(filterContext) {
+    
 
     // Return the accumulated filters from the context
     return filterContext.filters || [];
@@ -1012,38 +988,35 @@ class FhirCodeSystemProvider extends CodeSystemProvider {
 
   /**
    * Get the size of a filter result set
-   * @param {TxOperationContext} opContext - Operation context
    * @param {FilterExecutionContext} filterContext - Filter context
    * @param {FhirCodeSystemProviderFilterContext} set - Filter result set
    * @returns {Promise<number>} Number of concepts in the set
    */
-  async filterSize(opContext, filterContext, set) {
-    this._ensureOpContext(opContext);
+  async filterSize(filterContext, set) {
+    
     return set ? set.size() : 0;
   }
 
   /**
    * Check if there are more results in the filter set iterator
-   * @param {TxOperationContext} opContext - Operation context
    * @param {FilterExecutionContext} filterContext - Filter context
    * @param {FhirCodeSystemProviderFilterContext} set - Filter result set
    * @returns {Promise<boolean>} True if more results available
    */
-  async filterMore(opContext, filterContext, set) {
-    this._ensureOpContext(opContext);
+  async filterMore(filterContext, set) {
+    
     if (!set) return false;
     return set.hasMore();
   }
 
   /**
    * Get the current concept from the filter set iterator
-   * @param {TxOperationContext} opContext - Operation context
    * @param {FilterExecutionContext} filterContext - Filter context
    * @param {FhirCodeSystemProviderFilterContext} set - Filter result set
    * @returns {Promise<FhirCodeSystemProviderContext|null>} Current concept context
    */
-  async filterConcept(opContext, filterContext, set) {
-    this._ensureOpContext(opContext);
+  async filterConcept(filterContext, set) {
+    
     if (!set) return null;
 
     const concept = set.next();
@@ -1052,14 +1025,13 @@ class FhirCodeSystemProvider extends CodeSystemProvider {
 
   /**
    * Find a specific code in the filter results
-   * @param {TxOperationContext} opContext - Operation context
    * @param {FilterExecutionContext} filterContext - Filter context
    * @param {FhirCodeSystemProviderFilterContext} set - Filter result set
    * @param {string} code - Code to find
    * @returns {Promise<FhirCodeSystemProviderContext|string>} Context if found, error message if not
    */
-  async filterLocate(opContext, filterContext, set, code) {
-    this._ensureOpContext(opContext);
+  async filterLocate(filterContext, set, code) {
+    
     if (!set) {
       return `Code '${code}' not found: no filter results`;
     }
@@ -1074,14 +1046,13 @@ class FhirCodeSystemProvider extends CodeSystemProvider {
 
   /**
    * Check if a concept is in the filter results
-   * @param {TxOperationContext} opContext - Operation context
    * @param {FilterExecutionContext} filterContext - Filter context
    * @param {FhirCodeSystemProviderFilterContext} set - Filter result set
    * @param {FhirCodeSystemProviderContext} concept - Concept to check
    * @returns {Promise<boolean|string>} True if found, error message if not
    */
-  async filterCheck(opContext, filterContext, set, concept) {
-    this._ensureOpContext(opContext);
+  async filterCheck(filterContext, set, concept) {
+    
     if (!set || !concept) {
       return 'Invalid filter set or concept';
     }
@@ -1092,11 +1063,10 @@ class FhirCodeSystemProvider extends CodeSystemProvider {
 
   /**
    * Clean up filter resources
-   * @param {TxOperationContext} opContext - Operation context
    * @param {FilterExecutionContext} filterContext - Filter context
    */
-  async filterFinish(opContext, filterContext) {
-    this._ensureOpContext(opContext);
+  async filterFinish(filterContext) {
+    
     // Clear any cached data
     if (filterContext.filters) {
       filterContext.filters.forEach(filter => {
@@ -1109,14 +1079,13 @@ class FhirCodeSystemProvider extends CodeSystemProvider {
   }
   /**
    * Execute text-based search filter
-   * @param {TxOperationContext} opContext - Operation context
    * @param {FilterExecutionContext} filterContext - Filter context
    * @param {string} filter - Search text
    * @param {boolean} sort - Whether to sort results by relevance
    * @returns {Promise<FhirCodeSystemProviderFilterContext>} Filter results
    */
-  async searchFilter(opContext, filterContext, filter, sort) {
-    this._ensureOpContext(opContext);
+  async searchFilter(filterContext, filter, sort) {
+    
 
     const results = new FhirCodeSystemProviderFilterContext();
     const searchTerm = filter.toLowerCase();
@@ -1196,26 +1165,25 @@ class FhirCodeSystemProvider extends CodeSystemProvider {
 
   /**
    * Execute a value set filter
-   * @param {TxOperationContext} opContext - Operation context
    * @param {FilterExecutionContext} filterContext - Filter context
    * @param {string} prop - Property name to filter on
    * @param {string} op - Filter operator
    * @param {string} value - Filter value
    * @returns {Promise<FhirCodeSystemProviderFilterContext>} Filter results
    */
-  async filter(opContext, filterContext, prop, op, value) {
-    this._ensureOpContext(opContext);
+  async filter(filterContext, prop, op, value) {
+    
 
     let results = null;
 
     // Handle concept/code hierarchy filters
     if ((prop === 'concept' || prop === 'code')) {
-      results = await this._handleConceptFilter(opContext, filterContext, op, value);
+      results = await this._handleConceptFilter(filterContext, op, value);
     }
 
     // Handle child existence filter
     if (prop === 'child' && op === 'exists') {
-      results = await this._handleChildExistsFilter(opContext, filterContext, value);
+      results = await this._handleChildExistsFilter(filterContext, value);
     }
 
     // Handle property-based filters
@@ -1223,14 +1191,14 @@ class FhirCodeSystemProvider extends CodeSystemProvider {
     if (propertyDefs) {
       const propertyDef = propertyDefs.find(p => p.code === prop);
       if (propertyDef) {
-        results = await this._handlePropertyFilter(opContext, filterContext, propertyDef, op, value);
+        results = await this._handlePropertyFilter(filterContext, propertyDef, op, value);
       }
     }
 
     // Handle known special properties
     const knownProperties = ['notSelectable', 'status', 'inactive', 'deprecated'];
     if (knownProperties.includes(prop)) {
-      results = await this._handleKnownPropertyFilter(opContext, filterContext, prop, op, value);
+      results = await this._handleKnownPropertyFilter(filterContext, prop, op, value);
     }
 
     if (results == null) {
@@ -1247,14 +1215,13 @@ class FhirCodeSystemProvider extends CodeSystemProvider {
 
   /**
    * Handle concept/code filters (is-a, descendent-of, etc.)
-   * @param {TxOperationContext} opContext - Operation context
    * @param {FilterExecutionContext} filterContext - Filter context
    * @param {string} op - Filter operator
    * @param {string} value - Filter value (code)
    * @returns {Promise<FhirCodeSystemProviderFilterContext>} Filter results
    * @private
    */
-  async _handleConceptFilter(opContext, filterContext, op, value) {
+  async _handleConceptFilter(filterContext, op, value) {
     const results = new FhirCodeSystemProviderFilterContext();
 
     if (op === 'is-a' || op === 'descendent-of') {
@@ -1341,13 +1308,12 @@ class FhirCodeSystemProvider extends CodeSystemProvider {
 
   /**
    * Handle child exists filter
-   * @param {TxOperationContext} opContext - Operation context
    * @param {FilterExecutionContext} filterContext - Filter context
    * @param {string} value - 'true' or 'false'
    * @returns {Promise<FhirCodeSystemProviderFilterContext>} Filter results
    * @private
    */
-  async _handleChildExistsFilter(opContext, filterContext, value) {
+  async _handleChildExistsFilter(filterContext, value) {
     const results = new FhirCodeSystemProviderFilterContext();
     const wantChildren = (value === 'true');
 
@@ -1367,7 +1333,6 @@ class FhirCodeSystemProvider extends CodeSystemProvider {
 
   /**
    * Handle property-based filter
-   * @param {TxOperationContext} opContext - Operation context
    * @param {FilterExecutionContext} filterContext - Filter context
    * @param {Object} propertyDef - Property definition
    * @param {string} op - Filter operator
@@ -1375,7 +1340,7 @@ class FhirCodeSystemProvider extends CodeSystemProvider {
    * @returns {Promise<FhirCodeSystemProviderFilterContext>} Filter results
    * @private
    */
-  async _handlePropertyFilter(opContext, filterContext, propertyDef, op, value) {
+  async _handlePropertyFilter(filterContext, propertyDef, op, value) {
     const results = new FhirCodeSystemProviderFilterContext();
     const allConcepts = this.codeSystem.getAllConcepts();
 
@@ -1447,7 +1412,6 @@ class FhirCodeSystemProvider extends CodeSystemProvider {
 
   /**
    * Handle known property filters (notSelectable, status, etc.)
-   * @param {TxOperationContext} opContext - Operation context
    * @param {FilterExecutionContext} filterContext - Filter context
    * @param {string} prop - Property name
    * @param {string} op - Filter operator
@@ -1455,7 +1419,7 @@ class FhirCodeSystemProvider extends CodeSystemProvider {
    * @returns {Promise<FhirCodeSystemProviderFilterContext>} Filter results
    * @private
    */
-  async _handleKnownPropertyFilter(opContext, filterContext, prop, op, value) {
+  async _handleKnownPropertyFilter(filterContext, prop, op, value) {
     const results = new FhirCodeSystemProviderFilterContext();
     const allConcepts = this.codeSystem.getAllConcepts();
 
@@ -1463,12 +1427,12 @@ class FhirCodeSystemProvider extends CodeSystemProvider {
       let matches = false;
 
       if (prop === 'notSelectable') {
-        const isAbstract = await this.isAbstract(opContext, new FhirCodeSystemProviderContext(concept.code, concept));
+        const isAbstract = await this.isAbstract(new FhirCodeSystemProviderContext(concept.code, concept));
         const expectedValue = (value === 'true');
         matches = (isAbstract === expectedValue);
       }
       else if (prop === 'status') {
-        const status = await this.getStatus(opContext, new FhirCodeSystemProviderContext(concept.code, concept));
+        const status = await this.getStatus(new FhirCodeSystemProviderContext(concept.code, concept));
         if (op === '=') {
           matches = (status === value);
         } else if (op === 'in') {
@@ -1480,12 +1444,12 @@ class FhirCodeSystemProvider extends CodeSystemProvider {
         }
       }
       else if (prop === 'inactive') {
-        const isInactive = await this.isInactive(opContext, new FhirCodeSystemProviderContext(concept.code, concept));
+        const isInactive = await this.isInactive(new FhirCodeSystemProviderContext(concept.code, concept));
         const expectedValue = (value === 'true');
         matches = (isInactive === expectedValue);
       }
       else if (prop === 'deprecated') {
-        const isDeprecated = await this.isDeprecated(opContext, new FhirCodeSystemProviderContext(concept.code, concept));
+        const isDeprecated = await this.isDeprecated(new FhirCodeSystemProviderContext(concept.code, concept));
         const expectedValue = (value === 'true');
         matches = (isDeprecated === expectedValue);
       }
@@ -1500,14 +1464,13 @@ class FhirCodeSystemProvider extends CodeSystemProvider {
 
   /**
    * Handle special filters (placeholder - extend as needed)
-   * @param {TxOperationContext} opContext - Operation context
    * @param {FilterExecutionContext} filterContext - Filter context
    * @param {string} filter - Special filter
    * @param {boolean} sort - Whether to sort results
    * @returns {Promise<FhirCodeSystemProviderFilterContext>} Filter results
    */
-  async specialFilter(opContext, filterContext, filter, sort) {
-    this._ensureOpContext(opContext);
+  async specialFilter(filterContext, filter, sort) {
+    
 
     // Placeholder for special filter implementation
     // Can be extended for CodeSystem-specific special filters
@@ -1534,12 +1497,11 @@ class FhirCodeSystemFactory extends CodeSystemFactoryProvider {
 
   /**
    * Build a FHIR CodeSystem provider
-   * @param {TxOperationContext} opContext - Operation context
    * @param {CodeSystem} codeSystem - The FHIR CodeSystem to wrap
    * @param {CodeSystem[]} supplements - Array of supplement CodeSystems
    * @returns {FhirCodeSystemProvider} New provider instance
    */
-  build(opContext, codeSystem, supplements) {
+  build(opContext, supplements, codeSystem) {
     this.recordUse();
 
     // Validate parameters
@@ -1564,7 +1526,7 @@ class FhirCodeSystemFactory extends CodeSystemFactoryProvider {
       });
     }
 
-    return new FhirCodeSystemProvider(codeSystem, supplements || []);
+    return new FhirCodeSystemProvider(opContext, supplements, codeSystem);
   }
 }
 

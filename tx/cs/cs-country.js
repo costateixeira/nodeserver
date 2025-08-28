@@ -1,4 +1,4 @@
-const { CodeSystemProvider, TxOperationContext, Designation, FilterExecutionContext } = require('../../tx/cs/cs-api');
+const { CodeSystemProvider, Designation, FilterExecutionContext } = require('../../tx/cs/cs-api');
 const assert = require('assert');
 const { CodeSystem } = require("../library/codesystem");
 
@@ -17,8 +17,8 @@ class CountryCodeConceptFilter {
 }
 
 class CountryCodeServices extends CodeSystemProvider {
-  constructor(codes, codeMap) {
-    super();
+  constructor(opContext, supplements, codes, codeMap) {
+    super(opContext, supplements);
     this.codes = codes || [];
     this.codeMap = codeMap || new Map();
     this.supplements = [];
@@ -54,19 +54,19 @@ class CountryCodeServices extends CodeSystemProvider {
   }
 
   // Core concept methods
-  async code(opContext, code) {
-    this._ensureOpContext(opContext);
-    const ctxt = await this.#ensureContext(opContext, code);
+  async code(code) {
+    
+    const ctxt = await this.#ensureContext(code);
     return ctxt ? ctxt.code : null;
   }
 
-  async display(opContext, code) {
-    this._ensureOpContext(opContext);
-    const ctxt = await this.#ensureContext(opContext, code);
+  async display(code) {
+    
+    const ctxt = await this.#ensureContext(code);
     if (!ctxt) {
       return null;
     }
-    if (ctxt.display && opContext.langs.isEnglishOrNothing()) {
+    if (ctxt.display && this.opContext.langs.isEnglishOrNothing()) {
       return ctxt.display;
     }
     let disp = this._displayFromSupplements(ctxt.code);
@@ -76,34 +76,34 @@ class CountryCodeServices extends CodeSystemProvider {
     return ctxt.display;
   }
 
-  async definition(opContext, code) {
-    this._ensureOpContext(opContext);
-    const ctxt = await this.#ensureContext(opContext, code);
+  async definition(code) {
+    
+    // const ctxt = await this.#ensureContext(code);
     return null; // No definitions provided
   }
 
-  async isAbstract(opContext, code) {
-    this._ensureOpContext(opContext);
-    const ctxt = await this.#ensureContext(opContext, code);
+  async isAbstract(code) {
+    
+    // const ctxt = await this.#ensureContext(code);
     return false; // No abstract concepts
   }
 
-  async isInactive(opContext, code) {
-    this._ensureOpContext(opContext);
-    const ctxt = await this.#ensureContext(opContext, code);
+  async isInactive(code) {
+    
+    // const ctxt = await this.#ensureContext(code);
     return false; // No inactive concepts
   }
 
-  async isDeprecated(opContext, code) {
-    this._ensureOpContext(opContext);
-    const ctxt = await this.#ensureContext(opContext, code);
+  async isDeprecated(code) {
+    
+    // const ctxt = await this.#ensureContext(code);
     return false; // No deprecated concepts
   }
 
 
-  async designations(opContext, code) {
-    this._ensureOpContext(opContext);
-    const ctxt = await this.#ensureContext(opContext, code);
+  async designations(code) {
+    
+    const ctxt = await this.#ensureContext(code);
     let designations = [];
     if (ctxt != null) {
       designations.push(new Designation('en', CodeSystem.makeUseForDisplay(), ctxt.display));
@@ -112,12 +112,12 @@ class CountryCodeServices extends CodeSystemProvider {
     return designations;
   }
 
-  async #ensureContext(opContext, code) {
+  async #ensureContext(code) {
     if (code == null) {
       return code;
     }
     if (typeof code === 'string') {
-      const ctxt = await this.locate(opContext, code);
+      const ctxt = await this.locate(code);
       if (ctxt.context == null) {
         throw new Error(ctxt.message);
       } else {
@@ -131,8 +131,8 @@ class CountryCodeServices extends CodeSystemProvider {
   }
 
   // Lookup methods
-  async locate(opContext, code) {
-    this._ensureOpContext(opContext);
+  async locate(code) {
+    
     assert(!code || typeof code === 'string', 'code must be string');
     if (!code) return { context: null, message: 'Empty code' };
 
@@ -144,17 +144,17 @@ class CountryCodeServices extends CodeSystemProvider {
   }
 
   // Iterator methods
-  async iterator(opContext, code) {
-    this._ensureOpContext(opContext);
-    const ctxt = await this.#ensureContext(opContext, code);
+  async iterator(code) {
+    
+    const ctxt = await this.#ensureContext(code);
     if (!ctxt) {
       return { index: 0, total: this.totalCount() };
     }
     return null; // No child iteration
   }
 
-  async nextContext(opContext, iteratorContext) {
-    this._ensureOpContext(opContext);
+  async nextContext(iteratorContext) {
+    
     assert(iteratorContext, 'iteratorContext must be provided');
     if (iteratorContext && iteratorContext.index < iteratorContext.total) {
       const concept = this.codes[iteratorContext.index];
@@ -165,19 +165,19 @@ class CountryCodeServices extends CodeSystemProvider {
   }
 
   // Filtering methods
-  async doesFilter(opContext, prop, op, value) {
+  async doesFilter(prop, op, value) {
     assert(prop != null && typeof prop === 'string', 'prop must be a non-null string');
     assert(op != null && typeof op === 'string', 'op must be a non-null string');
     assert(value != null && typeof value === 'string', 'value must be a non-null string');
 
 
-    this._ensureOpContext(opContext);
+    
     return prop === 'code' && op === 'regex';
   }
 
 
-  async searchFilter(opContext, filterContext, filter, sort) {
-    this._ensureOpContext(opContext);
+  async searchFilter(filterContext, filter, sort) {
+    
     assert(filterContext && filterContext instanceof FilterExecutionContext, 'filterContext must be a FilterExecutionContext');
     assert(filter && typeof filter === 'string', 'filter must be a non-null string');
     assert(typeof sort === 'boolean', 'sort must be a boolean');
@@ -185,8 +185,8 @@ class CountryCodeServices extends CodeSystemProvider {
     throw new Error('Search filter not implemented for CountryCode');
   }
 
-  async specialFilter(opContext, filterContext, filter, sort) {
-    this._ensureOpContext(opContext);
+  async specialFilter(filterContext, filter, sort) {
+    
     assert(filterContext && filterContext instanceof FilterExecutionContext, 'filterContext must be a FilterExecutionContext');
     assert(filter && typeof filter === 'string', 'filter must be a non-null string');
     assert(typeof sort === 'boolean', 'sort must be a boolean');
@@ -194,8 +194,8 @@ class CountryCodeServices extends CodeSystemProvider {
     throw new Error('Special filter not implemented for CountryCode');
   }
 
-  async filter(opContext, filterContext, prop, op, value) {
-    this._ensureOpContext(opContext);
+  async filter(filterContext, prop, op, value) {
+    
     assert(filterContext && filterContext instanceof FilterExecutionContext, 'filterContext must be a FilterExecutionContext');
     assert(prop != null && typeof prop === 'string', 'prop must be a non-null string');
     assert(op != null && typeof op === 'string', 'op must be a non-null string');
@@ -223,35 +223,35 @@ class CountryCodeServices extends CodeSystemProvider {
     }
   }
 
-  async executeFilters(opContext, filterContext) {
-    this._ensureOpContext(opContext);
+  async executeFilters(filterContext) {
+    
     assert(filterContext && filterContext instanceof FilterExecutionContext, 'filterContext must be a FilterExecutionContext');
     return filterContext.filters;
   }
 
-  async filterSize(opContext, filterContext, set) {
-    this._ensureOpContext(opContext);
+  async filterSize(filterContext, set) {
+    
     assert(filterContext && filterContext instanceof FilterExecutionContext, 'filterContext must be a FilterExecutionContext');
     assert(set && set instanceof CountryCodeConceptFilter, 'set must be a CountryCodeConceptFilter');
     return set.list.length;
   }
 
-  async filtersNotClosed(opContext, filterContext) {
-    this._ensureOpContext(opContext);
+  async filtersNotClosed(filterContext) {
+    
     assert(filterContext && filterContext instanceof FilterExecutionContext, 'filterContext must be a FilterExecutionContext');
     return false; // Finite set
   }
 
-  async filterMore(opContext, filterContext, set) {
-    this._ensureOpContext(opContext);
+  async filterMore(filterContext, set) {
+    
     assert(filterContext && filterContext instanceof FilterExecutionContext, 'filterContext must be a FilterExecutionContext');
     assert(set && set instanceof CountryCodeConceptFilter, 'set must be a CountryCodeConceptFilter');
     set.cursor++;
     return set.cursor < set.list.length;
   }
 
-  async filterConcept(opContext, filterContext, set) {
-    this._ensureOpContext(opContext);
+  async filterConcept(filterContext, set) {
+    
     assert(filterContext && filterContext instanceof FilterExecutionContext, 'filterContext must be a FilterExecutionContext');
     assert(set && set instanceof CountryCodeConceptFilter, 'set must be a CountryCodeConceptFilter');
     if (set.cursor >= 0 && set.cursor < set.list.length) {
@@ -260,8 +260,8 @@ class CountryCodeServices extends CodeSystemProvider {
     return null;
   }
 
-  async filterLocate(opContext, filterContext, set, code) {
-    this._ensureOpContext(opContext);
+  async filterLocate(filterContext, set, code) {
+    
     assert(filterContext && filterContext instanceof FilterExecutionContext, 'filterContext must be a FilterExecutionContext');
     assert(set && set instanceof CountryCodeConceptFilter, 'set must be a CountryCodeConceptFilter');
     assert(typeof code === 'string', 'code must be non-null string');
@@ -275,22 +275,22 @@ class CountryCodeServices extends CodeSystemProvider {
     return `Code '${code}' not found in filter set`;
   }
 
-  async filterCheck(opContext, filterContext, set, concept) {
-    this._ensureOpContext(opContext);
+  async filterCheck(filterContext, set, concept) {
+    
     assert(filterContext && filterContext instanceof FilterExecutionContext, 'filterContext must be a FilterExecutionContext');
     assert(set && set instanceof CountryCodeConceptFilter, 'set must be a CountryCodeConceptFilter');
-    const ctxt = await this.#ensureContext(opContext, concept);
+    const ctxt = await this.#ensureContext(concept);
     return set.list.includes(ctxt);
   }
 
-  async filterFinish(opContext, filterContext) {
-    this._ensureOpContext(opContext);
+  async filterFinish(filterContext) {
+    
     // No cleanup needed
   }
 
   // Subsumption
-  async subsumesTest(opContext, codeA, codeB) {
-    this._ensureOpContext(opContext);
+  async subsumesTest(codeA, codeB) {
+    
     return 'not-subsumed'; // No subsumption relationships
   }
 }
@@ -298,20 +298,24 @@ class CountryCodeServices extends CodeSystemProvider {
 class CountryCodeFactoryProvider {
   constructor() {
     this.uses = 0;
-    this.load();
   }
 
   defaultVersion() {
     return '2018';
   }
 
+  // Metadata methods
+  system() {
+    return 'urn:iso:std:iso:3166';
+  }
+
+  version() {
+    return '2018';
+  }
+
   build(opContext, supplements) {
     this.uses++;
-    const provider = new CountryCodeServices(this.codes, this.codeMap);
-    if (supplements && supplements.length > 0) {
-      return provider.cloneWithSupplements(supplements);
-    }
-    return provider;
+    return new CountryCodeServices(opContext, supplements, this.codes, this.codeMap);
   }
 
   useCount() {
@@ -323,7 +327,7 @@ class CountryCodeFactoryProvider {
   }
 
   // Load the hardcoded country code data
-  load() {
+  async load() {
     this.codes = [];
     this.codeMap = new Map();
 

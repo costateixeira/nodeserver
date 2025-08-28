@@ -3,7 +3,7 @@ const path = require('path');
 const sqlite3 = require('sqlite3').verbose();
 const assert = require('assert');
 const { CodeSystem } = require('../library/codesystem');
-const { CodeSystemProvider, Designation } = require('./cs-api');
+const { CodeSystemProvider, Designation, CodeSystemFactoryProvider} = require('./cs-api');
 
 class NdcConcept {
   constructor(code, display, isPackage = false, key = null) {
@@ -21,8 +21,8 @@ class NdcConcept {
 }
 
 class NdcServices extends CodeSystemProvider {
-  constructor(db, supplements, lookupTables, packageCount, productCount, version) {
-    super(supplements);
+  constructor(opContext, supplements, db, lookupTables, packageCount, productCount, version) {
+    super(opContext, supplements);
     this.db = db;
     this._version = version;
     this._lookupTables = lookupTables;
@@ -43,7 +43,7 @@ class NdcServices extends CodeSystemProvider {
     return 'http://hl7.org/fhir/sid/ndc'; // NDC system URI
   }
 
-  async version() {
+  version() {
     return this._version;
   }
 
@@ -68,21 +68,21 @@ class NdcServices extends CodeSystemProvider {
   }
 
   // Core concept methods
-  async code(opContext, code) {
-    this._ensureOpContext(opContext);
-    const ctxt = await this.#ensureContext(opContext, code);
+  async code(code) {
+    
+    const ctxt = await this.#ensureContext(code);
     return ctxt ? ctxt.code : null;
   }
 
-  async display(opContext, code) {
-    this._ensureOpContext(opContext);
-    const ctxt = await this.#ensureContext(opContext, code);
+  async display(code) {
+    
+    const ctxt = await this.#ensureContext(code);
     if (!ctxt) {
       return null;
     }
 
     // Check supplements first
-    let disp = this._displayFromSupplements(opContext, ctxt.code);
+    let disp = this._displayFromSupplements(ctxt.code);
     if (disp) {
       return disp;
     }
@@ -90,33 +90,33 @@ class NdcServices extends CodeSystemProvider {
     return ctxt.display ? ctxt.display.trim() : '';
   }
 
-  async definition(opContext, code) {
-    this._ensureOpContext(opContext);
-    const ctxt = await this.#ensureContext(opContext, code);
+  async definition(code) {
+    
+    const ctxt = await this.#ensureContext(code);
     return null; // No definitions provided in NDC
   }
 
-  async isAbstract(opContext, code) {
-    this._ensureOpContext(opContext);
-    const ctxt = await this.#ensureContext(opContext, code);
+  async isAbstract(code) {
+    
+    const ctxt = await this.#ensureContext(code);
     return false; // No abstract concepts in NDC
   }
 
-  async isInactive(opContext, code) {
-    this._ensureOpContext(opContext);
-    const ctxt = await this.#ensureContext(opContext, code);
+  async isInactive(code) {
+    
+    const ctxt = await this.#ensureContext(code);
     return ctxt ? !ctxt.active : false;
   }
 
-  async isDeprecated(opContext, code) {
-    this._ensureOpContext(opContext);
-    const ctxt = await this.#ensureContext(opContext, code);
+  async isDeprecated(code) {
+    
+    const ctxt = await this.#ensureContext(code);
     return false; // NDC doesn't track deprecated status separately
   }
 
-  async designations(opContext, code) {
-    this._ensureOpContext(opContext);
-    const ctxt = await this.#ensureContext(opContext, code);
+  async designations(code) {
+    
+    const ctxt = await this.#ensureContext(code);
     let designations = [];
 
     if (ctxt) {
@@ -132,11 +132,11 @@ class NdcServices extends CodeSystemProvider {
     return designations;
   }
 
-  async extendLookup(opContext, ctxt, props, params) {
-    this._ensureOpContext(opContext);
+  async extendLookup(ctxt, props, params) {
+    
 
     if (typeof ctxt === 'string') {
-      const located = await this.locate(opContext, ctxt);
+      const located = await this.locate(ctxt);
       if (!located.context) {
         throw new Error(located.message);
       }
@@ -306,12 +306,12 @@ class NdcServices extends CodeSystemProvider {
     return display.replace(/\s+/g, ' ').trim();
   }
 
-  async #ensureContext(opContext, code) {
+  async #ensureContext(code) {
     if (code == null) {
       return null;
     }
     if (typeof code === 'string') {
-      const ctxt = await this.locate(opContext, code);
+      const ctxt = await this.locate(code);
       if (ctxt.context == null) {
         throw new Error(ctxt.message);
       } else {
@@ -325,8 +325,8 @@ class NdcServices extends CodeSystemProvider {
   }
 
   // Lookup methods
-  async locate(opContext, code) {
-    this._ensureOpContext(opContext);
+  async locate(code) {
+    
     assert(code == null || typeof code === 'string', 'code must be string');
     if (!code) return { context: null, message: 'Empty code' };
 
@@ -397,20 +397,20 @@ class NdcServices extends CodeSystemProvider {
   }
 
   // Filter support for code-type filtering
-  async doesFilter(opContext, prop, op, value) {
-    this._ensureOpContext(opContext);
+  async doesFilter(prop, op, value) {
+    
     return prop === 'code-type' &&
       op === 'equal' &&
       ['10-digit', '11-digit', 'product'].includes(value);
   }
 
-  async getPrepContext(opContext, iterate) {
-    this._ensureOpContext(opContext);
+  async getPrepContext(iterate) {
+    
     return { filters: [] };
   }
 
-  async filter(opContext, filterContext, prop, op, value) {
-    this._ensureOpContext(opContext);
+  async filter(filterContext, prop, op, value) {
+    
 
     if (prop === 'code-type' && op === 'equal') {
       const filter = { type: 'code-type', value: value };
@@ -421,13 +421,13 @@ class NdcServices extends CodeSystemProvider {
     throw new Error(`The filter "${prop} ${op} ${value}" is not supported for NDC`);
   }
 
-  async executeFilters(opContext, filterContext) {
-    this._ensureOpContext(opContext);
+  async executeFilters(filterContext) {
+    
     return filterContext.filters;
   }
 
-  async filterSize(opContext, filterContext, set) {
-    this._ensureOpContext(opContext);
+  async filterSize(filterContext, set) {
+    
 
     return new Promise((resolve, reject) => {
       let sql;
@@ -454,16 +454,16 @@ class NdcServices extends CodeSystemProvider {
     });
   }
 
-  async filterMore(opContext, filterContext, set) {
-    this._ensureOpContext(opContext);
+  async filterMore(filterContext, set) {
+    
     if (!set._iterator) {
       set._iterator = { offset: 0, hasMore: true };
     }
     return set._iterator.hasMore;
   }
 
-  async filterConcept(opContext, filterContext, set) {
-    this._ensureOpContext(opContext);
+  async filterConcept(filterContext, set) {
+    
 
     if (!set._iterator) {
       set._iterator = { offset: 0, hasMore: true };
@@ -522,11 +522,11 @@ class NdcServices extends CodeSystemProvider {
     });
   }
 
-  async filterLocate(opContext, filterContext, set, code) {
-    this._ensureOpContext(opContext);
+  async filterLocate(filterContext, set, code) {
+    
 
     // First locate the code normally
-    const located = await this.locate(opContext, code);
+    const located = await this.locate(code);
     if (!located.context) {
       return located.message;
     }
@@ -548,8 +548,8 @@ class NdcServices extends CodeSystemProvider {
     }
   }
 
-  async filterCheck(opContext, filterContext, set, concept) {
-    this._ensureOpContext(opContext);
+  async filterCheck(filterContext, set, concept) {
+    
 
     if (!(concept instanceof NdcConcept)) {
       return false;
@@ -567,25 +567,26 @@ class NdcServices extends CodeSystemProvider {
     }
   }
 
-  async filterFinish(opContext, filterContext) {
-    this._ensureOpContext(opContext);
+  async filterFinish(filterContext) {
+    
     // Clean up any resources if needed
   }
 
   // Iterator methods - not supported for NDC
-  async iterator(opContext, code) {
-    this._ensureOpContext(opContext);
+  async iterator(code) {
+    
     return null; // No iteration support
   }
 
-  async nextContext(opContext, iteratorContext) {
-    this._ensureOpContext(opContext);
+  async nextContext(iteratorContext) {
+    
     throw new Error('Iteration not supported for NDC codes');
   }
 }
 
-class NdcServicesFactory {
+class NdcServicesFactory extends CodeSystemFactoryProvider {
   constructor(dbPath) {
+    super();
     this.dbPath = dbPath;
     this.uses = 0;
     this._loaded = false;
@@ -595,14 +596,21 @@ class NdcServicesFactory {
     this._version = null;
   }
 
+  system() {
+    return 'http://hl7.org/fhir/sid/ndc'; // NDC system URI
+  }
+
+  version() {
+    return this._version;
+  }
+
   async #ensureLoaded() {
     if (!this._loaded) {
-      await this.#loadData();
-      this._loaded = true;
+      await this.load();
     }
   }
 
-  async #loadData() {
+  async load() {
     // Use temporary database connection for loading
     const tempDb = new sqlite3.Database(this.dbPath);
 
@@ -662,6 +670,7 @@ class NdcServicesFactory {
     } finally {
       tempDb.close();
     }
+    this._loaded = true;
   }
 
   defaultVersion() {
@@ -669,15 +678,15 @@ class NdcServicesFactory {
   }
 
   async build(opContext, supplements) {
-    await this.#ensureLoaded();
+    
     this.recordUse();
 
     // Create fresh database connection for this provider instance
     const db = new sqlite3.Database(this.dbPath);
 
     return new NdcServices(
+      opContext, supplements,
       db,
-      supplements,
       this._lookupTables,
       this._packageCount,
       this._productCount,

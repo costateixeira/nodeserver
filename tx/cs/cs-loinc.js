@@ -4,7 +4,7 @@ const sqlite3 = require('sqlite3').verbose();
 const assert = require('assert');
 const { CodeSystem } = require('../library/codesystem');
 const { Languages, Language } = require('../../library/languages');
-const { CodeSystemProvider, Designation } = require('./cs-api');
+const { CodeSystemProvider, Designation, CodeSystemFactoryProvider} = require('./cs-api');
 
 // Context kinds matching Pascal enum
 const LoincProviderContextKind = {
@@ -96,8 +96,8 @@ class LoincPrep {
 }
 
 class LoincServices extends CodeSystemProvider {
-  constructor(db, supplements, sharedData) {
-    super(supplements);
+  constructor(opContext, supplements, db, sharedData) {
+    super(opContext, supplements);
     this.db = db;
 
     // Shared data from factory
@@ -125,7 +125,7 @@ class LoincServices extends CodeSystemProvider {
     return 'http://loinc.org';
   }
 
-  async version() {
+  version() {
     return this._version;
   }
 
@@ -163,31 +163,31 @@ class LoincServices extends CodeSystemProvider {
   }
 
   // Core concept methods
-  async code(opContext, context) {
-    this._ensureOpContext(opContext);
-    const ctxt = await this.#ensureContext(opContext, context);
+  async code(context) {
+    
+    const ctxt = await this.#ensureContext(context);
     return ctxt ? ctxt.code : null;
   }
 
-  async display(opContext, context) {
-    this._ensureOpContext(opContext);
-    const ctxt = await this.#ensureContext(opContext, context);
+  async display(context) {
+    
+    const ctxt = await this.#ensureContext(context);
     if (!ctxt) {
       return null;
     }
 
     // Check supplements first
-    let disp = this._displayFromSupplements(opContext, ctxt.code);
+    let disp = this._displayFromSupplements(ctxt.code);
     if (disp) {
       return disp;
     }
 
     // Use language-aware display logic
-    if (opContext.langs && !opContext.langs.isEnglishOrNothing()) {
-      const displays = await this.#getDisplaysForContext(ctxt, opContext.langs);
+    if (this.opContext.langs && !this.opContext.langs.isEnglishOrNothing()) {
+      const displays = await this.#getDisplaysForContext(ctxt, this.opContext.langs);
 
       // Try to find exact language match
-      for (const lang of opContext.langs.langs) {
+      for (const lang of this.opContext.langs.langs) {
         for (const display of displays) {
           if (lang.matches(display.language, true)) {
             return display.value;
@@ -196,7 +196,7 @@ class LoincServices extends CodeSystemProvider {
       }
 
       // Try partial language match
-      for (const lang of opContext.langs.langs) {
+      for (const lang of this.opContext.langs.langs) {
         for (const display of displays) {
           if (lang.matches(display.language, false)) {
             return display.value;
@@ -208,29 +208,29 @@ class LoincServices extends CodeSystemProvider {
     return ctxt.desc || '';
   }
 
-  async definition(opContext, context) {
-    this._ensureOpContext(opContext);
+  async definition(context) {
+    
     return null; // LOINC doesn't provide definitions
   }
 
-  async isAbstract(opContext, context) {
-    this._ensureOpContext(opContext);
+  async isAbstract(context) {
+    
     return false; // LOINC codes are not abstract
   }
 
-  async isInactive(opContext, context) {
-    this._ensureOpContext(opContext);
+  async isInactive(context) {
+    
     return false; // Handle via status if needed
   }
 
-  async isDeprecated(opContext, context) {
-    this._ensureOpContext(opContext);
+  async isDeprecated(context) {
+    
     return false; // Handle via status if needed
   }
 
-  async designations(opContext, context) {
-    this._ensureOpContext(opContext);
-    const ctxt = await this.#ensureContext(opContext, context);
+  async designations(context) {
+    
+    const ctxt = await this.#ensureContext(context);
     let designations = [];
 
     if (ctxt) {
@@ -254,11 +254,11 @@ class LoincServices extends CodeSystemProvider {
     return designations;
   }
 
-  async extendLookup(opContext, ctxt, props, params) {
-    this._ensureOpContext(opContext);
+  async extendLookup(ctxt, props, params) {
+    
 
     if (typeof ctxt === 'string') {
-      const located = await this.locate(opContext, ctxt);
+      const located = await this.locate(ctxt);
       if (!located.context) {
         throw new Error(located.message);
       }
@@ -483,12 +483,12 @@ class LoincServices extends CodeSystemProvider {
     });
   }
 
-  async #ensureContext(opContext, context) {
+  async #ensureContext(context) {
     if (context == null) {
       return null;
     }
     if (typeof context === 'string') {
-      const ctxt = await this.locate(opContext, context);
+      const ctxt = await this.locate(context);
       if (ctxt.context == null) {
         throw new Error(ctxt.message);
       } else {
@@ -502,8 +502,8 @@ class LoincServices extends CodeSystemProvider {
   }
 
   // Lookup methods
-  async locate(opContext, code) {
-    this._ensureOpContext(opContext);
+  async locate(code) {
+    
     assert(code == null || typeof code === 'string', 'code must be string');
     if (!code) return { context: null, message: 'Empty code' };
 
@@ -516,15 +516,15 @@ class LoincServices extends CodeSystemProvider {
   }
 
   // Iterator methods
-  async iterator(opContext, context) {
-    this._ensureOpContext(opContext);
+  async iterator(context) {
+    
 
     if (context === null) {
       // Iterate all codes starting from first code
       const keys = Array.from({ length: this.codeList.length - this.firstCodeKey }, (_, i) => i + this.firstCodeKey);
       return new LoincIteratorContext(null, keys);
     } else {
-      const ctxt = await this.#ensureContext(opContext, context);
+      const ctxt = await this.#ensureContext(context);
       if (ctxt.kind === LoincProviderContextKind.PART && ctxt.children) {
         return new LoincIteratorContext(ctxt, Array.from(ctxt.children));
       } else {
@@ -533,8 +533,8 @@ class LoincServices extends CodeSystemProvider {
     }
   }
 
-  async nextContext(opContext, iteratorContext) {
-    this._ensureOpContext(opContext);
+  async nextContext(iteratorContext) {
+    
 
     if (!iteratorContext.more()) {
       return null;
@@ -547,8 +547,8 @@ class LoincServices extends CodeSystemProvider {
   }
 
   // Filter support
-  async doesFilter(opContext, prop, op, value) {
-    this._ensureOpContext(opContext);
+  async doesFilter(prop, op, value) {
+    
 
     // Relationship filters
     if (this.relationships.has(prop) && ['equal', 'in'].includes(op)) {
@@ -589,13 +589,13 @@ class LoincServices extends CodeSystemProvider {
     return false;
   }
 
-  async getPrepContext(opContext, iterate) {
-    this._ensureOpContext(opContext);
+  async getPrepContext(iterate) {
+    
     return new LoincPrep();
   }
 
-  async filter(opContext, filterContext, prop, op, value) {
-    this._ensureOpContext(opContext);
+  async filter(filterContext, prop, op, value) {
+    
 
     const filter = new LoincFilterHolder();
     await this.#executeFilterQuery(prop, op, value, filter);
@@ -738,24 +738,24 @@ class LoincServices extends CodeSystemProvider {
     return str.replace(/'/g, "''");
   }
 
-  async executeFilters(opContext, filterContext) {
-    this._ensureOpContext(opContext);
+  async executeFilters(filterContext) {
+    
     return filterContext.filters;
   }
 
-  async filterSize(opContext, filterContext, set) {
-    this._ensureOpContext(opContext);
+  async filterSize(filterContext, set) {
+    
     return set.keys.length;
   }
 
-  async filterMore(opContext, filterContext, set) {
-    this._ensureOpContext(opContext);
+  async filterMore(filterContext, set) {
+    
     set.cursor = set.cursor || 0;
     return set.cursor < set.keys.length;
   }
 
-  async filterConcept(opContext, filterContext, set) {
-    this._ensureOpContext(opContext);
+  async filterConcept(filterContext, set) {
+    
 
     if (set.cursor >= set.keys.length) {
       return null;
@@ -767,8 +767,8 @@ class LoincServices extends CodeSystemProvider {
     return this.codeList[key];
   }
 
-  async filterLocate(opContext, filterContext, set, code) {
-    this._ensureOpContext(opContext);
+  async filterLocate(filterContext, set, code) {
+    
 
     const context = this.codes.get(code);
     if (!context) {
@@ -787,8 +787,8 @@ class LoincServices extends CodeSystemProvider {
     }
   }
 
-  async filterCheck(opContext, filterContext, set, concept) {
-    this._ensureOpContext(opContext);
+  async filterCheck(filterContext, set, concept) {
+    
 
     if (!(concept instanceof LoincProviderContext)) {
       return false;
@@ -797,47 +797,58 @@ class LoincServices extends CodeSystemProvider {
     return set.hasKey(concept.key);
   }
 
-  async filterFinish(opContext, filterContext) {
-    this._ensureOpContext(opContext);
+  async filterFinish(filterContext) {
+    
     // Clean up resources if needed
   }
 
   // Search filter - placeholder for text search
-  async searchFilter(opContext, filterContext, filter, sort) {
-    this._ensureOpContext(opContext);
+  async searchFilter(filterContext, filter, sort) {
+    
     throw new Error('Text search not implemented yet');
   }
 
   // Subsumption testing
-  async subsumesTest(opContext, codeA, codeB) {
-    this._ensureOpContext(opContext);
+  async subsumesTest(codeA, codeB) {
+    
     return false; // Not implemented yet
   }
 }
 
-class LoincServicesFactory {
+class LoincServicesFactory extends CodeSystemFactoryProvider {
   constructor(dbPath) {
+    super();
     this.dbPath = dbPath;
     this.uses = 0;
     this._loaded = false;
     this._sharedData = null;
   }
 
+  system() {
+    return 'http://loinc.org';
+  }
+
+  version() {
+    return this._sharedData._version;
+  }
+
   async #ensureLoaded() {
     if (!this._loaded) {
-      await this.#loadSharedData();
-      this._loaded = true;
+      await this.load();
     }
   }
 
-  async #loadSharedData() {
+  async load() {
     const db = new sqlite3.Database(this.dbPath);
+
+    // Enable performance optimizations
+    await this.#optimizeDatabase(db);
 
     try {
       this._sharedData = {
         langs: new Map(),
         codes: new Map(),
-        codeList: [null], // Index 0 is null, keys start from 1
+        codeList: [null],
         relationships: new Map(),
         properties: new Map(),
         statusKeys: new Map(),
@@ -847,33 +858,41 @@ class LoincServicesFactory {
         firstCodeKey: 0
       };
 
-      // Load languages
-      await this.#loadLanguages(db);
+      // Load small lookup tables in parallel
+      const [langs, statusCodes, relationships, properties, config] = await Promise.all([
+        this.#loadLanguages(db),
+        this.#loadStatusCodes(db),
+        this.#loadRelationshipTypes(db),
+        this.#loadPropertyTypes(db),
+        this.#loadConfig(db)
+      ]);
 
-      // Load status codes
-      await this.#loadStatusCodes(db);
-
-      // Load relationship types
-      await this.#loadRelationshipTypes(db);
-
-      // Load property types
-      await this.#loadPropertyTypes(db);
-
-      // Load all codes
+      // Load codes (largest operation)
       await this.#loadCodes(db);
 
-      // Load designations cache for some contexts
-      await this.#loadDesignationsCache(db);
-
-      // Load hierarchical relationships
-      await this.#loadHierarchy(db);
-
-      // Load version and root
-      await this.#loadConfig(db);
+      // Load dependent data in parallel
+      await Promise.all([
+        this.#loadDesignationsCache(db),
+        this.#loadHierarchy(db)
+      ]);
 
     } finally {
       db.close();
     }
+    this._loaded = true;
+  }
+
+  async #optimizeDatabase(db) {
+    return new Promise((resolve) => {
+      db.serialize(() => {
+        db.run('PRAGMA journal_mode = WAL');
+        db.run('PRAGMA synchronous = NORMAL');
+        db.run('PRAGMA cache_size = 10000');
+        db.run('PRAGMA temp_store = MEMORY');
+        db.run('PRAGMA mmap_size = 268435456'); // 256MB
+        resolve();
+      });
+    });
   }
 
   async #loadLanguages(db) {
@@ -939,33 +958,36 @@ class LoincServicesFactory {
 
   async #loadCodes(db) {
     return new Promise((resolve, reject) => {
-      db.all('SELECT CodeKey, Code, Type, Description FROM Codes ORDER BY CodeKey ASC', (err, rows) => {
-        if (err) {
-          reject(err);
-        } else {
+      // First get the count to pre-allocate array
+      db.get('SELECT MAX(CodeKey) as maxKey FROM Codes', (err, row) => {
+        if (err) return reject(err);
+
+        // Pre-allocate the array to avoid repeated resizing
+        const maxKey = row.maxKey || 0;
+        this._sharedData.codeList = new Array(maxKey + 1).fill(null);
+
+        // Now load all codes
+        db.all('SELECT CodeKey, Code, Type, Description FROM Codes ORDER BY CodeKey ASC', (err, rows) => {
+          if (err) return reject(err);
+
+          // Batch process rows
           for (const row of rows) {
             const context = new LoincProviderContext(
               row.CodeKey,
-              row.Type - 1, // Convert from 1-based to 0-based enum
+              row.Type - 1,
               row.Code,
               row.Description
             );
 
             this._sharedData.codes.set(row.Code, context);
-
-            // Extend codeList array if needed
-            while (this._sharedData.codeList.length <= row.CodeKey) {
-              this._sharedData.codeList.push(null);
-            }
             this._sharedData.codeList[row.CodeKey] = context;
 
-            // Track first code key
             if (this._sharedData.firstCodeKey === 0 && context.kind === LoincProviderContextKind.CODE) {
               this._sharedData.firstCodeKey = context.key;
             }
           }
           resolve();
-        }
+        });
       });
     });
   }
@@ -973,26 +995,39 @@ class LoincServicesFactory {
   async #loadDesignationsCache(db) {
     return new Promise((resolve, reject) => {
       const sql = `
-          SELECT Languages.Code as Lang, CodeKey as Key, DescriptionTypes.Description as DType, Value
-          FROM Descriptions, Languages, DescriptionTypes
-          WHERE Descriptions.DescriptionTypeKey != 4
-            AND Descriptions.DescriptionTypeKey = DescriptionTypes.DescriptionTypeKey
-            AND Descriptions.LanguageKey = Languages.LanguageKey
+          SELECT
+              d.CodeKey,
+              l.Code as Lang,
+              dt.Description as DType,
+              d.Value,
+              dt.Description = 'LONG_COMMON_NAME' as IsDisplay
+          FROM Descriptions d
+                   JOIN Languages l ON d.LanguageKey = l.LanguageKey
+                   JOIN DescriptionTypes dt ON d.DescriptionTypeKey = dt.DescriptionTypeKey
+          WHERE d.DescriptionTypeKey != 4
+          ORDER BY d.CodeKey
       `;
 
       db.all(sql, (err, rows) => {
-        if (err) {
-          reject(err);
-        } else {
-          for (const row of rows) {
-            const context = this._sharedData.codeList[row.Key];
-            if (context) {
-              const isDisplay = row.DType === 'LONG_COMMON_NAME';
-              context.displays.push(new DescriptionCacheEntry(isDisplay, row.Lang, row.Value));
-            }
+        if (err) return reject(err);
+
+        // Batch process by CodeKey to reduce lookups
+        let currentKey = null;
+        let currentContext = null;
+
+        for (const row of rows) {
+          if (row.CodeKey !== currentKey) {
+            currentKey = row.CodeKey;
+            currentContext = this._sharedData.codeList[currentKey];
           }
-          resolve();
+
+          if (currentContext) {
+            currentContext.displays.push(
+              new DescriptionCacheEntry(row.IsDisplay, row.Lang, row.Value)
+            );
+          }
         }
+        resolve();
       });
     });
   }
@@ -1057,7 +1092,7 @@ class LoincServicesFactory {
     // Create fresh database connection for this provider instance
     const db = new sqlite3.Database(this.dbPath);
 
-    return new LoincServices(db, supplements, this._sharedData);
+    return new LoincServices(opContext, supplements, db, this._sharedData);
   }
 
   useCount() {

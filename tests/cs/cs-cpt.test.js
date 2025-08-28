@@ -2,12 +2,12 @@ const fs = require('fs');
 const path = require('path');
 const { CPTServices, CPTServicesFactory, CPTConcept, CPTExpression } = require('../../tx/cs/cs-cpt');
 const { TxOperationContext } = require('../../tx/cs/cs-api');
+const {Languages} = require("../../library/languages");
 
 describe('CPT Provider', () => {
   const testDbPath = path.resolve(__dirname, '../../tx/data/cpt-fragment.db');
   let factory;
   let provider;
-  let opContext;
 
   // Test data from the fragment database
   const testData = {
@@ -61,8 +61,7 @@ describe('CPT Provider', () => {
 
     // Create factory and provider
     factory = new CPTServicesFactory(testDbPath);
-    provider = await factory.build(null, []);
-    opContext = new TxOperationContext('en');
+    provider = await factory.build(new TxOperationContext('en'), []);
   });
 
   afterAll(() => {
@@ -116,7 +115,7 @@ describe('CPT Provider', () => {
   describe('Code Lookup', () => {
     test('should locate all known codes', async () => {
       for (const code of testData.allCodes) {
-        const result = await provider.locate(opContext, code);
+        const result = await provider.locate(code);
         expect(result.context).toBeDefined();
         expect(result.context).toBeInstanceOf(CPTConcept);
         expect(result.context.code).toBe(code);
@@ -126,26 +125,26 @@ describe('CPT Provider', () => {
     });
 
     test('should return null for non-existent code', async () => {
-      const result = await provider.locate(opContext, '99999');
+      const result = await provider.locate('99999');
       expect(result.context).toBeNull();
       expect(result.message).toContain('not found');
     });
 
     test('should return correct code for context', async () => {
       const testCode = testData.allCodes[0];
-      const result = await provider.locate(opContext, testCode);
-      const code = await provider.code(opContext, result.context);
+      const result = await provider.locate(testCode);
+      const code = await provider.code(result.context);
       expect(code).toBe(testCode);
     });
 
     test('should distinguish base codes from modifiers', async () => {
       for (const code of testData.baseCodes) {
-        const result = await provider.locate(opContext, code);
+        const result = await provider.locate(code);
         expect(result.context.modifier).toBe(false);
       }
 
       for (const code of testData.modifierCodes) {
-        const result = await provider.locate(opContext, code);
+        const result = await provider.locate(code);
         expect(result.context.modifier).toBe(true);
       }
     });
@@ -154,7 +153,7 @@ describe('CPT Provider', () => {
   describe('Displays and Designations', () => {
     test('should get display for codes', async () => {
       for (const [code, expectedDisplay] of Object.entries(testData.designations)) {
-        const display = await provider.display(opContext, code);
+        const display = await provider.display(code);
         expect(display).toBe(expectedDisplay);
         console.log(`✓ Display for ${code}: ${display.substring(0, 50)}...`);
       }
@@ -162,7 +161,7 @@ describe('CPT Provider', () => {
 
     test('should return designations for codes', async () => {
       for (const code of testData.allCodes) {
-        const designations = await provider.designations(opContext, code);
+        const designations = await provider.designations(code);
         expect(Array.isArray(designations)).toBe(true);
         expect(designations.length).toBeGreaterThan(0);
 
@@ -179,25 +178,25 @@ describe('CPT Provider', () => {
     test('should return false for abstract concepts', async () => {
       // Regular codes should not be abstract
       for (const code of ['99202', '99203', '25']) {
-        const result = await provider.locate(opContext, code);
-        const isAbstract = await provider.isAbstract(opContext, result.context);
+        const result = await provider.locate(code);
+        const isAbstract = await provider.isAbstract(result.context);
         expect(isAbstract).toBe(false);
       }
     });
 
     test('should return false for inactive/deprecated concepts', async () => {
       for (const code of testData.allCodes) {
-        const result = await provider.locate(opContext, code);
-        expect(await provider.isInactive(opContext, result.context)).toBe(false);
-        expect(await provider.isDeprecated(opContext, result.context)).toBe(false);
+        const result = await provider.locate(code);
+        expect(await provider.isInactive(result.context)).toBe(false);
+        expect(await provider.isDeprecated(result.context)).toBe(false);
       }
     });
 
     test('should return definition same as display', async () => {
       const testCode = testData.allCodes[0];
-      const result = await provider.locate(opContext, testCode);
-      const display = await provider.display(opContext, result.context);
-      const definition = await provider.definition(opContext, result.context);
+      const result = await provider.locate(testCode);
+      const display = await provider.display(result.context);
+      const definition = await provider.definition(result.context);
       expect(definition).toBe(display);
     });
   });
@@ -206,7 +205,7 @@ describe('CPT Provider', () => {
     test('should extend lookup with properties and designations', async () => {
       for (const code of testData.allCodes) {
         const params = { parameter: [] };
-        await provider.extendLookup(opContext, code, [], params);
+        await provider.extendLookup(code, [], params);
 
         expect(params.parameter).toBeDefined();
         expect(params.parameter.length).toBeGreaterThan(0);
@@ -225,7 +224,7 @@ describe('CPT Provider', () => {
     test('should include concept properties in extended lookup', async () => {
       for (const [code, expectedProps] of Object.entries(testData.properties)) {
         const params = { parameter: [] };
-        await provider.extendLookup(opContext, code, Object.keys(expectedProps), params);
+        await provider.extendLookup(code, Object.keys(expectedProps), params);
 
         // Check for expected properties
         for (const [propName, propValue] of Object.entries(expectedProps)) {
@@ -249,12 +248,12 @@ describe('CPT Provider', () => {
   describe('Expression Parsing', () => {
     test('should parse valid expressions', async () => {
       for (const expression of testData.validExpressions) {
-        const result = await provider.locate(opContext, expression);
+        const result = await provider.locate(expression);
         expect(result.context).toBeDefined();
         expect(result.context).toBeInstanceOf(CPTExpression);
         expect(result.message).toBeNull();
 
-        const code = await provider.code(opContext, result.context);
+        const code = await provider.code(result.context);
         expect(code).toBe(expression);
 
         console.log(`✓ Parsed expression: ${expression}`);
@@ -263,7 +262,7 @@ describe('CPT Provider', () => {
 
     test('should reject expressions with invalid codes', async () => {
       for (const expression of testData.invalidExpressions) {
-        const result = await provider.locate(opContext, expression);
+        const result = await provider.locate(expression);
         expect(result.context).toBeNull();
         expect(result.message).toBeDefined();
         console.log(`✓ Rejected invalid expression: ${expression} - ${result.message}`);
@@ -272,15 +271,15 @@ describe('CPT Provider', () => {
 
     test('should return empty display for expressions', async () => {
       const expression = testData.validExpressions[0];
-      const result = await provider.locate(opContext, expression);
-      const display = await provider.display(opContext, result.context);
+      const result = await provider.locate(expression);
+      const display = await provider.display(result.context);
       expect(display).toBe('');
     });
 
     test('should extend lookup for expressions', async () => {
       const expression = testData.validExpressions[0];
       const params = { parameter: [] };
-      await provider.extendLookup(opContext, expression, [], params);
+      await provider.extendLookup(expression, [], params);
 
       expect(params.parameter.length).toBeGreaterThan(0);
 
@@ -297,39 +296,39 @@ describe('CPT Provider', () => {
 
   describe('Filter Support', () => {
     test('should support modifier filter', async () => {
-      expect(await provider.doesFilter(opContext, 'modifier', 'equal', 'true')).toBe(true);
-      expect(await provider.doesFilter(opContext, 'modifier', 'equal', 'false')).toBe(true);
+      expect(await provider.doesFilter('modifier', 'equal', 'true')).toBe(true);
+      expect(await provider.doesFilter('modifier', 'equal', 'false')).toBe(true);
     });
 
     test('should support modified filter', async () => {
-      expect(await provider.doesFilter(opContext, 'modified', 'equal', 'true')).toBe(true);
-      expect(await provider.doesFilter(opContext, 'modified', 'equal', 'false')).toBe(true);
+      expect(await provider.doesFilter('modified', 'equal', 'true')).toBe(true);
+      expect(await provider.doesFilter('modified', 'equal', 'false')).toBe(true);
     });
 
     test('should support kind filter', async () => {
-      expect(await provider.doesFilter(opContext, 'kind', 'equal', 'code')).toBe(true);
-      expect(await provider.doesFilter(opContext, 'kind', 'equal', 'cat-2')).toBe(true);
+      expect(await provider.doesFilter('kind', 'equal', 'code')).toBe(true);
+      expect(await provider.doesFilter('kind', 'equal', 'cat-2')).toBe(true);
     });
 
     test('should reject unsupported filters', async () => {
-      expect(await provider.doesFilter(opContext, 'unsupported', 'equal', 'value')).toBe(false);
-      expect(await provider.doesFilter(opContext, 'modifier', 'regex', 'value')).toBe(false);
+      expect(await provider.doesFilter('unsupported', 'equal', 'value')).toBe(false);
+      expect(await provider.doesFilter('modifier', 'regex', 'value')).toBe(false);
     });
   });
 
   describe('Modifier Filters', () => {
     test('should filter modifier=true', async () => {
-      const filterContext = await provider.getPrepContext(opContext, true);
-      await provider.filter(opContext, filterContext, 'modifier', 'equal', 'true');
-      const filters = await provider.executeFilters(opContext, filterContext);
+      const filterContext = await provider.getPrepContext(true);
+      await provider.filter(filterContext, 'modifier', 'equal', 'true');
+      const filters = await provider.executeFilters(filterContext);
       const filter = filters[0];
 
-      const size = await provider.filterSize(opContext, filterContext, filter);
+      const size = await provider.filterSize(filterContext, filter);
       expect(size).toBe(testData.modifierCodes.length);
 
       const foundCodes = [];
-      while (await provider.filterMore(opContext, filterContext, filter)) {
-        const concept = await provider.filterConcept(opContext, filterContext, filter);
+      while (await provider.filterMore(filterContext, filter)) {
+        const concept = await provider.filterConcept(filterContext, filter);
         foundCodes.push(concept.code);
       }
 
@@ -338,17 +337,17 @@ describe('CPT Provider', () => {
     });
 
     test('should filter modifier=false', async () => {
-      const filterContext = await provider.getPrepContext(opContext, true);
-      await provider.filter(opContext, filterContext, 'modifier', 'equal', 'false');
-      const filters = await provider.executeFilters(opContext, filterContext);
+      const filterContext = await provider.getPrepContext(true);
+      await provider.filter(filterContext, 'modifier', 'equal', 'false');
+      const filters = await provider.executeFilters(filterContext);
       const filter = filters[0];
 
-      const size = await provider.filterSize(opContext, filterContext, filter);
+      const size = await provider.filterSize(filterContext, filter);
       expect(size).toBe(testData.baseCodes.length);
 
       const foundCodes = [];
-      while (await provider.filterMore(opContext, filterContext, filter)) {
-        const concept = await provider.filterConcept(opContext, filterContext, filter);
+      while (await provider.filterMore(filterContext, filter)) {
+        const concept = await provider.filterConcept(filterContext, filter);
         foundCodes.push(concept.code);
       }
 
@@ -359,14 +358,14 @@ describe('CPT Provider', () => {
 
   describe('Kind Filters', () => {
     test('should filter by kind=code', async () => {
-      const filterContext = await provider.getPrepContext(opContext, true);
-      await provider.filter(opContext, filterContext, 'kind', 'equal', 'code');
-      const filters = await provider.executeFilters(opContext, filterContext);
+      const filterContext = await provider.getPrepContext(true);
+      await provider.filter(filterContext, 'kind', 'equal', 'code');
+      const filters = await provider.executeFilters(filterContext);
       const filter = filters[0];
 
       const foundCodes = [];
-      while (await provider.filterMore(opContext, filterContext, filter)) {
-        const concept = await provider.filterConcept(opContext, filterContext, filter);
+      while (await provider.filterMore(filterContext, filter)) {
+        const concept = await provider.filterConcept(filterContext, filter);
         foundCodes.push(concept.code);
       }
 
@@ -378,14 +377,14 @@ describe('CPT Provider', () => {
     });
 
     test('should filter by kind=cat-2', async () => {
-      const filterContext = await provider.getPrepContext(opContext, true);
-      await provider.filter(opContext, filterContext, 'kind', 'equal', 'cat-2');
-      const filters = await provider.executeFilters(opContext, filterContext);
+      const filterContext = await provider.getPrepContext(true);
+      await provider.filter(filterContext, 'kind', 'equal', 'cat-2');
+      const filters = await provider.executeFilters(filterContext);
       const filter = filters[0];
 
       const foundCodes = [];
-      while (await provider.filterMore(opContext, filterContext, filter)) {
-        const concept = await provider.filterConcept(opContext, filterContext, filter);
+      while (await provider.filterMore(filterContext, filter)) {
+        const concept = await provider.filterConcept(filterContext, filter);
         foundCodes.push(concept.code);
       }
 
@@ -395,14 +394,14 @@ describe('CPT Provider', () => {
     });
 
     test('should filter by kind=general', async () => {
-      const filterContext = await provider.getPrepContext(opContext, true);
-      await provider.filter(opContext, filterContext, 'kind', 'equal', 'general');
-      const filters = await provider.executeFilters(opContext, filterContext);
+      const filterContext = await provider.getPrepContext(true);
+      await provider.filter(filterContext, 'kind', 'equal', 'general');
+      const filters = await provider.executeFilters(filterContext);
       const filter = filters[0];
 
       const foundCodes = [];
-      while (await provider.filterMore(opContext, filterContext, filter)) {
-        const concept = await provider.filterConcept(opContext, filterContext, filter);
+      while (await provider.filterMore(filterContext, filter)) {
+        const concept = await provider.filterConcept(filterContext, filter);
         foundCodes.push(concept.code);
       }
 
@@ -414,28 +413,28 @@ describe('CPT Provider', () => {
 
   describe('Modified Filter', () => {
     test('should filter modified=false (all codes)', async () => {
-      const filterContext = await provider.getPrepContext(opContext, true);
-      await provider.filter(opContext, filterContext, 'modified', 'equal', 'false');
-      const filters = await provider.executeFilters(opContext, filterContext);
+      const filterContext = await provider.getPrepContext(true);
+      await provider.filter(filterContext, 'modified', 'equal', 'false');
+      const filters = await provider.executeFilters(filterContext);
       const filter = filters[0];
 
-      const size = await provider.filterSize(opContext, filterContext, filter);
+      const size = await provider.filterSize(filterContext, filter);
       expect(size).toBe(testData.expectedTotalCount);
 
       console.log(`✓ Modified filter (false): ${size} codes (all)`);
     });
 
     test('should filter modified=true (empty)', async () => {
-      const filterContext = await provider.getPrepContext(opContext, true);
-      await provider.filter(opContext, filterContext, 'modified', 'equal', 'true');
-      const filters = await provider.executeFilters(opContext, filterContext);
+      const filterContext = await provider.getPrepContext(true);
+      await provider.filter(filterContext, 'modified', 'equal', 'true');
+      const filters = await provider.executeFilters(filterContext);
       const filter = filters[0];
 
-      const size = await provider.filterSize(opContext, filterContext, filter);
+      const size = await provider.filterSize(filterContext, filter);
       expect(size).toBe(0);
 
       // Should report not closed since it could have infinite results
-      const notClosed = await provider.filtersNotClosed(opContext, filterContext);
+      const notClosed = await provider.filtersNotClosed(filterContext);
       expect(notClosed).toBe(true);
 
       console.log(`✓ Modified filter (true): ${size} codes (empty, not closed)`);
@@ -444,13 +443,13 @@ describe('CPT Provider', () => {
 
   describe('Filter Operations', () => {
     test('should locate codes within filters', async () => {
-      const filterContext = await provider.getPrepContext(opContext, false);
-      await provider.filter(opContext, filterContext, 'modifier', 'equal', 'true');
-      const filters = await provider.executeFilters(opContext, filterContext);
+      const filterContext = await provider.getPrepContext(false);
+      await provider.filter(filterContext, 'modifier', 'equal', 'true');
+      const filters = await provider.executeFilters(filterContext);
       const filter = filters[0];
 
       const testCode = testData.modifierCodes[0];
-      const located = await provider.filterLocate(opContext, filterContext, filter, testCode);
+      const located = await provider.filterLocate(filterContext, filter, testCode);
       expect(located).toBeInstanceOf(CPTConcept);
       expect(located.code).toBe(testCode);
 
@@ -458,31 +457,31 @@ describe('CPT Provider', () => {
     });
 
     test('should check if concepts are in filters', async () => {
-      const filterContext = await provider.getPrepContext(opContext, true);
-      await provider.filter(opContext, filterContext, 'modifier', 'equal', 'false');
-      const filters = await provider.executeFilters(opContext, filterContext);
+      const filterContext = await provider.getPrepContext(true);
+      await provider.filter(filterContext, 'modifier', 'equal', 'false');
+      const filters = await provider.executeFilters(filterContext);
       const filter = filters[0];
 
-      const baseCodeResult = await provider.locate(opContext, testData.baseCodes[0]);
-      const inFilter = await provider.filterCheck(opContext, filterContext, filter, baseCodeResult.context);
+      const baseCodeResult = await provider.locate(testData.baseCodes[0]);
+      const inFilter = await provider.filterCheck(filterContext, filter, baseCodeResult.context);
       expect(inFilter).toBe(true);
 
-      const modifierCodeResult = await provider.locate(opContext, testData.modifierCodes[0]);
-      const notInFilter = await provider.filterCheck(opContext, filterContext, filter, modifierCodeResult.context);
+      const modifierCodeResult = await provider.locate(testData.modifierCodes[0]);
+      const notInFilter = await provider.filterCheck(filterContext, filter, modifierCodeResult.context);
       expect(notInFilter).toBe(false);
 
       console.log(`✓ Filter check working correctly`);
     });
 
     test('should handle expressions in filters', async () => {
-      const filterContext = await provider.getPrepContext(opContext, true);
-      await provider.filter(opContext, filterContext, 'modified', 'equal', 'true');
-      const filters = await provider.executeFilters(opContext, filterContext);
+      const filterContext = await provider.getPrepContext(true);
+      await provider.filter(filterContext, 'modified', 'equal', 'true');
+      const filters = await provider.executeFilters(filterContext);
       const filter = filters[0];
 
       // Expressions should be allowed in non-closed filters
-      const expressionResult = await provider.locate(opContext, testData.validExpressions[0]);
-      const inFilter = await provider.filterCheck(opContext, filterContext, filter, expressionResult.context);
+      const expressionResult = await provider.locate(testData.validExpressions[0]);
+      const inFilter = await provider.filterCheck(filterContext, filter, expressionResult.context);
       expect(inFilter).toBe(true); // Because the filter is not closed
 
       console.log(`✓ Expressions handled correctly in non-closed filters`);
@@ -491,12 +490,12 @@ describe('CPT Provider', () => {
 
   describe('Iterator Support', () => {
     test('should iterate all codes', async () => {
-      const iterator = await provider.iterator(opContext, null);
+      const iterator = await provider.iterator(null);
       expect(iterator).toBeDefined();
 
       const foundCodes = [];
       while (foundCodes.length < testData.expectedTotalCount) {
-        const context = await provider.nextContext(opContext, iterator);
+        const context = await provider.nextContext(iterator);
         if (!context) break;
 
         expect(context).toBeInstanceOf(CPTConcept);
@@ -510,10 +509,10 @@ describe('CPT Provider', () => {
     });
 
     test('should return empty iterator for specific context', async () => {
-      const codeResult = await provider.locate(opContext, testData.allCodes[0]);
-      const iterator = await provider.iterator(opContext, codeResult.context);
+      const codeResult = await provider.locate(testData.allCodes[0]);
+      const iterator = await provider.iterator(codeResult.context);
 
-      const context = await provider.nextContext(opContext, iterator);
+      const context = await provider.nextContext(iterator);
       expect(context).toBeNull();
 
       console.log(`✓ Empty iterator for specific context`);
@@ -521,16 +520,12 @@ describe('CPT Provider', () => {
   });
 
   describe('Error Handling', () => {
-    test('should handle invalid operation context', async () => {
-      await expect(provider.locate(null, '99202')).rejects.toThrow();
-      await expect(provider.locate('invalid', '99202')).rejects.toThrow();
-    });
 
     test('should handle unsupported filters', async () => {
-      const filterContext = await provider.getPrepContext(opContext, true);
+      const filterContext = await provider.getPrepContext(true);
 
       await expect(
-        provider.filter(opContext, filterContext, 'unsupported', 'equal', 'value')
+        provider.filter(filterContext, 'unsupported', 'equal', 'value')
       ).rejects.toThrow('not supported');
     });
 
@@ -538,13 +533,13 @@ describe('CPT Provider', () => {
       const params = { parameter: [] };
 
       await expect(
-        provider.extendLookup(opContext, 'invalid-code', [], params)
+        provider.extendLookup('invalid-code', [], params)
       ).rejects.toThrow();
     });
 
     test('should handle invalid context types', async () => {
       await expect(
-        provider.code(opContext, 'invalid-context')
+        provider.code('invalid-context')
       ).rejects.toThrow('Code \'invalid-context\' not found in CPT');
     });
   });
@@ -554,20 +549,20 @@ describe('CPT Provider', () => {
       // This would require having actual validation data in the test database
       // For now, just test that the parsing mechanism works
       const validExpression = '0001A:1P'; // Cat-2 code with cat-2 modifier
-      const result = await provider.locate(opContext, validExpression);
+      const result = await provider.locate(validExpression);
       expect(result.context).toBeInstanceOf(CPTExpression);
     });
 
     test('should validate telemedicine modifier 95', async () => {
       // Test that 95 can be used with telemedicine-enabled codes
       const expression = '99202:95'; // 99202 has telemedicine=true
-      const result = await provider.locate(opContext, expression);
+      const result = await provider.locate(expression);
       expect(result.context).toBeInstanceOf(CPTExpression);
       console.log(`✓ Telemedicine modifier validation works`);
     });
 
     test('should reject expressions with non-existent modifiers', async () => {
-      const result = await provider.locate(opContext, '99202:XYZ');
+      const result = await provider.locate('99202:XYZ');
       expect(result.context).toBeNull();
       expect(result.message).toContain('not found');
     });
@@ -575,12 +570,12 @@ describe('CPT Provider', () => {
 
   describe('Performance and Cleanup', () => {
     test('should handle filter cleanup', async () => {
-      const filterContext = await provider.getPrepContext(opContext, true);
-      await provider.filter(opContext, filterContext, 'modifier', 'equal', 'true');
-      const filters = await provider.executeFilters(opContext, filterContext);
+      const filterContext = await provider.getPrepContext(true);
+      await provider.filter(filterContext, 'modifier', 'equal', 'true');
+      const filters = await provider.executeFilters(filterContext);
 
       // Should not throw
-      await provider.filterFinish(opContext, filterContext);
+      await provider.filterFinish(filterContext);
       console.log(`✓ Filter cleanup completed successfully`);
     });
 
@@ -604,33 +599,33 @@ describe('CPT Provider', () => {
     test('should handle empty code lookup', async () => {
       // Recreate provider if needed
       if (!provider) {
-        provider = await factory.build(null, []);
+        provider = await factory.build(new TxOperationContext(Languages.fromAcceptLanguage('en')), []);
       }
 
-      const result = await provider.locate(opContext, '');
+      const result = await provider.locate('');
       expect(result.context).toBeNull();
       expect(result.message).toContain('Empty code');
     });
 
     test('should handle null context in various methods', async () => {
-      expect(await provider.code(opContext, null)).toBeNull();
-      expect(await provider.display(opContext, null)).toBeNull();
+      expect(await provider.code(null)).toBeNull();
+      expect(await provider.display(null)).toBeNull();
 
-      const designations = await provider.designations(opContext, null);
+      const designations = await provider.designations(null);
       expect(Array.isArray(designations)).toBe(true);
       expect(designations.length).toBe(0);
     });
 
     test('should handle subsumption test (not implemented)', async () => {
-      const result = await provider.subsumesTest(opContext, '99202', '99203');
+      const result = await provider.subsumesTest('99202', '99203');
       expect(result).toBe(false);
     });
 
     test('should reject search filter (not implemented)', async () => {
-      const filterContext = await provider.getPrepContext(opContext, true);
+      const filterContext = await provider.getPrepContext(true);
 
       await expect(
-        provider.searchFilter(opContext, filterContext, 'test', false)
+        provider.searchFilter(filterContext, 'test', false)
       ).rejects.toThrow('not implemented');
     });
   });

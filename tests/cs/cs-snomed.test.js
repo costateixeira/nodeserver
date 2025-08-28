@@ -497,7 +497,6 @@ describe('SNOMED CT Expression Parser (Standalone Tests)', () => {
 describe('SNOMED CT Subset Validation', () => {
   let factory;
   let provider;
-  let opContext;
 
   // Parse the subset data from the attached file
   const subsetData = parseSubsetData();
@@ -507,8 +506,7 @@ describe('SNOMED CT Subset Validation', () => {
 
     // Create factory and provider
     factory = new SnomedServicesFactory(cacheFilePath);
-    provider = await factory.build(null, []);
-    opContext = new TxOperationContext('en');
+    provider = await factory.build(new TxOperationContext('en'), []);
   });
 
   afterAll(() => {
@@ -600,7 +598,7 @@ describe('SNOMED CT Subset Validation', () => {
       let notFoundCodes = [];
 
       for (const concept of subsetData.concepts) {
-        const result = await provider.locate(opContext, concept.code);
+        const result = await provider.locate(concept.code);
 
         if (result.context) {
           foundCount++;
@@ -611,7 +609,7 @@ describe('SNOMED CT Subset Validation', () => {
           expect(result.message).toBeNull();
 
           // Get and verify display
-          const display = await provider.display(opContext, result.context);
+          const display = await provider.display(result.context);
           expect(display).toBeDefined();
           expect(display.length).toBeGreaterThan(0);
 
@@ -642,19 +640,19 @@ describe('SNOMED CT Subset Validation', () => {
       ];
 
       for (const testCase of testCases) {
-        const result = await provider.locate(opContext, testCase.code);
+        const result = await provider.locate(testCase.code);
 
         if (result.context) {
           // Check that it's active
-          const isInactive = await provider.isInactive(opContext, result.context);
+          const isInactive = await provider.isInactive(result.context);
           expect(isInactive).toBe(false);
 
           // Check that it's not abstract
-          const isAbstract = await provider.isAbstract(opContext, result.context);
+          const isAbstract = await provider.isAbstract(result.context);
           expect(isAbstract).toBe(false);
 
           // Get status
-          const status = await provider.getStatus(opContext, result.context);
+          const status = await provider.getStatus(result.context);
           expect(status).toBe('active');
 
           console.log(`✅ ${testCase.code} (${testCase.expectedType}): active, non-abstract`);
@@ -666,10 +664,10 @@ describe('SNOMED CT Subset Validation', () => {
       const sampleCodes = ['64572001', '86299006', '128045006'];
 
       for (const code of sampleCodes) {
-        const result = await provider.locate(opContext, code);
+        const result = await provider.locate(code);
 
         if (result.context) {
-          const designations = await provider.designations(opContext, result.context);
+          const designations = await provider.designations(result.context);
 
           expect(Array.isArray(designations)).toBe(true);
           expect(designations.length).toBeGreaterThan(0);
@@ -708,18 +706,18 @@ describe('SNOMED CT Subset Validation', () => {
       ];
 
       for (const test of hierarchyTests) {
-        const parentResult = await provider.locate(opContext, test.parent);
-        const childResult = await provider.locate(opContext, test.child);
+        const parentResult = await provider.locate(test.parent);
+        const childResult = await provider.locate(test.child);
 
         if (parentResult.context && childResult.context) {
           // Test subsumption
-          const subsumptionResult = await provider.subsumesTest(opContext, test.parent, test.child);
+          const subsumptionResult = await provider.subsumesTest(test.parent, test.child);
 
           // Should be either 'subsumes' or 'equivalent' (if they're the same)
           expect(['subsumes', 'equivalent']).toContain(subsumptionResult);
 
           // Test locateIsA
-          const locateIsAResult = await provider.locateIsA(opContext, test.child, test.parent, false);
+          const locateIsAResult = await provider.locateIsA(test.child, test.parent, false);
           expect(locateIsAResult.context).toBeDefined();
           expect(locateIsAResult.message).toBeNull();
 
@@ -734,7 +732,7 @@ describe('SNOMED CT Subset Validation', () => {
       const testConcepts = ['64572001', '128045006', '86299006']; // Disease, Cellulitis, Tetralogy of Fallot
 
       for (const code of testConcepts) {
-        const result = await provider.locate(opContext, code);
+        const result = await provider.locate(code);
 
         if (result.context && !result.context.isComplex()) {
           const reference = result.context.getReference();
@@ -779,7 +777,7 @@ describe('SNOMED CT Subset Validation', () => {
 
       for (const test of testExpressions) {
         try {
-          const result = await provider.locate(opContext, test.expression);
+          const result = await provider.locate(test.expression);
 
           if (test.expectedValid) {
             expect(result.context).toBeDefined();
@@ -787,7 +785,7 @@ describe('SNOMED CT Subset Validation', () => {
             expect(result.message).toBeNull();
 
             // Get display for complex expression
-            const display = await provider.display(opContext, result.context);
+            const display = await provider.display(result.context);
             expect(display).toBeDefined();
             expect(display.length).toBeGreaterThan(0);
 
@@ -823,16 +821,16 @@ describe('SNOMED CT Subset Validation', () => {
 
       for (const test of filterTests) {
         try {
-          const supports = await provider.doesFilter(opContext, test.property, test.operator, test.value);
+          const supports = await provider.doesFilter(test.property, test.operator, test.value);
           expect(supports).toBe(true);
 
-          const filterContext = await provider.getPrepContext(opContext, true);
-          await provider.filter(opContext, filterContext, test.property, test.operator, test.value);
+          const filterContext = await provider.getPrepContext(true);
+          await provider.filter(filterContext, test.property, test.operator, test.value);
 
-          const filters = await provider.executeFilters(opContext, filterContext);
+          const filters = await provider.executeFilters(filterContext);
           const filter = filters[0];
 
-          const size = await provider.filterSize(opContext, filterContext, filter);
+          const size = await provider.filterSize(filterContext, filter);
           expect(size).toBeGreaterThan(0);
 
           console.log(`✅ Filter "${test.description}": ${size} results`);
@@ -841,8 +839,8 @@ describe('SNOMED CT Subset Validation', () => {
           let count = 0;
           const maxCheck = Math.min(5, size); // Check first 5 results
 
-          while (await provider.filterMore(opContext, filterContext, filter) && count < maxCheck) {
-            const concept = await provider.filterConcept(opContext, filterContext, filter);
+          while (await provider.filterMore(filterContext, filter) && count < maxCheck) {
+            const concept = await provider.filterConcept(filterContext, filter);
             expect(concept.constructor.name).toBe('SnomedExpressionContext');
             expect(concept.getCode()).toBeDefined();
             count++;
@@ -868,8 +866,8 @@ describe('SNOMED CT Subset Validation', () => {
 
       for (const test of searchTests) {
         try {
-          const filterContext = await provider.getPrepContext(opContext, true);
-          const searchResult = await provider.searchFilter(opContext, filterContext, test.term, null);
+          const filterContext = await provider.getPrepContext(true);
+          const searchResult = await provider.searchFilter(filterContext, test.term, null);
 
           expect(searchResult).toBeDefined();
           expect(searchResult.matches).toBeDefined();
@@ -887,7 +885,7 @@ describe('SNOMED CT Subset Validation', () => {
 
           // Check if expected codes are found (if any exist in dataset)
           for (const expectedCode of test.expectedCodes) {
-            const codeExists = await provider.locate(opContext, expectedCode);
+            const codeExists = await provider.locate(expectedCode);
             if (codeExists.context && !foundCodes.includes(expectedCode)) {
               console.log(`  ! Expected code ${expectedCode} not found in search results`);
             }
@@ -902,7 +900,7 @@ describe('SNOMED CT Subset Validation', () => {
 
   describe('Iterator Validation', () => {
     test('should iterate through root concepts', async () => {
-      const iterator = await provider.iterator(opContext, null);
+      const iterator = await provider.iterator(null);
 
       expect(iterator).toBeDefined();
       expect(iterator.keys).toBeDefined();
@@ -915,14 +913,14 @@ describe('SNOMED CT Subset Validation', () => {
       const maxIterations = Math.min(3, iterator.total);
 
       while (count < maxIterations) {
-        const context = await provider.nextContext(opContext, iterator);
+        const context = await provider.nextContext(iterator);
         if (!context) break;
 
         expect(context.constructor.name).toBe('SnomedExpressionContext');
         expect(context.getReference()).toBeDefined();
 
         // Get display for root concept
-        const display = await provider.display(opContext, context);
+        const display = await provider.display(context);
         console.log(`  Root ${count + 1}: ${context.getCode()} - ${display}`);
 
         count++;
@@ -934,10 +932,10 @@ describe('SNOMED CT Subset Validation', () => {
     test('should iterate concept children', async () => {
       // Use Disease concept which should have children
       const diseaseCode = '64572001';
-      const result = await provider.locate(opContext, diseaseCode);
+      const result = await provider.locate(diseaseCode);
 
       if (result.context) {
-        const iterator = await provider.iterator(opContext, result.context);
+        const iterator = await provider.iterator(result.context);
 
         expect(iterator).toBeDefined();
         console.log(`✅ Disease has ${iterator.total} direct children`);
@@ -947,12 +945,12 @@ describe('SNOMED CT Subset Validation', () => {
         const maxIterations = Math.min(5, iterator.total);
 
         while (count < maxIterations) {
-          const context = await provider.nextContext(opContext, iterator);
+          const context = await provider.nextContext(iterator);
           if (!context) break;
 
           expect(context.constructor.name).toBe('SnomedExpressionContext');
 
-          const display = await provider.display(opContext, context);
+          const display = await provider.display(context);
           console.log(`  Child ${count + 1}: ${context.getCode()} - ${display}`);
 
           count++;
@@ -965,7 +963,7 @@ describe('SNOMED CT Subset Validation', () => {
     test('should have consistent hierarchy data', async () => {
       // Verify that parent-child relationships are consistent
       const testCode = '86299006'; // Tetralogy of Fallot
-      const result = await provider.locate(opContext, testCode);
+      const result = await provider.locate(testCode);
 
       if (result.context && !result.context.isComplex()) {
         const reference = result.context.getReference();
@@ -988,7 +986,7 @@ describe('SNOMED CT Subset Validation', () => {
       const sampleCodes = ['64572001', '128045006', '86299006'];
 
       for (const code of sampleCodes) {
-        const result = await provider.locate(opContext, code);
+        const result = await provider.locate(code);
 
         if (result.context && !result.context.isComplex()) {
           const reference = result.context.getReference();

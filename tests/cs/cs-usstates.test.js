@@ -5,12 +5,11 @@ const { LanguageDefinitions, Languages, Language } = require('../../library/lang
 describe('USStateServices', () => {
   let factory;
   let provider;
-  let opContext;
 
-  beforeEach(() => {
+  beforeEach(async () => {
     factory = new USStateFactoryProvider();
-    provider = factory.build(null, []);
-    opContext = new TxOperationContext(Languages.fromAcceptLanguage('en'));
+    await factory.load();
+    provider = factory.build(new TxOperationContext(Languages.fromAcceptLanguage('en')), []);
   });
 
   describe('Basic Functionality', () => {
@@ -37,75 +36,75 @@ describe('USStateServices', () => {
 
   describe('Code Lookup', () => {
     test('should locate valid state codes', async () => {
-      const result = await provider.locate(opContext, 'CA'); // California
+      const result = await provider.locate('CA'); // California
       expect(result.context).toBeTruthy();
       expect(result.message).toBeNull();
-      expect((await provider.code(opContext, result.context))).toBe('CA');
+      expect((await provider.code(result.context))).toBe('CA');
     });
 
     test('should locate valid territory codes', async () => {
-      const result = await provider.locate(opContext, 'PR'); // Puerto Rico
+      const result = await provider.locate('PR'); // Puerto Rico
       expect(result.context).toBeTruthy();
       expect(result.message).toBeNull();
-      expect((await provider.code(opContext, result.context))).toBe('PR');
+      expect((await provider.code(result.context))).toBe('PR');
     });
 
     test('should locate valid military codes', async () => {
-      const result = await provider.locate(opContext, 'AE'); // Armed Forces Europe
+      const result = await provider.locate('AE'); // Armed Forces Europe
       expect(result.context).toBeTruthy();
       expect(result.message).toBeNull();
-      expect((await provider.code(opContext, result.context))).toBe('AE');
+      expect((await provider.code(result.context))).toBe('AE');
     });
 
     test('should return error for invalid codes', async () => {
-      const result = await provider.locate(opContext, 'ZZ');
+      const result = await provider.locate('ZZ');
       expect(result.context).toBeNull();
       expect(result.message).toContain('not found');
     });
 
     test('should return error for empty codes', async () => {
-      const result = await provider.locate(opContext, '');
+      const result = await provider.locate('');
       expect(result.context).toBeNull();
       expect(result.message).toBe('Empty code');
     });
 
     test('should return correct displays', async () => {
-      const caResult = await provider.locate(opContext, 'CA');
-      const display = await provider.display(opContext, caResult.context);
+      const caResult = await provider.locate('CA');
+      const display = await provider.display(caResult.context);
       expect(display).toBe('California');
 
-      const nyResult = await provider.locate(opContext, 'NY');
-      const nyDisplay = await provider.display(opContext, nyResult.context);
+      const nyResult = await provider.locate('NY');
+      const nyDisplay = await provider.display(nyResult.context);
       expect(nyDisplay).toBe('New York');
     });
 
     test('should return trimmed displays', async () => {
-      const result = await provider.locate(opContext, 'TX');
-      const display = await provider.display(opContext, result.context);
+      const result = await provider.locate('TX');
+      const display = await provider.display(result.context);
       expect(display).toBe('Texas');
       expect(display).not.toMatch(/^\s|\s$/); // No leading/trailing whitespace
     });
 
     test('should throw error for display of invalid code', async () => {
-      await expect(provider.display(opContext, 'ZZ')).rejects.toThrow("US State Code 'ZZ' not found");
+      await expect(provider.display('ZZ')).rejects.toThrow("US State Code 'ZZ' not found");
     });
 
     test('should return null definition', async () => {
-      const result = await provider.locate(opContext, 'CA');
-      const definition = await provider.definition(opContext, result.context);
+      const result = await provider.locate('CA');
+      const definition = await provider.definition(result.context);
       expect(definition).toBeNull();
     });
 
     test('should return false for abstract, inactive, deprecated', async () => {
-      const result = await provider.locate(opContext, 'CA');
-      expect(await provider.isAbstract(opContext, result.context)).toBe(false);
-      expect(await provider.isInactive(opContext, result.context)).toBe(false);
-      expect(await provider.isDeprecated(opContext, result.context)).toBe(false);
+      const result = await provider.locate('CA');
+      expect(await provider.isAbstract(result.context)).toBe(false);
+      expect(await provider.isInactive(result.context)).toBe(false);
+      expect(await provider.isDeprecated(result.context)).toBe(false);
     });
 
     test('should return designations with display', async () => {
-      const result = await provider.locate(opContext, 'CA');
-      const designations = await provider.designations(opContext, result.context);
+      const result = await provider.locate('CA');
+      const designations = await provider.designations(result.context);
       expect(designations).toBeTruthy();
       expect(Array.isArray(designations)).toBe(true);
       expect(designations.length).toBeGreaterThan(0);
@@ -118,46 +117,46 @@ describe('USStateServices', () => {
 
   describe('Iterator Functionality', () => {
     test('should create iterator for all concepts', async () => {
-      const iterator = await provider.iterator(opContext, null);
+      const iterator = await provider.iterator(null);
       expect(iterator).toBeTruthy();
       expect(iterator.index).toBe(0);
       expect(iterator.total).toBe(provider.totalCount());
     });
 
     test('should iterate through concepts', async () => {
-      const iterator = await provider.iterator(opContext, null);
+      const iterator = await provider.iterator(null);
       const concepts = [];
 
       for (let i = 0; i < 10 && i < iterator.total; i++) {
-        const concept = await provider.nextContext(opContext, iterator);
+        const concept = await provider.nextContext(iterator);
         expect(concept).toBeTruthy();
         concepts.push(concept);
       }
 
       expect(concepts.length).toBe(10);
       // Should have different codes
-      const codes = await Promise.all(concepts.map(c => provider.code(opContext, c)));
+      const codes = await Promise.all(concepts.map(c => provider.code(c)));
       expect(new Set(codes).size).toBe(codes.length);
     });
 
     test('should return null when iterator exhausted', async () => {
       const iterator = { index: provider.totalCount(), total: provider.totalCount() };
-      const concept = await provider.nextContext(opContext, iterator);
+      const concept = await provider.nextContext(iterator);
       expect(concept).toBeNull();
     });
 
     test('should return null iterator for specific concept', async () => {
-      const result = await provider.locate(opContext, 'CA');
-      const iterator = await provider.iterator(opContext, result.context);
+      const result = await provider.locate('CA');
+      const iterator = await provider.iterator(result.context);
       expect(iterator).toBeNull();
     });
 
     test('should iterate through all states', async () => {
-      const iterator = await provider.iterator(opContext, null);
+      const iterator = await provider.iterator(null);
       const allConcepts = [];
 
       while (iterator.index < iterator.total) {
-        const concept = await provider.nextContext(opContext, iterator);
+        const concept = await provider.nextContext(iterator);
         if (concept) {
           allConcepts.push(concept);
         }
@@ -166,7 +165,7 @@ describe('USStateServices', () => {
       expect(allConcepts.length).toBe(provider.totalCount());
 
       // Check for some known states
-      const codes = await Promise.all(allConcepts.map(c => provider.code(opContext, c)));
+      const codes = await Promise.all(allConcepts.map(c => provider.code(c)));
       expect(codes).toContain('CA');
       expect(codes).toContain('NY');
       expect(codes).toContain('TX');
@@ -176,8 +175,8 @@ describe('USStateServices', () => {
 
   describe('Subsumption', () => {
     test('should not support subsumption', async () => {
-      expect(await provider.subsumesTest(opContext, 'CA', 'NY')).toBe(false);
-      expect(await provider.subsumesTest(opContext, 'TX', 'FL')).toBe(false);
+      expect(await provider.subsumesTest('CA', 'NY')).toBe(false);
+      expect(await provider.subsumesTest('TX', 'FL')).toBe(false);
     });
   });
 
@@ -186,10 +185,10 @@ describe('USStateServices', () => {
       const factory = new USStateFactoryProvider();
       expect(factory.useCount()).toBe(0);
 
-      factory.build(opContext, []);
+      factory.build(new TxOperationContext(Languages.fromAcceptLanguage('en')), []);
       expect(factory.useCount()).toBe(1);
 
-      factory.build(opContext, []);
+      factory.build(new TxOperationContext(Languages.fromAcceptLanguage('en')), []);
       expect(factory.useCount()).toBe(2);
     });
 
@@ -198,8 +197,8 @@ describe('USStateServices', () => {
     });
 
     test('should build working providers', () => {
-      const provider1 = factory.build(opContext, []);
-      const provider2 = factory.build(opContext, []);
+      const provider1 = factory.build(new TxOperationContext(Languages.fromAcceptLanguage('en')), []);
+      const provider2 = factory.build(new TxOperationContext(Languages.fromAcceptLanguage('en')), []);
 
       expect(provider1).toBeTruthy();
       expect(provider2).toBeTruthy();
@@ -274,10 +273,10 @@ describe('USStateServices', () => {
       ];
 
       for (const [code, expectedDisplay] of states) {
-        const result = await provider.locate(opContext, code);
+        const result = await provider.locate(code);
         expect(result.context).toBeTruthy();
 
-        const display = await provider.display(opContext, result.context);
+        const display = await provider.display(result.context);
         expect(display).toBe(expectedDisplay);
       }
     });
@@ -296,10 +295,10 @@ describe('USStateServices', () => {
       ];
 
       for (const [code, expectedDisplay] of territories) {
-        const result = await provider.locate(opContext, code);
+        const result = await provider.locate(code);
         expect(result.context).toBeTruthy();
 
-        const display = await provider.display(opContext, result.context);
+        const display = await provider.display(result.context);
         expect(display).toBe(expectedDisplay);
       }
     });
@@ -312,10 +311,10 @@ describe('USStateServices', () => {
       ];
 
       for (const [code, expectedDisplay] of military) {
-        const result = await provider.locate(opContext, code);
+        const result = await provider.locate(code);
         expect(result.context).toBeTruthy();
 
-        const display = await provider.display(opContext, result.context);
+        const display = await provider.display(result.context);
         expect(display).toBe(expectedDisplay);
       }
     });
@@ -331,13 +330,13 @@ describe('USStateServices', () => {
     });
 
     test('should return null for null code input', async () => {
-      const result = await provider.locate(opContext, null);
+      const result = await provider.locate(null);
       expect(result.context).toBeNull();
     });
 
     test('should handle case sensitivity', async () => {
       // Should not find lowercase codes
-      const result = await provider.locate(opContext, 'ca');
+      const result = await provider.locate('ca');
       expect(result.context).toBeNull();
       expect(result.message).toContain('not found');
     });
@@ -346,30 +345,30 @@ describe('USStateServices', () => {
   describe('Edge Cases', () => {
     test('should handle repeated lookups correctly', async () => {
       for (let i = 0; i < 5; i++) {
-        const result = await provider.locate(opContext, 'CA');
+        const result = await provider.locate('CA');
         expect(result.context).toBeTruthy();
         expect(result.message).toBeNull();
 
-        const display = await provider.display(opContext, result.context);
+        const display = await provider.display(result.context);
         expect(display).toBe('California');
       }
     });
 
     test('should handle context passing through ensureContext', async () => {
-      const result = await provider.locate(opContext, 'TX');
+      const result = await provider.locate('TX');
       const concept = result.context;
 
       // Pass concept through ensureContext
-      const code1 = await provider.code(opContext, concept);
-      const display1 = await provider.display(opContext, concept);
+      const code1 = await provider.code(concept);
+      const display1 = await provider.display(concept);
 
       expect(code1).toBe('TX');
       expect(display1).toBe('Texas');
     });
 
     test('should handle string codes through ensureContext', async () => {
-      const code = await provider.code(opContext, 'NY');
-      const display = await provider.display(opContext, 'NY');
+      const code = await provider.code('NY');
+      const display = await provider.display('NY');
 
       expect(code).toBe('NY');
       expect(display).toBe('New York');

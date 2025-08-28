@@ -4,7 +4,7 @@ const readline = require('readline');
 const sqlite3 = require('sqlite3').verbose();
 const assert = require('assert');
 const { CodeSystem } = require('../library/codesystem');
-const { CodeSystemProvider, Designation } = require('./cs-api');
+const { CodeSystemProvider, Designation, CodeSystemFactoryProvider} = require('./cs-api');
 
 class UniiConcept {
   constructor(code, display) {
@@ -15,10 +15,10 @@ class UniiConcept {
 }
 
 class UniiServices extends CodeSystemProvider {
-  constructor(db, supplements) {
-    super(supplements);
+  constructor(opContext, supplements, db, version) {
+    super(opContext, supplements);
     this.db = db;
-    this._version = null;
+    this._version = version;
   }
 
   // Clean up database connection when provider is destroyed
@@ -34,10 +34,7 @@ class UniiServices extends CodeSystemProvider {
     return 'http://fdasis.nlm.nih.gov'; // UNII system URI
   }
 
-  async version() {
-    if (this._version === null) {
-      this._version = await this.#getVersion();
-    }
+  version() {
     return this._version;
   }
 
@@ -62,55 +59,55 @@ class UniiServices extends CodeSystemProvider {
   }
 
   // Core concept methods
-  async code(opContext, code) {
-    this._ensureOpContext(opContext);
-    const ctxt = await this.#ensureContext(opContext, code);
+  async code(code) {
+    
+    const ctxt = await this.#ensureContext(code);
     return ctxt ? ctxt.code : null;
   }
 
-  async display(opContext, code) {
-    this._ensureOpContext(opContext);
-    const ctxt = await this.#ensureContext(opContext, code);
+  async display(code) {
+    
+    const ctxt = await this.#ensureContext(code);
     if (!ctxt) {
       return null;
     }
-    if (ctxt.display && opContext.langs.isEnglishOrNothing()) {
+    if (ctxt.display && this.opContext.langs.isEnglishOrNothing()) {
       return ctxt.display.trim();
     }
-    let disp = this._displayFromSupplements(opContext, ctxt.code);
+    let disp = this._displayFromSupplements(ctxt.code);
     if (disp) {
       return disp;
     }
     return ctxt.display ? ctxt.display.trim() : '';
   }
 
-  async definition(opContext, code) {
-    this._ensureOpContext(opContext);
-    const ctxt = await this.#ensureContext(opContext, code);
+  async definition(code) {
+    
+    const ctxt = await this.#ensureContext(code);
     return null; // No definitions provided
   }
 
-  async isAbstract(opContext, code) {
-    this._ensureOpContext(opContext);
-    const ctxt = await this.#ensureContext(opContext, code);
+  async isAbstract(code) {
+    
+    const ctxt = await this.#ensureContext(code);
     return false; // No abstract concepts
   }
 
-  async isInactive(opContext, code) {
-    this._ensureOpContext(opContext);
-    const ctxt = await this.#ensureContext(opContext, code);
+  async isInactive(code) {
+    
+    const ctxt = await this.#ensureContext(code);
     return false; // No inactive concepts
   }
 
-  async isDeprecated(opContext, code) {
-    this._ensureOpContext(opContext);
-    const ctxt = await this.#ensureContext(opContext, code);
+  async isDeprecated(code) {
+    
+    const ctxt = await this.#ensureContext(code);
     return false; // No deprecated concepts
   }
 
-  async designations(opContext, code) {
-    this._ensureOpContext(opContext);
-    const ctxt = await this.#ensureContext(opContext, code);
+  async designations(code) {
+    
+    const ctxt = await this.#ensureContext(code);
     let designations = [];
     if (ctxt != null) {
       // Add main display
@@ -128,12 +125,12 @@ class UniiServices extends CodeSystemProvider {
     return designations;
   }
 
-  async #ensureContext(opContext, code) {
+  async #ensureContext(code) {
     if (code == null) {
       return code;
     }
     if (typeof code === 'string') {
-      const ctxt = await this.locate(opContext, code);
+      const ctxt = await this.locate(code);
       if (ctxt.context == null) {
         throw new Error(ctxt.message);
       } else {
@@ -166,8 +163,8 @@ class UniiServices extends CodeSystemProvider {
   }
 
   // Lookup methods
-  async locate(opContext, code) {
-    this._ensureOpContext(opContext);
+  async locate(code) {
+    
     assert(code == null || typeof code === 'string', 'code must be string');
     if (!code) return { context: null, message: 'Empty code' };
 
@@ -204,32 +201,57 @@ class UniiServices extends CodeSystemProvider {
   }
 
   // Iterator methods - not supported
-  async iterator(opContext, code) {
-    this._ensureOpContext(opContext);
+  async iterator(code) {
+    
     return { index: 0, total: 0 }; // No iteration support
   }
 
-  async nextContext(opContext, iteratorContext) {
-    this._ensureOpContext(opContext);
+  async nextContext(iteratorContext) {
+    
     throw new Error('Iteration not supported for UNII codes');
   }
 
 }
 
-class UniiServicesFactory {
+class UniiServicesFactory extends CodeSystemFactoryProvider {
   constructor(dbPath) {
+    super();
     this.dbPath = dbPath;
     this.uses = 0;
+    this._version = null;
+  }
+
+  async load() {
+    let db = new sqlite3.Database(this.dbPath);
+
+    return new Promise((resolve, reject) => {
+      db.get('SELECT Version FROM UniiVersion', (err, row) => {
+        if (err) {
+          reject(new Error(err));
+        } else {
+          this._version = row ? row.Version : 'unknown';
+          resolve(); // This resolves the Promise
+        }
+      });
+    });
   }
 
   defaultVersion() {
     return 'unknown';
   }
 
+  system() {
+    return 'http://fdasis.nlm.nih.gov'; // UNII system URI
+  }
+
+  version() {
+    return this._version;
+  }
+
   build(opContext, supplements) {
     this.uses++;
 
-    return new UniiServices(new sqlite3.Database(this.dbPath), supplements);
+    return new UniiServices(opContext, supplements, new sqlite3.Database(this.dbPath), this._version);
   }
 
   useCount() {

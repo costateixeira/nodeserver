@@ -1,4 +1,4 @@
-const { CodeSystemProvider, TxOperationContext, Designation, FilterExecutionContext } = require('./cs-api');
+const { CodeSystemProvider, TxOperationContext, Designation, FilterExecutionContext, CodeSystemFactoryProvider} = require('./cs-api');
 const assert = require('assert');
 const { CodeSystem } = require("../library/codesystem");
 
@@ -10,8 +10,8 @@ class USStateConcept {
 }
 
 class USStateServices extends CodeSystemProvider {
-  constructor(codes, codeMap) {
-    super();
+  constructor(opContext, supplements, codes, codeMap) {
+    super(opContext, supplements);
     this.codes = codes || [];
     this.codeMap = codeMap || new Map();
   }
@@ -46,55 +46,55 @@ class USStateServices extends CodeSystemProvider {
   }
 
   // Core concept methods
-  async code(opContext, code) {
-    this._ensureOpContext(opContext);
-    const ctxt = await this.#ensureContext(opContext, code);
+  async code(code) {
+    
+    const ctxt = await this.#ensureContext(code);
     return ctxt ? ctxt.code : null;
   }
 
-  async display(opContext, code) {
-    this._ensureOpContext(opContext);
-    const ctxt = await this.#ensureContext(opContext, code);
+  async display(code) {
+    
+    const ctxt = await this.#ensureContext(code);
     if (!ctxt) {
       return null;
     }
-    if (ctxt.display && opContext.langs.isEnglishOrNothing()) {
+    if (ctxt.display && this.opContext.langs.isEnglishOrNothing()) {
       return ctxt.display.trim();
     }
-    let disp = this._displayFromSupplements(opContext, ctxt.code);
+    let disp = this._displayFromSupplements(ctxt.code);
     if (disp) {
       return disp;
     }
     return ctxt.display ? ctxt.display.trim() : '';
   }
 
-  async definition(opContext, code) {
-    this._ensureOpContext(opContext);
-    const ctxt = await this.#ensureContext(opContext, code);
+  async definition(code) {
+    
+    const ctxt = await this.#ensureContext(code);
     return null; // No definitions provided
   }
 
-  async isAbstract(opContext, code) {
-    this._ensureOpContext(opContext);
-    const ctxt = await this.#ensureContext(opContext, code);
+  async isAbstract(code) {
+    
+    const ctxt = await this.#ensureContext(code);
     return false; // No abstract concepts
   }
 
-  async isInactive(opContext, code) {
-    this._ensureOpContext(opContext);
-    const ctxt = await this.#ensureContext(opContext, code);
+  async isInactive(code) {
+    
+    const ctxt = await this.#ensureContext(code);
     return false; // No inactive concepts
   }
 
-  async isDeprecated(opContext, code) {
-    this._ensureOpContext(opContext);
-    const ctxt = await this.#ensureContext(opContext, code);
+  async isDeprecated(code) {
+    
+    const ctxt = await this.#ensureContext(code);
     return false; // No deprecated concepts
   }
 
-  async designations(opContext, code) {
-    this._ensureOpContext(opContext);
-    const ctxt = await this.#ensureContext(opContext, code);
+  async designations(code) {
+    
+    const ctxt = await this.#ensureContext(code);
     let designations = [];
     if (ctxt != null) {
       designations.push(new Designation('en', CodeSystem.makeUseForDisplay(), ctxt.display));
@@ -103,12 +103,12 @@ class USStateServices extends CodeSystemProvider {
     return designations;
   }
 
-  async #ensureContext(opContext, code) {
+  async #ensureContext(code) {
     if (code == null) {
       return code;
     }
     if (typeof code === 'string') {
-      const ctxt = await this.locate(opContext, code);
+      const ctxt = await this.locate(code);
       if (ctxt.context == null) {
         throw new Error(ctxt.message);
       } else {
@@ -122,8 +122,8 @@ class USStateServices extends CodeSystemProvider {
   }
 
   // Lookup methods
-  async locate(opContext, code) {
-    this._ensureOpContext(opContext);
+  async locate(code) {
+    
     assert(code == null || typeof code === 'string', 'code must be string');
     if (!code) return { context: null, message: 'Empty code' };
 
@@ -135,17 +135,17 @@ class USStateServices extends CodeSystemProvider {
   }
 
   // Iterator methods
-  async iterator(opContext, code) {
-    this._ensureOpContext(opContext);
-    const ctxt = await this.#ensureContext(opContext, code);
+  async iterator(code) {
+    
+    const ctxt = await this.#ensureContext(code);
     if (!ctxt) {
       return { index: 0, total: this.totalCount() };
     }
     return null; // No child iteration
   }
 
-  async nextContext(opContext, iteratorContext) {
-    this._ensureOpContext(opContext);
+  async nextContext(iteratorContext) {
+    
     assert(iteratorContext, 'iteratorContext must be provided');
     if (iteratorContext && iteratorContext.index < iteratorContext.total) {
       const concept = this.codes[iteratorContext.index];
@@ -156,18 +156,18 @@ class USStateServices extends CodeSystemProvider {
   }
 
   // Subsumption
-  async subsumesTest(opContext, codeA, codeB) {
-    this._ensureOpContext(opContext);
+  async subsumesTest(codeA, codeB) {
+    
     return false; // No subsumption relationships
   }
 }
 
-class USStateFactoryProvider {
+class USStateFactoryProvider extends CodeSystemFactoryProvider {
   constructor() {
+    super();
     this.uses = 0;
     this.codes = null;
     this.codeMap = null;
-    this.load();
   }
 
   defaultVersion() {
@@ -176,7 +176,7 @@ class USStateFactoryProvider {
 
   build(opContext, supplements) {
     this.uses++;
-    return new USStateServices(this.codes, this.codeMap);
+    return new USStateServices(opContext, supplements, this.codes, this.codeMap);
   }
 
   useCount() {
@@ -187,7 +187,16 @@ class USStateFactoryProvider {
     this.uses++;
   }
 
-  load() {
+
+  system() {
+    return 'https://www.usps.com/';
+  }
+
+  version() {
+    return null; // No version specified
+  }
+
+  async load() {
     this.codes = [];
     this.codeMap = new Map();
 

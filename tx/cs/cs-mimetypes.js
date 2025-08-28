@@ -1,4 +1,4 @@
-const { CodeSystemProvider, TxOperationContext, Designation, FilterExecutionContext } = require('./cs-api');
+const { CodeSystemProvider, TxOperationContext, Designation, FilterExecutionContext, CodeSystemFactoryProvider} = require('./cs-api');
 const assert = require('assert');
 const { CodeSystem } = require("../library/codesystem");
 
@@ -37,8 +37,8 @@ class MimeTypeConcept {
 }
 
 class MimeTypeServices extends CodeSystemProvider {
-  constructor(supplements) {
-    super(supplements);
+  constructor(opContext, supplements) {
+    super(opContext, supplements);
   }
 
   // Metadata methods
@@ -47,7 +47,7 @@ class MimeTypeServices extends CodeSystemProvider {
   }
 
   version() {
-    return '';
+    return null;
   }
 
   description() {
@@ -71,21 +71,21 @@ class MimeTypeServices extends CodeSystemProvider {
   }
 
   // Core concept methods
-  async code(opContext, code) {
-    this._ensureOpContext(opContext);
-    const ctxt = await this.#ensureContext(opContext, code);
+  async code(code) {
+    
+    const ctxt = await this.#ensureContext(code);
     return ctxt ? ctxt.code : null;
   }
 
-  async display(opContext, code) {
-    this._ensureOpContext(opContext);
-    const ctxt = await this.#ensureContext(opContext, code);
+  async display(code) {
+    
+    const ctxt = await this.#ensureContext(code);
     if (!ctxt) {
       return null;
     }
 
     // Check supplements first
-    const suppDisplay = this._displayFromSupplements(opContext, ctxt.code);
+    const suppDisplay = this._displayFromSupplements(ctxt.code);
     if (suppDisplay) {
       return suppDisplay;
     }
@@ -94,36 +94,36 @@ class MimeTypeServices extends CodeSystemProvider {
     return ctxt.code.trim();
   }
 
-  async definition(opContext, code) {
-    this._ensureOpContext(opContext);
-    const ctxt = await this.#ensureContext(opContext, code);
+  async definition(code) {
+    
+    const ctxt = await this.#ensureContext(code);
     return null; // No definitions provided
   }
 
-  async isAbstract(opContext, code) {
-    this._ensureOpContext(opContext);
-    const ctxt = await this.#ensureContext(opContext, code);
+  async isAbstract(code) {
+    
+    const ctxt = await this.#ensureContext(code);
     return false; // MIME types are not abstract
   }
 
-  async isInactive(opContext, code) {
-    this._ensureOpContext(opContext);
-    const ctxt = await this.#ensureContext(opContext, code);
+  async isInactive(code) {
+    
+    const ctxt = await this.#ensureContext(code);
     return false; // MIME types are not inactive
   }
 
-  async isDeprecated(opContext, code) {
-    this._ensureOpContext(opContext);
-    const ctxt = await this.#ensureContext(opContext, code);
+  async isDeprecated(code) {
+    
+    const ctxt = await this.#ensureContext(code);
     return false; // MIME types are not deprecated
   }
 
-  async designations(opContext, code) {
-    this._ensureOpContext(opContext);
-    const ctxt = await this.#ensureContext(opContext, code);
+  async designations(code) {
+    
+    const ctxt = await this.#ensureContext(code);
     const designations = [];
     if (ctxt != null) {
-      const display = await this.display(opContext, ctxt);
+      const display = await this.display(ctxt);
       if (display) {
         designations.push(new Designation('en', CodeSystem.makeUseForDisplay(), display));
       }
@@ -132,12 +132,12 @@ class MimeTypeServices extends CodeSystemProvider {
     return designations;
   }
 
-  async #ensureContext(opContext, code) {
+  async #ensureContext(code) {
     if (code == null) {
       return code;
     }
     if (typeof code === 'string') {
-      const ctxt = await this.locate(opContext, code);
+      const ctxt = await this.locate(code);
       if (ctxt.context == null) {
         throw new Error(ctxt.message);
       } else {
@@ -151,8 +151,8 @@ class MimeTypeServices extends CodeSystemProvider {
   }
 
   // Lookup methods
-  async locate(opContext, code) {
-    this._ensureOpContext(opContext);
+  async locate(code) {
+    
     assert(code == null || typeof code === 'string', 'code must be string');
     if (!code) return { context: null, message: 'Empty code' };
 
@@ -165,29 +165,38 @@ class MimeTypeServices extends CodeSystemProvider {
   }
 
   // Subsumption - not supported
-  async subsumesTest(opContext, codeA, codeB) {
-    this._ensureOpContext(opContext);
+  async subsumesTest(codeA, codeB) {
+    
     return false; // No subsumption relationships
   }
 
-  async locateIsA(opContext, code, parent) {
-    this._ensureOpContext(opContext);
+  async locateIsA(code, parent) {
+    
     return { context: null, message: 'Subsumption not supported for MIME types' };
   }
 }
 
-class MimeTypeServicesFactory {
+class MimeTypeServicesFactory extends CodeSystemFactoryProvider {
   constructor() {
+    super();
     this.uses = 0;
   }
 
   defaultVersion() {
-    return '';
+    return null;
+  }
+
+  system() {
+    return 'urn:ietf:bcp:13'; // BCP 13 defines MIME types
+  }
+
+  version() {
+    return null;
   }
 
   build(opContext, supplements) {
     this.uses++;
-    return new MimeTypeServices(supplements);
+    return new MimeTypeServices(opContext, supplements);
   }
 
   useCount() {

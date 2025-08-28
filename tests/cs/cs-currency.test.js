@@ -5,12 +5,11 @@ const { LanguageDefinitions, Languages, Language } = require('../../library/lang
 describe('Iso4217Services', () => {
   let factory;
   let provider;
-  let opContext;
 
-  beforeEach(() => {
+  beforeEach(async () => {
     factory = new Iso4217FactoryProvider();
-    provider = factory.build(null, []);
-    opContext = new TxOperationContext(Languages.fromAcceptLanguage('en'));
+    await factory.load();
+    provider = factory.build(new TxOperationContext(Languages.fromAcceptLanguage('en')), []);
   });
 
   describe('Basic Functionality', () => {
@@ -41,21 +40,21 @@ describe('Iso4217Services', () => {
       const majorCurrencies = ['USD', 'EUR', 'GBP', 'JPY', 'CHF', 'CAD', 'AUD'];
 
       for (const code of majorCurrencies) {
-        const result = await provider.locate(opContext, code);
+        const result = await provider.locate(code);
         expect(result.context).toBeTruthy();
         expect(result.message).toBeNull();
-        expect((await provider.code(opContext, result.context))).toBe(code);
+        expect((await provider.code(result.context))).toBe(code);
       }
     });
 
     test('should return error for invalid codes', async () => {
-      const result = await provider.locate(opContext, 'ZZZ');
+      const result = await provider.locate('ZZZ');
       expect(result.context).toBeNull();
       expect(result.message).toContain('not found');
     });
 
     test('should return error for empty codes', async () => {
-      const result = await provider.locate(opContext, '');
+      const result = await provider.locate('');
       expect(result.context).toBeNull();
       expect(result.message).toBe('Empty code');
     });
@@ -70,38 +69,38 @@ describe('Iso4217Services', () => {
       ];
 
       for (const [code, expectedDisplay] of testCases) {
-        const result = await provider.locate(opContext, code);
-        const display = await provider.display(opContext, result.context);
+        const result = await provider.locate(code);
+        const display = await provider.display(result.context);
         expect(display).toBe(expectedDisplay);
       }
     });
 
     test('should return trimmed displays', async () => {
-      const result = await provider.locate(opContext, 'USD');
-      const display = await provider.display(opContext, result.context);
+      const result = await provider.locate('USD');
+      const display = await provider.display(result.context);
       expect(display).not.toMatch(/^\s|\s$/); // No leading/trailing whitespace
     });
 
     test('should throw Error for display of invalid code', async () => {
-      await expect(provider.display(opContext, 'ZZZ')).rejects.toThrow('Currency Code \'ZZZ\' not found');
+      await expect(provider.display('ZZZ')).rejects.toThrow('Currency Code \'ZZZ\' not found');
     });
 
     test('should return null definition', async () => {
-      const result = await provider.locate(opContext, 'USD');
-      const definition = await provider.definition(opContext, result.context);
+      const result = await provider.locate('USD');
+      const definition = await provider.definition(result.context);
       expect(definition).toBeNull();
     });
 
     test('should return false for abstract, inactive, deprecated', async () => {
-      const result = await provider.locate(opContext, 'USD');
-      expect(await provider.isAbstract(opContext, result.context)).toBe(false);
-      expect(await provider.isInactive(opContext, result.context)).toBe(false);
-      expect(await provider.isDeprecated(opContext, result.context)).toBe(false);
+      const result = await provider.locate('USD');
+      expect(await provider.isAbstract(result.context)).toBe(false);
+      expect(await provider.isInactive(result.context)).toBe(false);
+      expect(await provider.isDeprecated(result.context)).toBe(false);
     });
 
     test('should return designations with display', async () => {
-      const result = await provider.locate(opContext, 'USD');
-      const designations = await provider.designations(opContext, result.context);
+      const result = await provider.locate('USD');
+      const designations = await provider.designations(result.context);
       expect(designations).toBeTruthy();
       expect(Array.isArray(designations)).toBe(true);
       expect(designations.length).toBeGreaterThan(0);
@@ -112,7 +111,7 @@ describe('Iso4217Services', () => {
     });
 
     test('should access currency properties', async () => {
-      const result = await provider.locate(opContext, 'USD');
+      const result = await provider.locate('USD');
       const concept = result.context;
 
       expect(concept.code).toBe('USD');
@@ -124,46 +123,46 @@ describe('Iso4217Services', () => {
 
   describe('Iterator Functionality', () => {
     test('should create iterator for all concepts', async () => {
-      const iterator = await provider.iterator(opContext, null);
+      const iterator = await provider.iterator(null);
       expect(iterator).toBeTruthy();
       expect(iterator.index).toBe(0);
       expect(iterator.total).toBe(provider.totalCount());
     });
 
     test('should iterate through concepts', async () => {
-      const iterator = await provider.iterator(opContext, null);
+      const iterator = await provider.iterator(null);
       const concepts = [];
 
       for (let i = 0; i < 10 && i < iterator.total; i++) {
-        const concept = await provider.nextContext(opContext, iterator);
+        const concept = await provider.nextContext(iterator);
         expect(concept).toBeTruthy();
         concepts.push(concept);
       }
 
       expect(concepts.length).toBe(10);
       // Should have different codes
-      const codes = await Promise.all(concepts.map(c => provider.code(opContext, c)));
+      const codes = await Promise.all(concepts.map(c => provider.code(c)));
       expect(new Set(codes).size).toBe(codes.length);
     });
 
     test('should return null when iterator exhausted', async () => {
       const iterator = { index: provider.totalCount(), total: provider.totalCount() };
-      const concept = await provider.nextContext(opContext, iterator);
+      const concept = await provider.nextContext(iterator);
       expect(concept).toBeNull();
     });
 
     test('should return null iterator for specific concept', async () => {
-      const result = await provider.locate(opContext, 'USD');
-      const iterator = await provider.iterator(opContext, result.context);
+      const result = await provider.locate('USD');
+      const iterator = await provider.iterator(result.context);
       expect(iterator).toBeNull();
     });
 
     test('should iterate through all currencies', async () => {
-      const iterator = await provider.iterator(opContext, null);
+      const iterator = await provider.iterator(null);
       const allConcepts = [];
 
       while (iterator.index < iterator.total) {
-        const concept = await provider.nextContext(opContext, iterator);
+        const concept = await provider.nextContext(iterator);
         if (concept) {
           allConcepts.push(concept);
         }
@@ -172,7 +171,7 @@ describe('Iso4217Services', () => {
       expect(allConcepts.length).toBe(provider.totalCount());
 
       // Check for some known currencies
-      const codes = await Promise.all(allConcepts.map(c => provider.code(opContext, c)));
+      const codes = await Promise.all(allConcepts.map(c => provider.code(c)));
       expect(codes).toContain('USD');
       expect(codes).toContain('EUR');
       expect(codes).toContain('JPY');
@@ -182,35 +181,35 @@ describe('Iso4217Services', () => {
 
   describe('Filter Support - Decimals', () => {
     test('should support decimals equals filter', async () => {
-      expect(await provider.doesFilter(opContext, 'decimals', 'equals', '2')).toBe(true);
-      expect(await provider.doesFilter(opContext, 'decimals', 'equals', '0')).toBe(true);
-      expect(await provider.doesFilter(opContext, 'decimals', 'equals', '3')).toBe(true);
+      expect(await provider.doesFilter('decimals', 'equals', '2')).toBe(true);
+      expect(await provider.doesFilter('decimals', 'equals', '0')).toBe(true);
+      expect(await provider.doesFilter('decimals', 'equals', '3')).toBe(true);
     });
 
     test('should not support other filters', async () => {
-      expect(await provider.doesFilter(opContext, 'symbol', 'equals', '$')).toBe(false);
-      expect(await provider.doesFilter(opContext, 'decimals', 'contains', '2')).toBe(false);
-      expect(await provider.doesFilter(opContext, 'display', 'equals', 'Dollar')).toBe(false);
+      expect(await provider.doesFilter('symbol', 'equals', '$')).toBe(false);
+      expect(await provider.doesFilter('decimals', 'contains', '2')).toBe(false);
+      expect(await provider.doesFilter('display', 'equals', 'Dollar')).toBe(false);
     });
 
     test('should throw error for search filter', async () => {
-      const ctxt = await provider.getPrepContext(opContext, false);
+      const ctxt = await provider.getPrepContext(false);
       await expect(
-        provider.searchFilter(opContext, ctxt, 'dollar', false)
+        provider.searchFilter(ctxt, 'dollar', false)
       ).rejects.toThrow('not implemented');
     });
 
     test('should throw error for special filter', async () => {
-      const ctxt = await provider.getPrepContext(opContext, false);
+      const ctxt = await provider.getPrepContext(false);
       await expect(
-        provider.specialFilter(opContext, ctxt, 'test', false)
+        provider.specialFilter(ctxt, 'test', false)
       ).rejects.toThrow('not implemented');
     });
 
     test('should throw error for unsupported filter', async () => {
-      const ctxt = await provider.getPrepContext(opContext, false);
+      const ctxt = await provider.getPrepContext(false);
       await expect(
-        provider.filter(opContext, ctxt, 'symbol', 'equals', '$')
+        provider.filter(ctxt, 'symbol', 'equals', '$')
       ).rejects.toThrow('not supported');
     });
   });
@@ -220,9 +219,9 @@ describe('Iso4217Services', () => {
     let ctxt;
 
     beforeEach(async () => {
-      ctxt = await provider.getPrepContext(opContext, false);
-      await provider.filter(opContext, ctxt, 'decimals', 'equals', '2');
-      const filters = await provider.executeFilters(opContext, ctxt);
+      ctxt = await provider.getPrepContext(false);
+      await provider.filter(ctxt, 'decimals', 'equals', '2');
+      const filters = await provider.executeFilters(ctxt);
       decimalsFilter = filters[0];
     });
 
@@ -233,7 +232,7 @@ describe('Iso4217Services', () => {
     });
 
     test('should return correct filter size for decimals=2', async () => {
-      const size = await provider.filterSize(opContext, ctxt, decimalsFilter);
+      const size = await provider.filterSize(ctxt, decimalsFilter);
       expect(size).toBeGreaterThan(100); // Most currencies have 2 decimals
     });
 
@@ -243,8 +242,8 @@ describe('Iso4217Services', () => {
 
       // Get first 10 currencies
       for (let i = 0; i < 10; i++) {
-        if (await provider.filterMore(opContext, ctxt, decimalsFilter)) {
-          const concept = await provider.filterConcept(opContext, ctxt, decimalsFilter);
+        if (await provider.filterMore(ctxt, decimalsFilter)) {
+          const concept = await provider.filterConcept(ctxt, decimalsFilter);
           expect(concept).toBeTruthy();
           expect(concept.decimals).toBe(2);
           currencies.push(concept);
@@ -259,7 +258,7 @@ describe('Iso4217Services', () => {
     });
 
     test('should locate specific 2-decimal currency in filter', async () => {
-      const result = await provider.filterLocate(opContext, ctxt, decimalsFilter, 'USD');
+      const result = await provider.filterLocate(ctxt, decimalsFilter, 'USD');
       expect(result).toBeTruthy();
       expect(typeof result).not.toBe('string'); // Should not be error message
       expect(result.code).toBe('USD');
@@ -267,7 +266,7 @@ describe('Iso4217Services', () => {
     });
 
     test('should not locate 0-decimal currency in 2-decimal filter', async () => {
-      const result = await provider.filterLocate(opContext, ctxt, decimalsFilter, 'JPY');
+      const result = await provider.filterLocate(ctxt, decimalsFilter, 'JPY');
       expect(typeof result).toBe('string'); // Should be error message
       expect(result).toContain('not found');
     });
@@ -275,10 +274,10 @@ describe('Iso4217Services', () => {
     test('should check if concept is in decimals=2 filter', async () => {
       // Find a 2-decimal currency concept
       decimalsFilter.cursor = -1;
-      await provider.filterMore(opContext, ctxt, decimalsFilter);
-      const currencyConcept = await provider.filterConcept(opContext, ctxt, decimalsFilter);
+      await provider.filterMore(ctxt, decimalsFilter);
+      const currencyConcept = await provider.filterConcept(ctxt, decimalsFilter);
 
-      const isInFilter = await provider.filterCheck(opContext, ctxt, decimalsFilter, currencyConcept);
+      const isInFilter = await provider.filterCheck(ctxt, decimalsFilter, currencyConcept);
       expect(isInFilter).toBe(true);
     });
   });
@@ -288,9 +287,9 @@ describe('Iso4217Services', () => {
     let ctxt;
 
     beforeEach(async () => {
-      ctxt = await provider.getPrepContext(opContext, false);
-      await provider.filter(opContext, ctxt, 'decimals', 'equals', '0');
-      const filters = await provider.executeFilters(opContext, ctxt);
+      ctxt = await provider.getPrepContext(false);
+      await provider.filter(ctxt, 'decimals', 'equals', '0');
+      const filters = await provider.executeFilters(ctxt);
       decimalsFilter = filters[0];
     });
 
@@ -301,7 +300,7 @@ describe('Iso4217Services', () => {
     });
 
     test('should return correct filter size for decimals=0', async () => {
-      const size = await provider.filterSize(opContext, ctxt, decimalsFilter);
+      const size = await provider.filterSize(ctxt, decimalsFilter);
       expect(size).toBeGreaterThan(10); // Several currencies have 0 decimals
       expect(size).toBeLessThan(30); // But not too many
     });
@@ -311,8 +310,8 @@ describe('Iso4217Services', () => {
       decimalsFilter.cursor = -1; // Reset cursor
 
       // Get all 0-decimal currencies
-      while (await provider.filterMore(opContext, ctxt, decimalsFilter)) {
-        const concept = await provider.filterConcept(opContext, ctxt, decimalsFilter);
+      while (await provider.filterMore(ctxt, decimalsFilter)) {
+        const concept = await provider.filterConcept(ctxt, decimalsFilter);
         expect(concept).toBeTruthy();
         expect(concept.decimals).toBe(0);
         currencies.push(concept);
@@ -328,7 +327,7 @@ describe('Iso4217Services', () => {
     });
 
     test('should locate specific 0-decimal currency in filter', async () => {
-      const result = await provider.filterLocate(opContext, ctxt, decimalsFilter, 'JPY');
+      const result = await provider.filterLocate(ctxt, decimalsFilter, 'JPY');
       expect(result).toBeTruthy();
       expect(typeof result).not.toBe('string'); // Should not be error message
       expect(result.code).toBe('JPY');
@@ -336,7 +335,7 @@ describe('Iso4217Services', () => {
     });
 
     test('should not locate 2-decimal currency in 0-decimal filter', async () => {
-      const result = await provider.filterLocate(opContext, ctxt, decimalsFilter, 'USD');
+      const result = await provider.filterLocate(ctxt, decimalsFilter, 'USD');
       expect(typeof result).toBe('string'); // Should be error message
       expect(result).toContain('not found');
     });
@@ -347,9 +346,9 @@ describe('Iso4217Services', () => {
     let ctxt;
 
     beforeEach(async () => {
-      ctxt = await provider.getPrepContext(opContext, false);
-      await provider.filter(opContext, ctxt, 'decimals', 'equals', '3');
-      const filters = await provider.executeFilters(opContext, ctxt);
+      ctxt = await provider.getPrepContext(false);
+      await provider.filter(ctxt, 'decimals', 'equals', '3');
+      const filters = await provider.executeFilters(ctxt);
       decimalsFilter = filters[0];
     });
 
@@ -360,7 +359,7 @@ describe('Iso4217Services', () => {
     });
 
     test('should return correct filter size for decimals=3', async () => {
-      const size = await provider.filterSize(opContext, ctxt, decimalsFilter);
+      const size = await provider.filterSize(ctxt, decimalsFilter);
       expect(size).toBeGreaterThan(3); // Several Middle Eastern currencies
       expect(size).toBeLessThan(10); // But not many
     });
@@ -370,8 +369,8 @@ describe('Iso4217Services', () => {
       decimalsFilter.cursor = -1; // Reset cursor
 
       // Get all 3-decimal currencies
-      while (await provider.filterMore(opContext, ctxt, decimalsFilter)) {
-        const concept = await provider.filterConcept(opContext, ctxt, decimalsFilter);
+      while (await provider.filterMore(ctxt, decimalsFilter)) {
+        const concept = await provider.filterConcept(ctxt, decimalsFilter);
         expect(concept).toBeTruthy();
         expect(concept.decimals).toBe(3);
         currencies.push(concept);
@@ -392,9 +391,9 @@ describe('Iso4217Services', () => {
     let ctxt;
 
     beforeEach(async () => {
-      ctxt = await provider.getPrepContext(opContext, false);
-      await provider.filter(opContext, ctxt, 'decimals', 'equals', '-1');
-      const filters = await provider.executeFilters(opContext, ctxt);
+      ctxt = await provider.getPrepContext(false);
+      await provider.filter(ctxt, 'decimals', 'equals', '-1');
+      const filters = await provider.executeFilters(ctxt);
       decimalsFilter = filters[0];
     });
 
@@ -405,7 +404,7 @@ describe('Iso4217Services', () => {
     });
 
     test('should return correct filter size for decimals=-1', async () => {
-      const size = await provider.filterSize(opContext, ctxt, decimalsFilter);
+      const size = await provider.filterSize(ctxt, decimalsFilter);
       expect(size).toBeGreaterThan(5); // Special currencies and commodities
       expect(size).toBeLessThan(15); // But not many
     });
@@ -415,8 +414,8 @@ describe('Iso4217Services', () => {
       decimalsFilter.cursor = -1; // Reset cursor
 
       // Get all -1-decimal currencies
-      while (await provider.filterMore(opContext, ctxt, decimalsFilter)) {
-        const concept = await provider.filterConcept(opContext, ctxt, decimalsFilter);
+      while (await provider.filterMore(ctxt, decimalsFilter)) {
+        const concept = await provider.filterConcept(ctxt, decimalsFilter);
         expect(concept).toBeTruthy();
         expect(concept.decimals).toBe(-1);
         currencies.push(concept);
@@ -434,9 +433,9 @@ describe('Iso4217Services', () => {
 
   describe('Execute Filters', () => {
     test('should execute single filter', async () => {
-      const ctxt = await provider.getPrepContext(opContext, false);
-      await provider.filter(opContext, ctxt, 'decimals', 'equals', '2');
-      const results = await provider.executeFilters(opContext, ctxt);
+      const ctxt = await provider.getPrepContext(false);
+      await provider.filter(ctxt, 'decimals', 'equals', '2');
+      const results = await provider.executeFilters(ctxt);
 
       expect(results).toBeTruthy();
       expect(Array.isArray(results)).toBe(true);
@@ -444,25 +443,25 @@ describe('Iso4217Services', () => {
     });
 
     test('should return empty array for no filters', async () => {
-      const ctxt = await provider.getPrepContext(opContext, false);
-      const results = await provider.executeFilters(opContext, ctxt);
+      const ctxt = await provider.getPrepContext(false);
+      const results = await provider.executeFilters(ctxt);
       expect(results).toEqual([]);
     });
 
     test('should indicate filters are closed', async () => {
-      const ctxt = await provider.getPrepContext(opContext, false);
-      expect(await provider.filtersNotClosed(opContext, ctxt)).toBe(false);
+      const ctxt = await provider.getPrepContext(false);
+      expect(await provider.filtersNotClosed(ctxt)).toBe(false);
     });
   });
 
   describe('Subsumption - Not Supported', () => {
     test('should not support subsumption', async () => {
-      expect(await provider.subsumesTest(opContext, 'USD', 'EUR')).toBe(false);
-      expect(await provider.subsumesTest(opContext, 'GBP', 'JPY')).toBe(false);
+      expect(await provider.subsumesTest('USD', 'EUR')).toBe(false);
+      expect(await provider.subsumesTest('GBP', 'JPY')).toBe(false);
     });
 
     test('should return error for locateIsA', async () => {
-      const result = await provider.locateIsA(opContext, 'USD', 'EUR');
+      const result = await provider.locateIsA('USD', 'EUR');
       expect(result.context).toBeNull();
       expect(result.message).toContain('not supported');
     });
@@ -473,10 +472,10 @@ describe('Iso4217Services', () => {
       const factory = new Iso4217FactoryProvider();
       expect(factory.useCount()).toBe(0);
 
-      factory.build(opContext, []);
+      factory.build(new TxOperationContext(Languages.fromAcceptLanguage('en')), []);
       expect(factory.useCount()).toBe(1);
 
-      factory.build(opContext, []);
+      factory.build(new TxOperationContext(Languages.fromAcceptLanguage('en')), []);
       expect(factory.useCount()).toBe(2);
     });
 
@@ -485,8 +484,8 @@ describe('Iso4217Services', () => {
     });
 
     test('should build working providers', () => {
-      const provider1 = factory.build(opContext, []);
-      const provider2 = factory.build(opContext, []);
+      const provider1 = factory.build(new TxOperationContext(Languages.fromAcceptLanguage('en')), []);
+      const provider2 = factory.build(new TxOperationContext(Languages.fromAcceptLanguage('en')), []);
 
       expect(provider1).toBeTruthy();
       expect(provider2).toBeTruthy();
@@ -518,10 +517,10 @@ describe('Iso4217Services', () => {
       ];
 
       for (const [code, expectedDisplay, expectedDecimals, expectedSymbol] of majorCurrencies) {
-        const result = await provider.locate(opContext, code);
+        const result = await provider.locate(code);
         expect(result.context).toBeTruthy();
 
-        const display = await provider.display(opContext, result.context);
+        const display = await provider.display(result.context);
         expect(display).toBe(expectedDisplay);
         expect(result.context.decimals).toBe(expectedDecimals);
         expect(result.context.symbol).toBe(expectedSymbol);
@@ -537,10 +536,10 @@ describe('Iso4217Services', () => {
       ];
 
       for (const [code, expectedDisplay, expectedDecimals] of commodities) {
-        const result = await provider.locate(opContext, code);
+        const result = await provider.locate(code);
         expect(result.context).toBeTruthy();
 
-        const display = await provider.display(opContext, result.context);
+        const display = await provider.display(result.context);
         expect(display).toBe(expectedDisplay);
         expect(result.context.decimals).toBe(expectedDecimals);
       }
@@ -556,10 +555,10 @@ describe('Iso4217Services', () => {
       ];
 
       for (const [code, expectedDisplay, expectedDecimals] of highPrecision) {
-        const result = await provider.locate(opContext, code);
+        const result = await provider.locate(code);
         expect(result.context).toBeTruthy();
 
-        const display = await provider.display(opContext, result.context);
+        const display = await provider.display(result.context);
         expect(display).toBe(expectedDisplay);
         expect(result.context.decimals).toBe(expectedDecimals);
       }
@@ -575,10 +574,10 @@ describe('Iso4217Services', () => {
       ];
 
       for (const [code, expectedDisplay, expectedDecimals] of noDecimalCurrencies) {
-        const result = await provider.locate(opContext, code);
+        const result = await provider.locate(code);
         expect(result.context).toBeTruthy();
 
-        const display = await provider.display(opContext, result.context);
+        const display = await provider.display(result.context);
         expect(display).toBe(expectedDisplay);
         expect(result.context.decimals).toBe(expectedDecimals);
       }
@@ -592,10 +591,10 @@ describe('Iso4217Services', () => {
       ];
 
       for (const [code, expectedDisplay, expectedDecimals] of specialCurrencies) {
-        const result = await provider.locate(opContext, code);
+        const result = await provider.locate(code);
         expect(result.context).toBeTruthy();
 
-        const display = await provider.display(opContext, result.context);
+        const display = await provider.display(result.context);
         expect(display).toBe(expectedDisplay);
         expect(result.context.decimals).toBe(expectedDecimals);
       }
@@ -612,13 +611,13 @@ describe('Iso4217Services', () => {
     });
 
     test('should return null for null code input', async () => {
-      const result = await provider.locate(opContext, null);
+      const result = await provider.locate(null);
       expect(result.context).toBeNull();
     });
 
     test('should handle case sensitivity', async () => {
       // Should not find lowercase codes
-      const result = await provider.locate(opContext, 'usd');
+      const result = await provider.locate('usd');
       expect(result.context).toBeNull();
       expect(result.message).toContain('not found');
     });
@@ -627,30 +626,30 @@ describe('Iso4217Services', () => {
   describe('Edge Cases', () => {
     test('should handle repeated lookups correctly', async () => {
       for (let i = 0; i < 5; i++) {
-        const result = await provider.locate(opContext, 'EUR');
+        const result = await provider.locate('EUR');
         expect(result.context).toBeTruthy();
         expect(result.message).toBeNull();
 
-        const display = await provider.display(opContext, result.context);
+        const display = await provider.display(result.context);
         expect(display).toBe('Euro');
       }
     });
 
     test('should handle context passing through ensureContext', async () => {
-      const result = await provider.locate(opContext, 'GBP');
+      const result = await provider.locate('GBP');
       const concept = result.context;
 
       // Pass concept through ensureContext
-      const code1 = await provider.code(opContext, concept);
-      const display1 = await provider.display(opContext, concept);
+      const code1 = await provider.code(concept);
+      const display1 = await provider.display(concept);
 
       expect(code1).toBe('GBP');
       expect(display1).toBe('Pound sterling');
     });
 
     test('should handle string codes through ensureContext', async () => {
-      const code = await provider.code(opContext, 'JPY');
-      const display = await provider.display(opContext, 'JPY');
+      const code = await provider.code('JPY');
+      const display = await provider.display('JPY');
 
       expect(code).toBe('JPY');
       expect(display).toBe('Japanese yen');
@@ -659,10 +658,10 @@ describe('Iso4217Services', () => {
     test('should handle all decimal categories', async () => {
       // Test that we have currencies in all decimal categories
       const allCurrencies = [];
-      const iterator = await provider.iterator(opContext, null);
+      const iterator = await provider.iterator(null);
 
       while (iterator.index < iterator.total) {
-        const concept = await provider.nextContext(opContext, iterator);
+        const concept = await provider.nextContext(iterator);
         if (concept) {
           allCurrencies.push(concept);
         }
@@ -685,8 +684,8 @@ describe('Iso4217Services', () => {
 
   describe('Filter Cleanup', () => {
     test('should not throw on filter finish', async () => {
-      const ctxt = await provider.getPrepContext(opContext, false);
-      await expect(provider.filterFinish(opContext, ctxt)).resolves.not.toThrow();
+      const ctxt = await provider.getPrepContext(false);
+      await expect(provider.filterFinish(ctxt)).resolves.not.toThrow();
     });
   });
 });

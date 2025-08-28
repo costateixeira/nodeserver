@@ -277,20 +277,16 @@ class ValueSetDatabase {
 
     // Insert systems from compose.include
     if (valueSet.compose?.include) {
-      console.log(`Processing systems for ValueSet ${valueSet.url}`);
       for (const include of valueSet.compose.include) {
         if (include.system) {
           pendingOperations++;
-          console.log(`  Inserting system: ${include.system}`);
 
           db.run(`
             INSERT INTO valueset_systems (valueset_url, system) VALUES (?, ?)
           `, [valueSet.url, include.system], function(err) {
             if (err) {
-              console.error(`Failed to insert system ${include.system}: ${err.message}`);
               operationError(new Error(`Failed to insert system: ${err.message}`));
             } else {
-              console.log(`  Successfully inserted system ${include.system}, changes: ${this.changes}`);
               operationComplete();
             }
           });

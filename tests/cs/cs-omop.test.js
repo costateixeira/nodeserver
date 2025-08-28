@@ -7,7 +7,6 @@ describe('OMOP Provider', () => {
   const testDbPath = path.resolve(__dirname, '../../tx/data/omop-fragment.db');
   let factory;
   let provider;
-  let opContext;
 
   // Test data structure - will be populated dynamically from the database
   const testData = {
@@ -31,8 +30,7 @@ describe('OMOP Provider', () => {
 
     // Create factory and provider
     factory = new OMOPServicesFactory(testDbPath);
-    provider = await factory.build(null, []);
-    opContext = new TxOperationContext('en');
+    provider = await factory.build(new TxOperationContext('en'), []);
 
     // Populate test data by querying the database
     await populateTestData();
@@ -121,15 +119,15 @@ describe('OMOP Provider', () => {
     });
 
     test('should not support iteration (too large)', async () => {
-      await expect(provider.iterator(opContext, null)).rejects.toThrow('too large');
-      await expect(provider.nextContext(opContext, null)).rejects.toThrow('too large');
+      await expect(provider.iterator(null)).rejects.toThrow('too large');
+      await expect(provider.nextContext(null)).rejects.toThrow('too large');
     });
   });
 
   describe('Code Lookup', () => {
     test('should locate known concepts', async () => {
       for (const conceptId of testData.sampleConcepts.slice(0, 5)) {
-        const result = await provider.locate(opContext, conceptId);
+        const result = await provider.locate(conceptId);
         expect(result.context).toBeDefined();
         expect(result.context).toBeInstanceOf(OMOPConcept);
         expect(result.context.code).toBe(conceptId);
@@ -140,7 +138,7 @@ describe('OMOP Provider', () => {
     });
 
     test('should return null for non-existent concept', async () => {
-      const result = await provider.locate(opContext, '999999999');
+      const result = await provider.locate('999999999');
       expect(result.context).toBeNull();
       expect(result.message).toContain('not found');
     });
@@ -148,15 +146,15 @@ describe('OMOP Provider', () => {
     test('should return correct code for context', async () => {
       if (testData.sampleConcepts.length > 0) {
         const testCode = testData.sampleConcepts[0];
-        const result = await provider.locate(opContext, testCode);
-        const code = await provider.code(opContext, result.context);
+        const result = await provider.locate(testCode);
+        const code = await provider.code(result.context);
         expect(code).toBe(testCode);
       }
     });
 
     test('should have concept metadata', async () => {
       if (testData.sampleConcepts.length > 0) {
-        const result = await provider.locate(opContext, testData.sampleConcepts[0]);
+        const result = await provider.locate(testData.sampleConcepts[0]);
         const concept = result.context;
 
         expect(concept.display).toBeDefined();
@@ -173,7 +171,7 @@ describe('OMOP Provider', () => {
   describe('Displays and Designations', () => {
     test('should get display for concepts', async () => {
       for (const conceptId of testData.sampleConcepts.slice(0, 3)) {
-        const display = await provider.display(opContext, conceptId);
+        const display = await provider.display(conceptId);
         expect(display).toBeDefined();
         expect(typeof display).toBe('string');
         expect(display.length).toBeGreaterThan(0);
@@ -184,7 +182,7 @@ describe('OMOP Provider', () => {
 
     test('should return designations for concepts', async () => {
       if (testData.sampleConcepts.length > 0) {
-        const designations = await provider.designations(opContext, testData.sampleConcepts[0]);
+        const designations = await provider.designations(testData.sampleConcepts[0]);
         expect(Array.isArray(designations)).toBe(true);
         expect(designations.length).toBeGreaterThan(0);
 
@@ -206,24 +204,24 @@ describe('OMOP Provider', () => {
   describe('Code Properties', () => {
     test('should return false for abstract concepts', async () => {
       if (testData.sampleConcepts.length > 0) {
-        const result = await provider.locate(opContext, testData.sampleConcepts[0]);
-        const isAbstract = await provider.isAbstract(opContext, result.context);
+        const result = await provider.locate(testData.sampleConcepts[0]);
+        const isAbstract = await provider.isAbstract(result.context);
         expect(isAbstract).toBe(false);
       }
     });
 
     test('should return false for inactive/deprecated concepts', async () => {
       if (testData.sampleConcepts.length > 0) {
-        const result = await provider.locate(opContext, testData.sampleConcepts[0]);
-        expect(await provider.isInactive(opContext, result.context)).toBe(false);
-        expect(await provider.isDeprecated(opContext, result.context)).toBe(false);
+        const result = await provider.locate(testData.sampleConcepts[0]);
+        expect(await provider.isInactive(result.context)).toBe(false);
+        expect(await provider.isDeprecated(result.context)).toBe(false);
       }
     });
 
     test('should return empty definition', async () => {
       if (testData.sampleConcepts.length > 0) {
-        const result = await provider.locate(opContext, testData.sampleConcepts[0]);
-        const definition = await provider.definition(opContext, result.context);
+        const result = await provider.locate(testData.sampleConcepts[0]);
+        const definition = await provider.definition(result.context);
         expect(definition).toBe('');
       }
     });
@@ -236,7 +234,7 @@ describe('OMOP Provider', () => {
         const params = { parameter: [] };
 
         const requestedProps = ['domain-id', 'concept-class-id', 'standard-concept', 'vocabulary-id'];
-        await provider.extendLookup(opContext, conceptId, requestedProps, params);
+        await provider.extendLookup(conceptId, requestedProps, params);
 
         expect(params.parameter).toBeDefined();
         expect(params.parameter.length).toBeGreaterThan(0);
@@ -264,7 +262,7 @@ describe('OMOP Provider', () => {
           'valid-start-date', 'valid-end-date',
           'vocabulary-concept-id', 'invalid-reason'
         ];
-        await provider.extendLookup(opContext, conceptId, extendedProps, params);
+        await provider.extendLookup(conceptId, extendedProps, params);
 
         const properties = params.parameter.filter(p => p.name === 'property');
         console.log(`✓ Extended properties for ${conceptId}: ${properties.length} found`);
@@ -277,7 +275,7 @@ describe('OMOP Provider', () => {
         const params = { parameter: [] };
 
         // Request all properties to potentially capture relationships
-        await provider.extendLookup(opContext, conceptId, [], params);
+        await provider.extendLookup(conceptId, [], params);
 
         const relationships = params.parameter.filter(p =>
           p.name === 'property' &&
@@ -291,13 +289,13 @@ describe('OMOP Provider', () => {
 
   describe('Filter Support', () => {
     test('should support domain filter', async () => {
-      expect(await provider.doesFilter(opContext, 'domain', 'equal', 'Condition')).toBe(true);
-      expect(await provider.doesFilter(opContext, 'domain', 'equal', 'Drug')).toBe(true);
+      expect(await provider.doesFilter('domain', 'equal', 'Condition')).toBe(true);
+      expect(await provider.doesFilter('domain', 'equal', 'Drug')).toBe(true);
     });
 
     test('should reject unsupported filters', async () => {
-      expect(await provider.doesFilter(opContext, 'unsupported', 'equal', 'value')).toBe(false);
-      expect(await provider.doesFilter(opContext, 'domain', 'regex', 'value')).toBe(false);
+      expect(await provider.doesFilter('unsupported', 'equal', 'value')).toBe(false);
+      expect(await provider.doesFilter('domain', 'regex', 'value')).toBe(false);
     });
   });
 
@@ -305,13 +303,13 @@ describe('OMOP Provider', () => {
     test('should filter by domain', async () => {
       if (testData.domains.length > 0) {
         const testDomain = testData.domains[0];
-        const filterContext = await provider.getPrepContext(opContext, true);
+        const filterContext = await provider.getPrepContext(true);
 
-        await provider.filter(opContext, filterContext, 'domain', 'equal', testDomain);
-        const filters = await provider.executeFilters(opContext, filterContext);
+        await provider.filter(filterContext, 'domain', 'equal', testDomain);
+        const filters = await provider.executeFilters(filterContext);
         const filter = filters[0];
 
-        const size = await provider.filterSize(opContext, filterContext, filter);
+        const size = await provider.filterSize(filterContext, filter);
         expect(size).toBeGreaterThanOrEqual(0);
 
         console.log(`✓ Domain filter '${testDomain}': ${size} concepts found`);
@@ -320,8 +318,8 @@ describe('OMOP Provider', () => {
         let count = 0;
         const maxToTest = Math.min(5, size);
 
-        while (await provider.filterMore(opContext, filterContext, filter) && count < maxToTest) {
-          const concept = await provider.filterConcept(opContext, filterContext, filter);
+        while (await provider.filterMore(filterContext, filter) && count < maxToTest) {
+          const concept = await provider.filterConcept(filterContext, filter);
           expect(concept).toBeInstanceOf(OMOPConcept);
           expect(concept.code).toBeDefined();
           expect(concept.display).toBeDefined();
@@ -331,7 +329,7 @@ describe('OMOP Provider', () => {
         expect(count).toBeGreaterThan(0);
         console.log(`  - Iterated ${count} concepts from filter`);
 
-        await provider.filterFinish(opContext, filterContext);
+        await provider.filterFinish(filterContext);
       }
     });
 
@@ -340,17 +338,17 @@ describe('OMOP Provider', () => {
 
       for (let i = 0; i < testedDomains; i++) {
         const domain = testData.domains[i];
-        const filterContext = await provider.getPrepContext(opContext, true);
+        const filterContext = await provider.getPrepContext(true);
 
         try {
-          await provider.filter(opContext, filterContext, 'domain', 'equal', domain);
-          const filters = await provider.executeFilters(opContext, filterContext);
+          await provider.filter(filterContext, 'domain', 'equal', domain);
+          const filters = await provider.executeFilters(filterContext);
           const filter = filters[0];
 
-          const size = await provider.filterSize(opContext, filterContext, filter);
+          const size = await provider.filterSize(filterContext, filter);
           console.log(`✓ Domain '${domain}': ${size} concepts`);
 
-          await provider.filterFinish(opContext, filterContext);
+          await provider.filterFinish(filterContext);
         } catch (error) {
           console.log(`⚠ Domain '${domain}' caused error: ${error.message}`);
         }
@@ -362,31 +360,31 @@ describe('OMOP Provider', () => {
     test('should check if concepts are in domain filters', async () => {
       if (testData.domains.length > 0 && testData.sampleConcepts.length > 0) {
         // Get a concept and its domain
-        const conceptResult = await provider.locate(opContext, testData.sampleConcepts[0]);
+        const conceptResult = await provider.locate(testData.sampleConcepts[0]);
         const concept = conceptResult.context;
 
         if (concept && concept.domain) {
-          const filterContext = await provider.getPrepContext(opContext, true);
-          await provider.filter(opContext, filterContext, 'domain', 'equal', concept.domain);
-          const filters = await provider.executeFilters(opContext, filterContext);
+          const filterContext = await provider.getPrepContext(true);
+          await provider.filter(filterContext, 'domain', 'equal', concept.domain);
+          const filters = await provider.executeFilters(filterContext);
           const filter = filters[0];
 
-          const inFilter = await provider.filterCheck(opContext, filterContext, filter, concept);
+          const inFilter = await provider.filterCheck(filterContext, filter, concept);
           expect(typeof inFilter).toBe('boolean');
 
           console.log(`✓ Concept ${concept.code} in domain '${concept.domain}' filter: ${inFilter}`);
 
-          await provider.filterFinish(opContext, filterContext);
+          await provider.filterFinish(filterContext);
         }
       }
     });
 
     test('should have closed filters', async () => {
       if (testData.domains.length > 0) {
-        const filterContext = await provider.getPrepContext(opContext, true);
-        await provider.filter(opContext, filterContext, 'domain', 'equal', testData.domains[0]);
+        const filterContext = await provider.getPrepContext(true);
+        await provider.filter(filterContext, 'domain', 'equal', testData.domains[0]);
 
-        const notClosed = await provider.filtersNotClosed(opContext, filterContext);
+        const notClosed = await provider.filtersNotClosed(filterContext);
         expect(notClosed).toBe(false);
 
         console.log(`✓ OMOP filters are closed (not infinite)`);
@@ -403,7 +401,7 @@ describe('OMOP Provider', () => {
         };
 
         // Test translation to SNOMED CT
-        const translations = await provider.getTranslations(opContext, coding, 'http://snomed.info/sct');
+        const translations = await provider.getTranslations(coding, 'http://snomed.info/sct');
         expect(Array.isArray(translations)).toBe(true);
 
         console.log(`✓ Translation to SNOMED CT: ${translations.length} results`);
@@ -417,7 +415,7 @@ describe('OMOP Provider', () => {
           code: testData.sampleConcepts[0]
         };
 
-        const translations = await provider.getTranslations(opContext, coding, 'http://unsupported.example.com');
+        const translations = await provider.getTranslations(coding, 'http://unsupported.example.com');
         expect(Array.isArray(translations)).toBe(true);
         expect(translations.length).toBe(0);
       }
@@ -473,16 +471,12 @@ describe('OMOP Provider', () => {
   });
 
   describe('Error Handling', () => {
-    test('should handle invalid operation context', async () => {
-      await expect(provider.locate(null, '123')).rejects.toThrow();
-      await expect(provider.locate('invalid', '123')).rejects.toThrow();
-    });
 
     test('should handle unsupported filters', async () => {
-      const filterContext = await provider.getPrepContext(opContext, true);
+      const filterContext = await provider.getPrepContext(true);
 
       await expect(
-        provider.filter(opContext, filterContext, 'unsupported', 'equal', 'value')
+        provider.filter(filterContext, 'unsupported', 'equal', 'value')
       ).rejects.toThrow('not understood');
     });
 
@@ -490,43 +484,43 @@ describe('OMOP Provider', () => {
       const params = { parameter: [] };
 
       await expect(
-        provider.extendLookup(opContext, 'invalid-concept-id', [], params)
+        provider.extendLookup('invalid-concept-id', [], params)
       ).rejects.toThrow();
     });
 
     test('should handle invalid context types', async () => {
       await expect(
-        provider.code(opContext, 'invalid-context')
+        provider.code('invalid-context')
       ).rejects.toThrow('OMOP Concept \'invalid-context\' not found');
     });
 
     test('should reject unsupported operations', async () => {
-      const filterContext = await provider.getPrepContext(opContext, true);
+      const filterContext = await provider.getPrepContext(true);
 
       await expect(
-        provider.searchFilter(opContext, filterContext, 'test', false)
+        provider.searchFilter(filterContext, 'test', false)
       ).rejects.toThrow('not implemented');
     });
   });
 
   describe('Edge Cases', () => {
     test('should handle empty code lookup', async () => {
-      const result = await provider.locate(opContext, '');
+      const result = await provider.locate('');
       expect(result.context).toBeNull();
       expect(result.message).toContain('Empty code');
     });
 
     test('should handle null context in various methods', async () => {
-      expect(await provider.code(opContext, null)).toBeNull();
-      expect(await provider.display(opContext, null)).toBeNull();
+      expect(await provider.code(null)).toBeNull();
+      expect(await provider.display(null)).toBeNull();
 
-      const designations = await provider.designations(opContext, null);
+      const designations = await provider.designations(null);
       expect(Array.isArray(designations)).toBe(true);
       expect(designations.length).toBe(0);
     });
 
     test('should handle subsumption test (not implemented)', async () => {
-      const result = await provider.subsumesTest(opContext, '123', '456');
+      const result = await provider.subsumesTest('123', '456');
       expect(result).toBe(false);
     });
   });
@@ -537,15 +531,15 @@ describe('OMOP Provider', () => {
       const domainCounts = {};
 
       for (const domain of testData.domains.slice(0, 3)) {
-        const filterContext = await provider.getPrepContext(opContext, true);
-        await provider.filter(opContext, filterContext, 'domain', 'equal', domain);
-        const filters = await provider.executeFilters(opContext, filterContext);
+        const filterContext = await provider.getPrepContext(true);
+        await provider.filter(filterContext, 'domain', 'equal', domain);
+        const filters = await provider.executeFilters(filterContext);
         const filter = filters[0];
 
-        const size = await provider.filterSize(opContext, filterContext, filter);
+        const size = await provider.filterSize(filterContext, filter);
         domainCounts[domain] = size;
 
-        await provider.filterFinish(opContext, filterContext);
+        await provider.filterFinish(filterContext);
       }
 
       console.log('✓ Domain distribution:', domainCounts);
@@ -557,7 +551,7 @@ describe('OMOP Provider', () => {
 
     test('should have valid concept structure', async () => {
       if (testData.sampleConcepts.length > 0) {
-        const result = await provider.locate(opContext, testData.sampleConcepts[0]);
+        const result = await provider.locate(testData.sampleConcepts[0]);
         const concept = result.context;
 
         // Validate concept structure
