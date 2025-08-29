@@ -13,6 +13,7 @@ const PackageCrawler = require('./package-crawler.js');
 const htmlServer = require('../common/html-server');
 
 const Logger = require('../common/logger');
+const {validateParameter} = require("../library/utilities");
 const pckLog = Logger.getInstance().child({ module: 'packages' });
 
 class PackagesModule {
@@ -234,6 +235,7 @@ class PackagesModule {
 
         // Add dependency search
         if (dependency) {
+          validateParameter(dependency, "dependency", String);
           let depQuery;
           if (dependency.includes('#')) {
             depQuery = `${dependency}%`;
