@@ -439,9 +439,7 @@ class RxNormSubsetModule extends BaseTerminologyModule {
       crlfDelay: Infinity
     });
 
-    let lineNum = 0;
     for await (const line of rl) {
-      lineNum++;
       const trimmedLine = line.trim();
 
       // Skip empty lines and comments
@@ -793,7 +791,7 @@ class RxNormSubsetProcessor {
     });
   }
 
-  async processRXNREL(sourcePath, destPath, options) {
+  async processRXNREL(sourcePath, destPath) {
     await this.processRRFFile(sourcePath, destPath, (items) => {
       const rxcui1 = items[0];
       const rxcui2 = items[4];
@@ -803,14 +801,14 @@ class RxNormSubsetProcessor {
     });
   }
 
-  async processRXNSTY(sourcePath, destPath, options) {
+  async processRXNSTY(sourcePath, destPath) {
     await this.processRRFFile(sourcePath, destPath, (items) => {
       const rxcui = items[0];
       return this.targetCodes.has(rxcui);
     });
   }
 
-  async processRXNSAB(sourcePath, destPath, options) {
+  async processRXNSAB(sourcePath, destPath) {
     // For RXNSAB, we need to find which sources are referenced
     // First pass: collect all SABs referenced in target concepts
     const referencedSabs = await this.findReferencedSabs(sourcePath.replace('RXNSAB.RRF', 'RXNCONSO.RRF'));
@@ -821,7 +819,7 @@ class RxNormSubsetProcessor {
     });
   }
 
-  async processRXNCUI(sourcePath, destPath, options) {
+  async processRXNCUI(sourcePath, destPath) {
     await this.processRRFFile(sourcePath, destPath, (items) => {
       const cui1 = items[0];
       const cui2 = items[4];
@@ -831,7 +829,7 @@ class RxNormSubsetProcessor {
     });
   }
 
-  async processRXNATOMARCHIVE(sourcePath, destPath, options) {
+  async processRXNATOMARCHIVE(sourcePath, destPath) {
     await this.processRRFFile(sourcePath, destPath, (items) => {
       const rxcui = items[12]; // RXCUI field in archive
       return rxcui && this.targetCodes.has(rxcui);

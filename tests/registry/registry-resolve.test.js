@@ -3,7 +3,6 @@
 
 const fs = require('fs');
 const path = require('path');
-const { ServerRegistries } = require('../../registry/model');
 const RegistryCrawler = require('../../registry/crawler');
 const RegistryAPI = require('../../registry/api');
 

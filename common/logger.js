@@ -1,6 +1,5 @@
 const winston = require('winston');
 require('winston-daily-rotate-file');
-const path = require('path');
 const fs = require('fs');
 
 class Logger {

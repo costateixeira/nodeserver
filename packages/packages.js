@@ -9,7 +9,6 @@ const sqlite3 = require('sqlite3').verbose();
 const cron = require('node-cron');
 const path = require('path');
 const fs = require('fs');
-const crypto = require('crypto');
 const PackageCrawler = require('./package-crawler.js');
 const htmlServer = require('../common/html-server');
 
@@ -136,14 +135,13 @@ class PackagesModule {
       '=': '&#x3D;'
     };
 
-    return str.replace(/[&<>"'`=\/]/g, (match) => escapeMap[match]);
+    return str.replace(/[&<>"'`=/]/g, (match) => escapeMap[match]);
   }
 
-  // Safe SQL parameter binding
   buildSecureQuery(baseQuery, conditions = []) {
     let query = baseQuery;
     const params = [];
-    
+
     conditions.forEach(condition => {
       if (condition.operator === 'LIKE') {
         query += ` AND ${condition.column} LIKE ?`;
@@ -155,13 +153,15 @@ class PackagesModule {
         const placeholders = condition.values.map(() => '?').join(',');
         query += ` AND ${condition.column} IN (${placeholders})`;
         params.push(...condition.values);
+      } else if (condition.operator === 'IN_SUBQUERY') {
+        query += ` AND ${condition.column} IN (${condition.subquery})`;
+        params.push(condition.value);
       }
     });
-    
+
     return { query, params };
   }
 
-  // Secure package search with parameterized queries
   async searchPackages(params, req = null, secure = false) {
     const {
       name = '',
@@ -191,6 +191,18 @@ class PackagesModule {
           }
         }
 
+        // Add the missing dependency search logic
+        if (dependson) {
+          versioned = dependson.includes('#');
+          // This requires a subquery to PackageDependencies table
+          conditions.push({
+            column: 'PackageVersions.PackageVersionKey',
+            operator: 'IN_SUBQUERY',
+            subquery: 'SELECT PackageVersionKey FROM PackageDependencies WHERE Dependency LIKE ?',
+            value: `%${dependson}%`
+          });
+        }
+
         if (canonicalPkg) {
           if (canonicalPkg.endsWith('%')) {
             conditions.push({ column: 'PackageVersions.Canonical', operator: 'LIKE', value: canonicalPkg.slice(0, -1) });
@@ -199,20 +211,60 @@ class PackagesModule {
           }
         }
 
+        // Add canonical URL search (requires PackageURLs table)
+        if (canonicalUrl) {
+          conditions.push({
+            column: 'PackageVersions.PackageVersionKey',
+            operator: 'IN_SUBQUERY',
+            subquery: 'SELECT PackageVersionKey FROM PackageURLs WHERE URL LIKE ?',
+            value: `${canonicalUrl}%`
+          });
+        }
+
+        // Add FHIR version search (requires PackageFHIRVersions table)
+        if (fhirVersion) {
+          const mappedVersion = this.getVersion(fhirVersion);
+          conditions.push({
+            column: 'PackageVersions.PackageVersionKey',
+            operator: 'IN_SUBQUERY',
+            subquery: 'SELECT PackageVersionKey FROM PackageFHIRVersions WHERE Version LIKE ?',
+            value: `${mappedVersion}%`
+          });
+        }
+
+        // Add dependency search
+        if (dependency) {
+          let depQuery;
+          if (dependency.includes('#')) {
+            depQuery = `${dependency}%`;
+          } else if (dependency.includes('|')) {
+            depQuery = `${dependency.replace('|', '#')}%`;
+          } else {
+            depQuery = `${dependency}#%`;
+          }
+
+          conditions.push({
+            column: 'PackageVersions.PackageVersionKey',
+            operator: 'IN_SUBQUERY',
+            subquery: 'SELECT PackageVersionKey FROM PackageDependencies WHERE Dependency LIKE ?',
+            value: depQuery
+          });
+        }
+
         // Build appropriate base query
         if (versioned) {
           baseQuery = `SELECT Id, Version, PubDate, FhirVersions, Kind, Canonical, Description
-                       FROM PackageVersions 
-                       WHERE PackageVersions.PackageVersionKey > 0`;
+                     FROM PackageVersions 
+                     WHERE PackageVersions.PackageVersionKey > 0`;
         } else {
           baseQuery = `SELECT Packages.Id, Version, PubDate, FhirVersions, Kind, 
-                              PackageVersions.Canonical, Packages.DownloadCount, Description
-                       FROM Packages, PackageVersions
-                       WHERE Packages.CurrentVersion = PackageVersions.PackageVersionKey`;
+                            PackageVersions.Canonical, Packages.DownloadCount, Description
+                     FROM Packages, PackageVersions
+                     WHERE Packages.CurrentVersion = PackageVersions.PackageVersionKey`;
         }
 
         const { query, params: queryParams } = this.buildSecureQuery(baseQuery, conditions);
-        
+
         this.db.all(query + ' ORDER BY PubDate', queryParams, (err, rows) => {
           if (err) {
             reject(err);
@@ -416,7 +468,7 @@ class PackagesModule {
   }
 
   async getDatabaseTableCounts() {
-    return new Promise((resolve, reject) => {
+    return new Promise((resolve) => {
       if (!this.db) {
         resolve({packages: 0, packageVersions: 0});
         return;
@@ -849,9 +901,6 @@ class PackagesModule {
   }
 
   setupRoutes() {
-    // Helper function to check if request accepts HTML
-    const acceptsHtml = (req) => req.headers.accept && req.headers.accept.includes('text/html');
-
     // Parameter validation configs
     const searchParams = {
       name: { maxLength: 100, pattern: /^[a-zA-Z0-9._#-]*$/ },
@@ -870,9 +919,6 @@ class PackagesModule {
       dateValue: { maxLength: 10, pattern: /^\d{4}-\d{2}-\d{2}$/, default: new Date().toISOString().split('T')[0] }
     };
 
-    const versionParams = {
-      sort: { maxLength: 20, pattern: /^-?(version|fhirversion|kind|date|count)$/ }
-    };
     // GET /packages/catalog - Search packages or get updates
     this.router.get('/catalog', this.validateQueryParams(searchParams), async (req, res) => {
       try {
@@ -1273,7 +1319,7 @@ class PackagesModule {
     }
   }
 
-  generateUpdatesTable(updates, secure) {
+  generateUpdatesTable(updates) {
     if (updates.length === 0) {
       return '<div class="alert alert-info">No package updates found for the specified time period.</div>';
     }
@@ -1308,7 +1354,7 @@ class PackagesModule {
 
     let content = '<div class="row mb-4">';
     content += '<div class="col-12">';
-    content += `<p>Showing packages updated since ${vars.fromDateTime}</p>`;
+    content += `<p>Showing packages updated since ${fromDate}</p>`;
 
     content += '<form method="GET" action="/packages/updates">';
 
@@ -1324,16 +1370,19 @@ class PackagesModule {
 
     content += '</form>';
 
-
-    // Summary info
+    // Summary info - now using the actual parameters
     content += '<table class="grid">';
-    content += `<tr><td>Updates Found:</td><td>${vars.count}</td></tr>`;
-    content += `<tr><td>Since Date:</td><td>${vars.fromDateTime}</td></tr>`;
+    content += `<tr><td>Updates Found:</td><td>${updates.length}</td></tr>`;
+    content += `<tr><td>Since Date:</td><td>${fromDate}</td></tr>`;
     content += `<tr><td>Query Time:</td><td>${new Date().toLocaleString()}</td></tr>`;
     content += '</table>';
 
-    // Updates table
-    content += vars.matches;
+    // Updates table - now using the generateUpdatesTable method with actual updates
+    content += this.generateUpdatesTable(updates);
+
+    content += '</div>';
+    content += '</div>';
+
     return content;
   }
 
@@ -1484,7 +1533,7 @@ class PackagesModule {
     }
   }
 
-  async servePage(page, req, res, secure) {
+  async servePage(page, req, res) {
     // TODO: Implement page serving functionality
     res.json({
       message: 'Page serving not implemented yet',
@@ -1949,7 +1998,7 @@ class PackagesModule {
     return value === current ? 'selected' : '';
   }
 
-  generateResultsTable(results, searchParams, secure) {
+  generateResultsTable(results, searchParams) {
     if (results.length === 0) {
       return '<div class="alert alert-info">No packages found matching your search criteria.</div>';
     }
@@ -2187,10 +2236,7 @@ class PackagesModule {
 
   generateSearchHtml(req, results, params) {
     // Simplified HTML generation - you'd want to use a proper template engine
-    const {name, dependson, canonicalPkg, canonicalUrl, fhirVersion, secure} = params;
-
-    const baseUrl = this.buildPackageUrl('', '', secure, req).replace('/packages/', '');
-
+    const {name, dependson, canonicalPkg, canonicalUrl, fhirVersion} = params;
     return `
     <!DOCTYPE html>
     <html>
@@ -2453,7 +2499,7 @@ class PackagesModule {
     return table;
   }
 
-  buildBrokenPageContent(vars, brokenDependencies, filter) {
+  buildBrokenPageContent(vars, brokenDependencies) {
     const affectedCount = Object.keys(brokenDependencies).length;
     const totalBrokenDeps = Object.values(brokenDependencies).reduce((sum, deps) => sum + deps.length, 0);
 

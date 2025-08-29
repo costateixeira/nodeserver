@@ -127,7 +127,7 @@ describe('HGVS Provider', () => {
       const testCode = testData.potentiallyValidCodes[1];
 
       try {
-        const result = await provider.locate(testCode);
+        await provider.locate(testCode);
         // If we get here, the service responded
         console.log(`✓ Service responded for: ${testCode}`);
       } catch (error) {

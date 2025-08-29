@@ -5,7 +5,7 @@
  */
 
 const {
-  UcumException, Decimal, Pair, Registry, UcumVersionDetails
+  UcumException, Pair, Registry, UcumVersionDetails
 } = require('./ucum-types.js');
 
 const {

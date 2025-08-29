@@ -1,10 +1,9 @@
-const fs = require('fs');
-const path = require('path');
 const sqlite3 = require('sqlite3').verbose();
 const assert = require('assert');
 const { CodeSystem } = require('../library/codesystem');
-const { Languages, Language } = require('../../library/languages');
+const { Language, Languages} = require('../../library/languages');
 const { CodeSystemProvider, Designation, CodeSystemFactoryProvider} = require('./cs-api');
+const { validateOptionalParameter} = require("../../library/utilities");
 
 // Context kinds matching Pascal enum
 const LoincProviderContextKind = {
@@ -151,7 +150,7 @@ class LoincServices extends CodeSystemProvider {
 
     // Check if any requested languages are available in LOINC data
     for (const requestedLang of langs.languages) {
-      for (const [loincLangCode, loincLangKey] of this.langs) {
+      for (const [loincLangCode] of this.langs) {
         const loincLang = new Language(loincLangCode);
         if (loincLang.matchesForDisplay(requestedLang)) {
           return true;
@@ -209,22 +208,22 @@ class LoincServices extends CodeSystemProvider {
   }
 
   async definition(context) {
-    
+    await this.#ensureContext(context);
     return null; // LOINC doesn't provide definitions
   }
 
   async isAbstract(context) {
-    
+    await this.#ensureContext(context);
     return false; // LOINC codes are not abstract
   }
 
   async isInactive(context) {
-    
+    await this.#ensureContext(context);
     return false; // Handle via status if needed
   }
 
   async isDeprecated(context) {
-    
+    await this.#ensureContext(context);
     return false; // Handle via status if needed
   }
 
@@ -411,6 +410,7 @@ class LoincServices extends CodeSystemProvider {
   }
 
   async #getDisplaysForContext(ctxt, langs) {
+    validateOptionalParameter(langs, "langs", Languages);
     const displays = [new LoincDisplay('en-US', ctxt.desc)];
 
     return new Promise((resolve, reject) => {
@@ -590,8 +590,7 @@ class LoincServices extends CodeSystemProvider {
   }
 
   async getPrepContext(iterate) {
-    
-    return new LoincPrep();
+    return new LoincPrep(iterate);
   }
 
   async filter(filterContext, prop, op, value) {
@@ -797,12 +796,8 @@ class LoincServices extends CodeSystemProvider {
     return set.hasKey(concept.key);
   }
 
-  async filterFinish(filterContext) {
-    
-    // Clean up resources if needed
-  }
-
   // Search filter - placeholder for text search
+  // eslint-disable-next-line no-unused-vars
   async searchFilter(filterContext, filter, sort) {
     
     throw new Error('Text search not implemented yet');
@@ -810,7 +805,9 @@ class LoincServices extends CodeSystemProvider {
 
   // Subsumption testing
   async subsumesTest(codeA, codeB) {
-    
+    await this.#ensureContext(codeA);
+    await this.#ensureContext(codeB);
+
     return false; // Not implemented yet
   }
 }
@@ -859,6 +856,7 @@ class LoincServicesFactory extends CodeSystemFactoryProvider {
       };
 
       // Load small lookup tables in parallel
+      // eslint-disable-next-line no-unused-vars
       const [langs, statusCodes, relationships, properties, config] = await Promise.all([
         this.#loadLanguages(db),
         this.#loadStatusCodes(db),

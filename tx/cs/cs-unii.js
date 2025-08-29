@@ -1,6 +1,3 @@
-const fs = require('fs');
-const path = require('path');
-const readline = require('readline');
 const sqlite3 = require('sqlite3').verbose();
 const assert = require('assert');
 const { CodeSystem } = require('../library/codesystem');
@@ -83,25 +80,22 @@ class UniiServices extends CodeSystemProvider {
 
   async definition(code) {
     
-    const ctxt = await this.#ensureContext(code);
+    await this.#ensureContext(code);
     return null; // No definitions provided
   }
 
   async isAbstract(code) {
-    
-    const ctxt = await this.#ensureContext(code);
+    await this.#ensureContext(code);
     return false; // No abstract concepts
   }
 
   async isInactive(code) {
-    
-    const ctxt = await this.#ensureContext(code);
+    await this.#ensureContext(code);
     return false; // No inactive concepts
   }
 
   async isDeprecated(code) {
-    
-    const ctxt = await this.#ensureContext(code);
+    await this.#ensureContext(code);
     return false; // No deprecated concepts
   }
 
@@ -198,17 +192,6 @@ class UniiServices extends CodeSystemProvider {
         });
       });
     });
-  }
-
-  // Iterator methods - not supported
-  async iterator(code) {
-    
-    return { index: 0, total: 0 }; // No iteration support
-  }
-
-  async nextContext(iteratorContext) {
-    
-    throw new Error('Iteration not supported for UNII codes');
   }
 
 }

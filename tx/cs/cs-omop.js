@@ -1,10 +1,8 @@
-const fs = require('fs');
-const path = require('path');
 const sqlite3 = require('sqlite3').verbose();
 const assert = require('assert');
 const { CodeSystem } = require('../library/codesystem');
-const { Languages, Language } = require('../../library/languages');
 const { CodeSystemProvider, Designation, FilterExecutionContext, CodeSystemFactoryProvider } = require('./cs-api');
+const {validateOptionalParameter} = require("../../library/utilities");
 
 class OMOPConcept {
   constructor(code, display, domain, conceptClass, standard, vocabulary) {
@@ -185,22 +183,22 @@ class OMOPServices extends CodeSystemProvider {
   }
 
   async definition(context) {
-    
+    await this.#ensureContext(context);
     return ''; // OMOP doesn't provide definitions
   }
 
   async isAbstract(context) {
-    
+    await this.#ensureContext(context);
     return false; // OMOP concepts are not abstract
   }
 
   async isInactive(context) {
-    
+    await this.#ensureContext(context);
     return false; // Handle via standard_concept if needed
   }
 
   async isDeprecated(context) {
-    
+    await this.#ensureContext(context);
     return false; // Handle via invalid_reason if needed
   }
 
@@ -468,29 +466,25 @@ class OMOPServices extends CodeSystemProvider {
 
   // Iterator methods - not supported for OMOP due to size
   async iterator(context) {
-    
+    await this.#ensureContext(context);
     throw new Error('getNextContext not supported by OMOP - too large to iterate');
   }
 
+  // eslint-disable-next-line no-unused-vars
   async nextContext(iteratorContext) {
-    
     throw new Error('getNextContext not supported by OMOP - too large to iterate');
   }
 
   // Filter support
   async doesFilter(prop, op, value) {
-    
-
     if (prop === 'domain' && op === 'equal') {
-      return true;
+      return value != null;
     }
-
     return false;
   }
 
   async getPrepContext(iterate) {
-    
-    return new OMOPPrep();
+    return new OMOPPrep(iterate);
   }
 
   async filter(filterContext, prop, op, value) {
@@ -591,11 +585,12 @@ class OMOPServices extends CodeSystemProvider {
   }
 
   async filtersNotClosed(filterContext) {
-    
+    validateOptionalParameter(filterContext, "filterContext", FilterExecutionContext);
     return false; // OMOP filters are closed
   }
 
   // Search filter - not implemented
+  // eslint-disable-next-line no-unused-vars
   async searchFilter(filterContext, filter, sort) {
     
     throw new Error('Search filter not implemented yet');
@@ -603,6 +598,8 @@ class OMOPServices extends CodeSystemProvider {
 
   // Subsumption testing - not implemented
   async subsumesTest(codeA, codeB) {
+    await this.#ensureContext(codeA);
+    await this.#ensureContext(codeB);
     
     return false;
   }
@@ -685,7 +682,7 @@ class OMOPServices extends CodeSystemProvider {
   }
 
   // Register concept maps for vocabularies
-  async registerConceptMaps(list, factory) {
+  async registerConceptMaps(list) {
     return new Promise((resolve, reject) => {
       const sql = 'SELECT DISTINCT vocabulary_id FROM Concepts';
 
@@ -819,7 +816,7 @@ class OMOPServicesFactory extends CodeSystemFactoryProvider {
 
       try {
         // Simple count query to verify database integrity
-        db.get('SELECT COUNT(*) as count FROM Concepts', (err, row) => {
+        db.get('SELECT COUNT(*) as count FROM Concepts', (err) => {
           if (err) {
             db.close();
             return 'Missing Tables - needs re-importing (by java)';

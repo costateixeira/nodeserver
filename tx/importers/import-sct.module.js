@@ -162,7 +162,7 @@ class SnomedModule extends BaseTerminologyModule {
       "731000124108": { name: "US Edition", needsBase: true, lang: "en-US" },
       "32506021000036107": { name: "Australian Edition", needsBase: true, lang: "en-AU" },
       "449081005": { name: "Spanish Edition (International)", needsBase: true, lang: "es" },
-      "11000279109": { name: "Czech Edition", needsBase: true, lang: "cs-CZ" },
+      "11000279109": { name: "Czech Edition", needsBase: false, lang: "cs-CZ" },
       "554471000005108": { name: "Danish Edition", needsBase: true, lang: "da-DK" },
       "11000146104": { name: "Dutch Edition", needsBase: true, lang: "nl-NL" },
       "45991000052106": { name: "Swedish Edition", needsBase: true, lang: "sv-SE" },
@@ -1420,8 +1420,11 @@ class SnomedImporter {
 
       // Verify concept exists in concept list
       const foundConcept = this.concepts.findConcept(concept.id);
-      if (!foundConcept.found || foundConcept.index !== concept.index) {
-        throw new Error(`Import error: concept ${concept.id} not found or index mismatch`);
+      if (!foundConcept.found) {
+        throw new Error(`Import error: concept ${concept.id} not found`);
+      }
+      if (foundConcept.index !== concept.index) {
+        throw new Error(`Import error: concept ${concept.id} index mismatch (${foundConcept.index} vs ${concept.index})`);
       }
 
       if (tracker) {

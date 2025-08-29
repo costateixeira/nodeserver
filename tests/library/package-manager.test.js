@@ -656,7 +656,7 @@ const runTests = shouldRunSlowTests();
             test('should throw error for invalid package folder', async () => {
                 const badLoader = new PackageContentLoader('/non/existent/path');
 
-                await expect(badLoader.initialize()).rejects.toThrow(/Failed to load package index/);
+                await expect(badLoader.initialize()).rejects.toThrow('no such file or directory');
             });
         });
     });

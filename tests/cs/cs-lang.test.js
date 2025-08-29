@@ -7,7 +7,6 @@ const {
 } = require('../../tx/cs/cs-lang');
 const { LanguageDefinitions, Languages, Language } = require('../../library/languages');
 const { TxOperationContext, FilterExecutionContext} = require('../../tx/cs/cs-api');
-const { CodeSystem } = require('../../tx/library/codesystem');
 
 describe('IETF Language CodeSystem Provider', () => {
   let languageDefinitions;

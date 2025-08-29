@@ -748,7 +748,7 @@ class CodeSystem {
   }
 
   static isUseADisplay(use) {
-    return true; // for now
+    return (use != null) || true; // for now
   }
 
   static makeUseForDisplay() {

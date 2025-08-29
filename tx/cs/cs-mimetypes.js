@@ -1,4 +1,4 @@
-const { CodeSystemProvider, TxOperationContext, Designation, FilterExecutionContext, CodeSystemFactoryProvider} = require('./cs-api');
+const { CodeSystemProvider, Designation, CodeSystemFactoryProvider} = require('./cs-api');
 const assert = require('assert');
 const { CodeSystem } = require("../library/codesystem");
 
@@ -96,25 +96,25 @@ class MimeTypeServices extends CodeSystemProvider {
 
   async definition(code) {
     
-    const ctxt = await this.#ensureContext(code);
+    await this.#ensureContext(code);
     return null; // No definitions provided
   }
 
   async isAbstract(code) {
     
-    const ctxt = await this.#ensureContext(code);
+    await this.#ensureContext(code);
     return false; // MIME types are not abstract
   }
 
   async isInactive(code) {
     
-    const ctxt = await this.#ensureContext(code);
+    await this.#ensureContext(code);
     return false; // MIME types are not inactive
   }
 
   async isDeprecated(code) {
     
-    const ctxt = await this.#ensureContext(code);
+    await this.#ensureContext(code);
     return false; // MIME types are not deprecated
   }
 
@@ -166,12 +166,15 @@ class MimeTypeServices extends CodeSystemProvider {
 
   // Subsumption - not supported
   async subsumesTest(codeA, codeB) {
-    
+
+    await this.#ensureContext(codeA);
+    await this.#ensureContext(codeB);
     return false; // No subsumption relationships
   }
 
   async locateIsA(code, parent) {
-    
+    await this.#ensureContext(code);
+    await this.#ensureContext(parent);
     return { context: null, message: 'Subsumption not supported for MIME types' };
   }
 }

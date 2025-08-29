@@ -1,6 +1,4 @@
-const { CodeSystem } = require('../library/codesystem');
-const { CodeSystemProvider, CodeSystemFactoryProvider, TxOperationContext, Designation} = require('./cs-api');
-const { Language, Languages } = require('../../library/languages');
+const { CodeSystemProvider, CodeSystemFactoryProvider} = require('./cs-api');
 const assert = require('assert');
 
 /**
@@ -61,7 +59,7 @@ class UriServices extends CodeSystemProvider {
 
   async code(code) {
     
-    const ctxt = await this.#ensureContext(code);
+    await this.#ensureContext(code);
     return code; // For URIs, the code is the context
   }
 
@@ -73,25 +71,25 @@ class UriServices extends CodeSystemProvider {
 
   async definition(code) {
     
-    const ctxt = await this.#ensureContext(code);
+    await this.#ensureContext(code);
     return null; // URIs don't have definitions by default
   }
 
   async isAbstract(code) {
     
-    const ctxt = await this.#ensureContext(code);
+    await this.#ensureContext(code);
     return false; // URIs are not abstract
   }
 
   async isInactive(code) {
     
-    const ctxt = await this.#ensureContext(code);
+    await this.#ensureContext(code);
     return false; // URIs are not inactive
   }
 
   async isDeprecated(code) {
     
-    const ctxt = await this.#ensureContext(code);
+    await this.#ensureContext(code);
     return false; // URIs are not deprecated
   }
 
@@ -113,7 +111,7 @@ class UriServices extends CodeSystemProvider {
 
     if (this.supplements) {
       for (const supplement of this.supplements) {
-        const concept = supplement.getConceptByCode(code);  // ← Uses CodeSystem API
+        const concept = supplement.getConceptByCode(ctxt);  // ← Uses CodeSystem API
         if (concept && concept.property) {
           // Add all properties from this concept
           allProperties = allProperties.concat(concept.property);
@@ -126,8 +124,8 @@ class UriServices extends CodeSystemProvider {
 
   async sameConcept(a, b) {
     
-    const ac = await this.#ensureContext(a);
-    const bc = await this.#ensureContext(b);
+    await this.#ensureContext(a);
+    await this.#ensureContext(b);
     return a === b; // For URIs, direct string comparison
   }
 
@@ -167,15 +165,6 @@ class UriServices extends CodeSystemProvider {
   // ============================================================================
   // Translations and concept maps
   // ============================================================================
-
-  async registerConceptMaps(list) {
-    // No concept maps for URIs
-  }
-
-  async getTranslations(coding, target) {
-    
-    return null; // No translations available
-  }
 }
 
 /**

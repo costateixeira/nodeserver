@@ -9,7 +9,6 @@ const {
   SnomedExpressionServices, SnomedExpression, SnomedConcept,
   SnomedExpressionParser, NO_REFERENCE, SnomedServicesRenderOption
 } = require('./cs-snomed-expressions');
-const { Languages, Language } = require('../../library/languages');
 
 // Context kinds matching Pascal enum
 const SnomedProviderContextKind = {
@@ -530,12 +529,12 @@ class SnomedProvider extends CodeSystemProvider {
   }
 
   async definition(context) {
-    
+    await this.#ensureContext(context);
     return null; // SNOMED doesn't provide definitions in this sense
   }
 
   async isAbstract(context) {
-    
+    await this.#ensureContext(context);
     return false; // SNOMED concepts are not abstract
   }
 
@@ -549,7 +548,8 @@ class SnomedProvider extends CodeSystemProvider {
   }
 
   async isDeprecated(context) {
-    
+    await this.#ensureContext(context);
+
     return false; // Handle via status if needed
   }
 
@@ -745,6 +745,7 @@ class SnomedProvider extends CodeSystemProvider {
     return false;
   }
 
+  // eslint-disable-next-line no-unused-vars
   async getPrepContext(iterate) {
     
     return {}; // Simple filter context
@@ -881,16 +882,10 @@ class SnomedProvider extends CodeSystemProvider {
     return false;
   }
 
-  async filterFinish(filterContext) {
-    
-    // Cleanup if needed
-  }
 
   // Search filter
   async searchFilter(filterContext, filter, sort) {
-    
-
-    return this.sct.searchFilter(filter, false, true);
+    return this.sct.searchFilter(filter, false, sort);
   }
 
   // Subsumption testing

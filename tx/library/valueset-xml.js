@@ -2,7 +2,9 @@
  * XML support for FHIR ValueSet resources
  * Handles conversion between FHIR XML format and ValueSet objects
  */
+import {XMLBuilder} from "fast-xml-parser";
 
+const { XMLParser } = require('fast-xml-parser');
 import { ValueSet } from './ValueSet.js';
 
 /**
@@ -76,7 +78,7 @@ export class ValueSetXML {
       textNodeName: 'value', // FHIR puts primitive values in 'value' attribute
       parseAttributeValue: true,
       removeNSPrefix: true, // Remove namespace prefixes
-      isArray: (tagName, jPath, isLeafNode, isAttribute) => {
+      isArray: (tagName, jPath) => {
         // Check if this element should be an array based on FHIR rules
         return this._shouldBeArray(tagName, jPath);
       },

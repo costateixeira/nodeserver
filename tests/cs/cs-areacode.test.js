@@ -1,6 +1,6 @@
 const { TxOperationContext } = require('../../tx/cs/cs-api');
-const { AreaCodeServices, AreaCodeFactoryProvider } = require('../../tx/cs/cs-areacode');
-const { LanguageDefinitions, Languages, Language } = require('../../library/languages');
+const { AreaCodeFactoryProvider } = require('../../tx/cs/cs-areacode');
+const { Languages } = require('../../library/languages');
 
 describe('AreaCodeServices', () => {
   let factory;

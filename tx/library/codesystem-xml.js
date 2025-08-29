@@ -3,8 +3,7 @@
  * Handles conversion between FHIR XML format and CodeSystem objects
  */
 
-// Import the XMLParser and XMLBuilder from fast-xml-parser
-const { XMLParser, XMLBuilder } = require('fast-xml-parser');
+const { XMLParser } = require('fast-xml-parser');
 const { CodeSystem } = require('./codesystem');
 
 /**
@@ -82,6 +81,7 @@ class CodeSystemXML {
       attributeNamePrefix: '@_',
       attributesGroupName: false,
       textNodeName: '#text',
+      // eslint-disable-next-line no-unused-vars
       isArray: (name, path, isLeaf, isAttribute) => {
         // These elements should always be arrays even if there's only one
         return this._arrayElements.has(name);

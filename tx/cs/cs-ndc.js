@@ -1,5 +1,3 @@
-const fs = require('fs');
-const path = require('path');
 const sqlite3 = require('sqlite3').verbose();
 const assert = require('assert');
 const { CodeSystem } = require('../library/codesystem');
@@ -91,14 +89,12 @@ class NdcServices extends CodeSystemProvider {
   }
 
   async definition(code) {
-    
-    const ctxt = await this.#ensureContext(code);
+    await this.#ensureContext(code);
     return null; // No definitions provided in NDC
   }
 
   async isAbstract(code) {
-    
-    const ctxt = await this.#ensureContext(code);
+    await this.#ensureContext(code);
     return false; // No abstract concepts in NDC
   }
 
@@ -109,8 +105,7 @@ class NdcServices extends CodeSystemProvider {
   }
 
   async isDeprecated(code) {
-    
-    const ctxt = await this.#ensureContext(code);
+    await this.#ensureContext(code);
     return false; // NDC doesn't track deprecated status separately
   }
 
@@ -404,11 +399,6 @@ class NdcServices extends CodeSystemProvider {
       ['10-digit', '11-digit', 'product'].includes(value);
   }
 
-  async getPrepContext(iterate) {
-    
-    return { filters: [] };
-  }
-
   async filter(filterContext, prop, op, value) {
     
 
@@ -567,21 +557,8 @@ class NdcServices extends CodeSystemProvider {
     }
   }
 
-  async filterFinish(filterContext) {
-    
-    // Clean up any resources if needed
-  }
-
   // Iterator methods - not supported for NDC
-  async iterator(code) {
-    
-    return null; // No iteration support
-  }
 
-  async nextContext(iteratorContext) {
-    
-    throw new Error('Iteration not supported for NDC codes');
-  }
 }
 
 class NdcServicesFactory extends CodeSystemFactoryProvider {

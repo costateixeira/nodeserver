@@ -572,7 +572,7 @@ describe('CPT Provider', () => {
     test('should handle filter cleanup', async () => {
       const filterContext = await provider.getPrepContext(true);
       await provider.filter(filterContext, 'modifier', 'equal', 'true');
-      const filters = await provider.executeFilters(filterContext);
+      await provider.executeFilters(filterContext);
 
       // Should not throw
       await provider.filterFinish(filterContext);

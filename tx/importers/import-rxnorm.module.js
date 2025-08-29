@@ -380,7 +380,7 @@ class RxNormModule extends BaseTerminologyModule {
     });
   }
 
-  getTableCounts(db, stats, resolve, reject) {
+  getTableCounts(db, stats, resolve) {
     const queries = [
       { name: 'rxnconsoCount', sql: 'SELECT COUNT(*) as count FROM RXNCONSO' },
       { name: 'rxnrelCount', sql: 'SELECT COUNT(*) as count FROM RXNREL' },
@@ -628,7 +628,7 @@ class RxNormImporter {
        )`
     ];
 
-    return new Promise((resolve, reject) => {
+    return new Promise((resolve) => {
       db.serialize(() => {
         tableSQL.forEach(sql => {
           db.run(sql, (err) => {

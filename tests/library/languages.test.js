@@ -2,12 +2,7 @@ const {
   Language,
   Languages,
   LanguageDefinitions,
-  LanguagePartType,
-  LanguageLanguage,
-  LanguageExtLang,
-  LanguageScript,
-  LanguageRegion,
-  LanguageVariant
+  LanguagePartType
 } = require('../../library/languages');
 
 const fs = require('fs');

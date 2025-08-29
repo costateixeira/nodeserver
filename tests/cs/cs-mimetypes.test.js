@@ -1,6 +1,6 @@
 const { TxOperationContext } = require('../../tx/cs/cs-api');
 const { MimeTypeServices, MimeTypeServicesFactory, MimeTypeConcept } = require('../../tx/cs/cs-mimetypes');
-const { Languages, Language } = require('../../library/languages');
+const { Languages } = require('../../library/languages');
 const { CodeSystem } = require('../../tx/library/codesystem');
 
 describe('MimeTypeServices', () => {
@@ -183,7 +183,7 @@ describe('MimeTypeServices', () => {
     });
 
     test('should return error for locateIsA', async () => {
-      const result = await provider.locateIsA('text/plain', 'text');
+      const result = await provider.locateIsA('text/plain+fml', 'text/plain');
       expect(result.context).toBeNull();
       expect(result.message).toContain('not supported');
     });

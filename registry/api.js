@@ -1,9 +1,6 @@
 // Enhanced registry-api.js with resolver and HTML rendering functions
 
-const {
-  ServerRow,
-  ServerRegistryUtilities
-} = require('./model');
+const { ServerRegistryUtilities } = require('./model');
 
 class RegistryAPI {
   constructor(crawler) {

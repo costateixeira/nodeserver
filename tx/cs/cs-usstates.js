@@ -1,4 +1,4 @@
-const { CodeSystemProvider, TxOperationContext, Designation, FilterExecutionContext, CodeSystemFactoryProvider} = require('./cs-api');
+const { CodeSystemProvider, Designation, CodeSystemFactoryProvider} = require('./cs-api');
 const assert = require('assert');
 const { CodeSystem } = require("../library/codesystem");
 
@@ -70,25 +70,25 @@ class USStateServices extends CodeSystemProvider {
 
   async definition(code) {
     
-    const ctxt = await this.#ensureContext(code);
+    await this.#ensureContext(code);
     return null; // No definitions provided
   }
 
   async isAbstract(code) {
     
-    const ctxt = await this.#ensureContext(code);
+    await this.#ensureContext(code);
     return false; // No abstract concepts
   }
 
   async isInactive(code) {
     
-    const ctxt = await this.#ensureContext(code);
+    await this.#ensureContext(code);
     return false; // No inactive concepts
   }
 
   async isDeprecated(code) {
     
-    const ctxt = await this.#ensureContext(code);
+    await this.#ensureContext(code);
     return false; // No deprecated concepts
   }
 
@@ -157,7 +157,8 @@ class USStateServices extends CodeSystemProvider {
 
   // Subsumption
   async subsumesTest(codeA, codeB) {
-    
+    await this.#ensureContext(codeA);
+    await this.#ensureContext(codeB);
     return false; // No subsumption relationships
   }
 }

@@ -1,5 +1,5 @@
-const { CodeSystemProvider, TxOperationContext, Designation, FilterExecutionContext, CodeSystemFactoryProvider} = require('./cs-api');
-const { Language, LanguageDefinitions, Languages} = require('../../library/languages');
+const { CodeSystemProvider, Designation, FilterExecutionContext, CodeSystemFactoryProvider} = require('./cs-api');
+const { Language } = require('../../library/languages');
 const { CodeSystem } = require("../library/codesystem");
 const assert = require('assert');
 
@@ -111,25 +111,25 @@ class IETFLanguageCodeProvider extends CodeSystemProvider {
 
   async definition(code) {
     
-    const ctxt = await this.#ensureContext(code);
+    await this.#ensureContext(code);
     return null; // No definitions for language codes
   }
 
   async isAbstract(code) {
     
-    const ctxt = await this.#ensureContext(code);
+    await this.#ensureContext(code);
     return false; // Language codes are not abstract
   }
 
   async isInactive(code) {
     
-    const ctxt = await this.#ensureContext(code);
+    await this.#ensureContext(code);
     return false; // We don't track inactive language codes
   }
 
   async isDeprecated(code) {
     
-    const ctxt = await this.#ensureContext(code);
+    await this.#ensureContext(code);
     return false; // We don't track deprecated language codes
   }
 
@@ -383,22 +383,9 @@ class IETFLanguageCodeProvider extends CodeSystemProvider {
     return hasComponent === filter.status;
   }
 
-  async filterFinish(filterContext) {
-    
-    // Nothing to clean up
-  }
 
   // ========== Iterator Methods ==========
-
-  async iterator(context) {
-    
-    return null; // Cannot iterate language codes (grammar-based)
-  }
-
-  async nextContext(iterator) {
-    
-    return null; // Cannot iterate language codes
-  }
+  // Cannot iterate language codes (grammar-based)
 
   // ========== Additional Methods ==========
 
@@ -410,23 +397,11 @@ class IETFLanguageCodeProvider extends CodeSystemProvider {
   }
 
   async subsumesTest(codeA, codeB) {
-    
+    await this.#ensureContext(codeA);
+    await this.#ensureContext(codeB);
     return false; // No subsumption in language codes
   }
 
-  async extendLookup(ctxt, props, params) {
-    
-    // No additional properties to add
-  }
-
-  async registerConceptMaps(list) {
-    // No concept maps for language codes
-  }
-
-  async getTranslations(coding, target) {
-    
-    return null; // No translations available
-  }
 }
 
 /**

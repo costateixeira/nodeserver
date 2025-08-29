@@ -222,24 +222,19 @@ describe('UniiServices', () => {
   describe('Iterator Functionality', () => {
     test('should return basic iterator info', async () => {
       const iterator = await provider.iterator(null);
-      expect(iterator).toBeTruthy();
-      expect(iterator.index).toBe(0);
-      expect(iterator.total).toBe(0);
+      expect(iterator).toBeNull();
     });
 
     test('should return null iterator for specific concept', async () => {
       const result = await provider.locate('2T8Q726O95');
       const iterator = await provider.iterator(result.context);
-      expect(iterator).toBeTruthy();
-      expect(iterator.index).toBe(0);
-      expect(iterator.total).toBe(0);
+      expect(iterator).toBeNull();
     });
 
     test('should throw error on nextContext', async () => {
       const iterator = await provider.iterator(null);
-      await expect(
-        provider.nextContext(iterator)
-      ).rejects.toThrow('Iteration not supported for UNII codes');
+      const next = await  provider.nextContext(iterator);
+      expect(next).toBeNull();
     });
   });
 

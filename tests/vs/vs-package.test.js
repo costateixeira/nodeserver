@@ -1,4 +1,3 @@
-const fs = require('fs').promises;
 const path = require('path');
 const { describe, beforeAll, afterAll, test, expect } = require('@jest/globals');
 const { PackageManager, PackageContentLoader} = require('../../library/package-manager');

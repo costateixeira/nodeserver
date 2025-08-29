@@ -3,7 +3,7 @@
  * JavaScript port of the Java JUnit tests
  */
 
-const { VersionUtilities, VersionPrecision, FHIRException, SemverParser } = require('../../library/version-utilities');
+const { VersionUtilities, VersionPrecision, FHIRException } = require('../../library/version-utilities');
 
 describe('VersionUtilities', () => {
 

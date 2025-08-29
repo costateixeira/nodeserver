@@ -348,48 +348,6 @@ class VSACValueSetProvider extends AbstractValueSetProvider {
 }
 
 // Usage examples:
-async function vsacExample() {
-  try {
-    // Create a VSAC provider
-    const vsacProvider = new VSACValueSetProvider({
-      apiKey: 'your-api-key-here',
-      cacheFolder: '/path/to/cache',
-      refreshIntervalHours: 12, // Refresh every 12 hours
-      baseUrl: 'http://cts.nlm.nih.gov/fhir' // Optional, this is the default
-    });
-
-    // Fetch specific value set
-    const valueSet = await vsacProvider.fetchValueSet(
-      'http://cts.nlm.nih.gov/fhir/ValueSet/2.16.840.1.113762.1.4.1078.91',
-      '20230330'
-    );
-    console.log('Fetched value set:', valueSet.name);
-
-    // Search for value sets
-    const searchResults = await vsacProvider.searchValueSets([
-      { name: 'status', value: 'active' },
-      { name: 'publisher', value: 'Optum' }
-    ]);
-    console.log(`Found ${searchResults.length} active Optum value sets`);
-
-    // Force a refresh
-    await vsacProvider.forceRefresh();
-    console.log('Refresh completed');
-
-    // Get statistics including refresh info
-    const stats = await vsacProvider.getStatistics();
-    console.log('VSAC statistics:', stats);
-    console.log('Last refresh:', stats.refreshInfo.lastRefresh);
-    console.log('Is refreshing:', stats.refreshInfo.isRefreshing);
-
-    // Clean shutdown
-    vsacProvider.stopRefreshTimer();
-
-  } catch (error) {
-    console.error('Error:', error.message);
-  }
-}
-
 module.exports = {
   VSACValueSetProvider
 };

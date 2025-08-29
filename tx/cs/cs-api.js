@@ -1,6 +1,8 @@
-const {Languages, Language} = require("../../library/languages");
+/* eslint-disable no-unused-vars */
+
 const assert = require('assert');
 const {CodeSystem, CodeSystemContentMode} = require("../library/codesystem");
+const {Languages, Language} = require("../../library/languages");
 
 class TxOperationContext {
 
@@ -443,8 +445,8 @@ class CodeSystemProvider {
 
   /**
    
-   * @param {string | CodeSystemIterator} codeA
-   * @param {string | CodeSystemIterator} codeB
+   * @param {string | CodeSystemProviderContext} codeA
+   * @param {string | CodeSystemProviderContext} codeB
    * @returns {boolean} true if codeA subsumes codeB
    */
   async subsumesTest(codeA, codeB) { return false; }
@@ -455,6 +457,7 @@ class CodeSystemProvider {
    * @param {string[]} props the properties requested
    * @param {Parameters} params the parameters response to add to
    */
+
   async extendLookup(ctxt, props, params) { }
 
   // procedure getCDSInfo(card : TCDSHookCard; langList : THTTPLanguageList; baseURL, code, display : String); virtual;

@@ -20,7 +20,24 @@ const Utilities = {
     const num = parseInt(str, 10);
     return num.toString() === str && !isNaN(num);
   }
+
 };
 
+function validateParameter(param, name, type) {
+  if (param == null) {
+    throw new Error(`${name} must be a provided`);
+  }
+  if (!(param instanceof type)) {
+    throw new Error(`${name} must be a valid ${type}`);
+  }
+}
 
-module.exports = { Utilities };
+function validateOptionalParameter(param, name, type) {
+  if (param != null) {
+    if (!(param instanceof type)) {
+      throw new Error(`${name} must be a valid ${type}`);
+    }
+  }
+}
+
+module.exports = { Utilities, validateParameter, validateOptionalParameter };

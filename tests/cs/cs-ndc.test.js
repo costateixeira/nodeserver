@@ -203,7 +203,7 @@ function getInvalidCodes(db, tableName, codeColumn, maxLength) {
         FROM ${tableName}
         WHERE ${codeColumn} = ''
            OR ${codeColumn} IS NULL
-           OR LENGTH(${codeColumn}) > 15
+           OR LENGTH(${codeColumn}) > ${maxLength}
            OR LENGTH(${codeColumn}) < 8
     `, (err, row) => {
       if (err) reject(err);
@@ -212,39 +212,39 @@ function getInvalidCodes(db, tableName, codeColumn, maxLength) {
   });
 }
 
-function getValidNdcFormatCount(db) {
-  return new Promise((resolve, reject) => {
-    db.get(`
-        SELECT COUNT(*) as count
-        FROM NDCProducts
-        WHERE (
-        -- FDA format with dashes: 4-4-2, 5-3-2, 5-4-1, 6-3-2, 6-4-1
-            (Code GLOB '*-*-*' AND LENGTH(Code) BETWEEN 8 AND 13) OR
-        -- CMS format without dashes: 11 digits
-            (Code NOT LIKE '%-%' AND LENGTH(Code) = 11 AND Code GLOB '[0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9]')
-            )
-    `, (err, row) => {
-      if (err) reject(err);
-      else resolve(row.count);
-    });
-  });
-}
+// function getValidNdcFormatCount(db) {
+//   return new Promise((resolve, reject) => {
+//     db.get(`
+//         SELECT COUNT(*) as count
+//         FROM NDCProducts
+//         WHERE (
+//         -- FDA format with dashes: 4-4-2, 5-3-2, 5-4-1, 6-3-2, 6-4-1
+//             (Code GLOB '*-*-*' AND LENGTH(Code) BETWEEN 8 AND 13) OR
+//         -- CMS format without dashes: 11 digits
+//             (Code NOT LIKE '%-%' AND LENGTH(Code) = 11 AND Code GLOB '[0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9]')
+//             )
+//     `, (err, row) => {
+//       if (err) reject(err);
+//       else resolve(row.count);
+//     });
+//   });
+// }
 
-function getInvalidCode11s(db) {
-  return new Promise((resolve, reject) => {
-    db.get(`
-        SELECT COUNT(*) as count
-        FROM NDCPackages
-        WHERE LENGTH(Code11) != 11
-           OR Code11 GLOB '*[^0-9]*'
-           OR Code11 = ''
-           OR Code11 IS NULL
-    `, (err, row) => {
-      if (err) reject(err);
-      else resolve(row.count);
-    });
-  });
-}
+// function getInvalidCode11s(db) {
+//   return new Promise((resolve, reject) => {
+//     db.get(`
+//         SELECT COUNT(*) as count
+//         FROM NDCPackages
+//         WHERE LENGTH(Code11) != 11
+//            OR Code11 GLOB '*[^0-9]*'
+//            OR Code11 = ''
+//            OR Code11 IS NULL
+//     `, (err, row) => {
+//       if (err) reject(err);
+//       else resolve(row.count);
+//     });
+//   });
+// }
 
 function getActiveCount(db, tableName) {
   return new Promise((resolve, reject) => {

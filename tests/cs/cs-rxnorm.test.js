@@ -682,7 +682,7 @@ describe('RxNorm Provider', () => {
 
 // Helper functions for database queries
 async function getDatabaseCounts(dbPath) {
-  return new Promise((resolve, reject) => {
+  return new Promise((resolve) => {
     const db = new sqlite3.Database(dbPath);
     const counts = {};
 
@@ -756,7 +756,7 @@ async function getDatabaseSchema(dbPath) {
 }
 
 async function getSampleData(dbPath) {
-  return new Promise((resolve, reject) => {
+  return new Promise((resolve) => {
     const db = new sqlite3.Database(dbPath);
     const samples = {};
 

@@ -3,8 +3,7 @@
  * Implementation of CodeSystemProvider for UCUM (Unified Code for Units of Measure)
  */
 
-const { CodeSystemProvider, TxOperationContext, Designation, FilterExecutionContext, CodeSystemFactoryProvider} = require('./cs-api');
-const { Languages } = require('../../library/languages');
+const { CodeSystemProvider, Designation, FilterExecutionContext, CodeSystemFactoryProvider} = require('./cs-api');
 const { CodeSystem } = require("../library/codesystem");
 const ValueSet = require("../library/valueset");
 const assert = require('assert');
@@ -403,34 +402,22 @@ class UcumCodeSystemProvider extends CodeSystemProvider {
     }
   }
 
-  async filterFinish(filterContext) {
-    
-    // Nothing to clean up
-  }
 
-  // ========== Iterator Methods ==========
-
-  async iterator(context) {
-    
-    return null; // Cannot iterate UCUM codes (grammar-based)
-  }
-
-  async nextContext(iterator) {
-    
-    return null; // Cannot iterate UCUM codes
-  }
+  // ========== Not Iterator Methods: Cannot iterate UCUM codes ==========
 
   // ========== Additional Methods ==========
 
   async sameConcept(a, b) {
     
-    const codeA = await this.code(a);
-    const codeB = await this.code(b);
+    const codeA = await this.#ensureContext(a);
+    const codeB = await this.#ensureContext(b);
     return codeA === codeB;
   }
 
   async subsumesTest(codeA, codeB) {
-    
+
+    await this.#ensureContext(codeA);
+    await this.#ensureContext(codeB);
     return false; // No subsumption in UCUM
   }
 
@@ -448,15 +435,6 @@ class UcumCodeSystemProvider extends CodeSystemProvider {
         // Ignore errors in canonical form calculation
       }
     }
-  }
-
-  async registerConceptMaps(list) {
-    // No concept maps for UCUM
-  }
-
-  async getTranslations(coding, target) {
-    
-    return null; // No translations available
   }
 
 }

@@ -3,6 +3,7 @@ const { AbstractValueSetProvider } = require('./vs-api');
 const { PackageContentLoader } = require('../../library/package-manager');
 const { ValueSetDatabase } = require('./vs-database');
 const { VersionUtilities } = require('../../library/version-utilities');
+const {validateParameter} = require("../../library/utilities");
 
 /**
  * Package-based ValueSet provider using shared database layer
@@ -13,6 +14,7 @@ class PackageValueSetProvider extends AbstractValueSetProvider {
    */
   constructor(packageLoader) {
     super();
+    validateParameter(packageLoader, "packageLoader", PackageContentLoader);
     this.packageLoader = packageLoader;
     this.dbPath = path.join(packageLoader.packageFolder, '.valuesets.db');
     this.database = new ValueSetDatabase(this.dbPath);

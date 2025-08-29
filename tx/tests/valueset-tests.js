@@ -3,6 +3,8 @@
  * These tests can be run with Jest, Mocha, or any similar testing framework
  */
 
+import ValueSet from "../library/valueset";
+
 describe('ValueSet', () => {
   // Test data
   const validValueSet = {

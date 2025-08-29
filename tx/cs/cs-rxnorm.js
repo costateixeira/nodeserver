@@ -1,10 +1,7 @@
-const fs = require('fs');
-const path = require('path');
 const sqlite3 = require('sqlite3').verbose();
 const assert = require('assert');
 const { CodeSystem } = require('../library/codesystem');
-const { Languages, Language } = require('../../library/languages');
-const { CodeSystemProvider, Designation, TxOperationContext, FilterExecutionContext, CodeSystemFactoryProvider } = require('./cs-api');
+const { CodeSystemProvider, Designation, CodeSystemFactoryProvider } = require('./cs-api');
 
 // Context for RxNorm concepts
 class RxNormConcept {
@@ -127,12 +124,13 @@ class RxNormServices extends CodeSystemProvider {
   }
 
   async definition(context) {
-    
+    await this.#ensureContext(context);
     return null; // RxNorm doesn't provide definitions
   }
 
   async isAbstract(context) {
-    
+    await this.#ensureContext(context);
+
     return false; // RxNorm codes are not abstract
   }
 
@@ -211,7 +209,6 @@ class RxNormServices extends CodeSystemProvider {
 
     return new Promise((resolve, reject) => {
       let sql = `SELECT STR, TTY FROM rxnconso WHERE ${this.getCodeField()} = ? AND SAB = ?`;
-      let archive = false;
 
       this.db.all(sql, [code, this.getSAB()], (err, rows) => {
         if (err) {
@@ -339,8 +336,8 @@ class RxNormServices extends CodeSystemProvider {
     return false;
   }
 
+  // eslint-disable-next-line no-unused-vars
   async getPrepContext(iterate) {
-    
     return new RxNormPrep();
   }
 
@@ -421,6 +418,9 @@ class RxNormServices extends CodeSystemProvider {
       rxnormFilter.params[`stem${i}`] = this.#sqlWrapString(stem) + '%';
 
       filterContext.filters.push(rxnormFilter);
+    }
+    if (sort) {
+      // TODO
     }
   }
 
@@ -547,11 +547,6 @@ class RxNormServices extends CodeSystemProvider {
     return set.results.some(row => row[this.getCodeField()] === concept.code);
   }
 
-  async filterFinish(filterContext) {
-    
-    // Clean up resources if needed
-  }
-
   async #executeFilter(filter) {
     return new Promise((resolve, reject) => {
       const paramArray = this.#buildParamArray(filter.sql, filter.params);
@@ -598,7 +593,8 @@ class RxNormServices extends CodeSystemProvider {
 
   // Subsumption testing
   async subsumesTest(codeA, codeB) {
-    
+    await this.#ensureContext(codeA);
+    await this.#ensureContext(codeB);
     return false; // Not implemented yet
   }
 
