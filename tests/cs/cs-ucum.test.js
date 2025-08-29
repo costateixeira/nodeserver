@@ -6,7 +6,6 @@
 const { readFileSync } = require('fs');
 
 const {
-  UcumCodeSystemProvider,
   UcumCodeSystemFactory
 } = require('../../tx/cs/cs-ucum');
 

@@ -1,6 +1,6 @@
 const { TxOperationContext } = require('../../tx/cs/cs-api');
-const { USStateServices, USStateFactoryProvider } = require('../../tx/cs/cs-usstates');
-const { LanguageDefinitions, Languages, Language } = require('../../library/languages');
+const { USStateFactoryProvider } = require('../../tx/cs/cs-usstates');
+const { Languages } = require('../../library/languages');
 
 describe('USStateServices', () => {
   let factory;

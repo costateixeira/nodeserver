@@ -2,16 +2,14 @@ const path = require('path');
 const fs = require('fs');
 const sqlite3 = require('sqlite3').verbose();
 const { Languages } = require('../../library/languages');
-const { TxOperationContext, Designation } = require('../../tx/cs/cs-api');
-const { UniiServices, UniiServicesFactory, UniiConcept } = require('../../tx/cs/cs-unii');
+const { TxOperationContext } = require('../../tx/cs/cs-api');
+const { UniiServicesFactory, UniiConcept } = require('../../tx/cs/cs-unii');
 const { UniiDataMigrator } = require('../../tx/importers/import-unii.module');
 
 describe('UniiDataMigrator', () => {
   const repoRoot = path.join(__dirname, '..', '..');
   const sourceFile = path.join(repoRoot, 'tests', 'data', 'unii-source-testing.txt');
   const destFile = path.join(repoRoot, 'data', 'unii-testing.db');
-
-  let migrator;
 
   test('should create database file', async () => {
     // Check that source file exists
