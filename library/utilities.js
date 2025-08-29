@@ -27,8 +27,23 @@ function validateParameter(param, name, type) {
   if (param == null) {
     throw new Error(`${name} must be a provided`);
   }
-  if (!(param instanceof type)) {
-    throw new Error(`${name} must be a valid ${type}`);
+  if (type === String) {
+    if (typeof param !== 'string') {
+      throw new Error(`${name} must be a string`);
+    }
+  } else if (type === Number) {
+    if (typeof param !== 'number' || isNaN(param)) {
+      throw new Error(`${name} must be a number`);
+    }
+  } else if (type === Boolean) {
+    if (typeof param !== 'boolean') {
+      throw new Error(`${name} must be a boolean`);
+    }
+  } else {
+    // Handle object types with instanceof
+    if (!(param instanceof type)) {
+      throw new Error(`${name} must be a valid ${type.name}`);
+    }
   }
 }
 

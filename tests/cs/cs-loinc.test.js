@@ -4,6 +4,7 @@ const path = require('path');
 const { LoincDataMigrator } = require('../../tx/importers/import-loinc.module');
 const { LoincServices, LoincServicesFactory, LoincProviderContext } = require('../../tx/cs/cs-loinc');
 const { TxOperationContext } = require('../../tx/cs/cs-api');
+const {validateParameter} = require("../../library/utilities");
 
 describe('LOINC Module Import', () => {
   const testSourceDir = path.resolve(__dirname, '../../tx/data/loinc');
@@ -573,6 +574,7 @@ describe('LOINC Provider', () => {
 
       for (const [filterType, testCases] of Object.entries(filterTests)) {
         for (const testCase of testCases) {
+          validateParameter(filterType, "filterType", String);
           const supports = await provider.doesFilter(
             testCase.property,
             testCase.operator,

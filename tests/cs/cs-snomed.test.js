@@ -17,22 +17,12 @@ const {
 const {
   SnomedExpressionParser,
   SnomedExpressionStatus,
-  SnomedConcept,
-  SnomedExpression,
-  SnomedRefinement,
-  SnomedRefinementGroup,
   SnomedExpressionServices,
   SnomedExpressionContext,
-  MatchingConcept,
-  SnomedServicesRenderOption,
-  SnomedRefinementGroupMatchState
+  SnomedServicesRenderOption
 } = require('../../tx/cs/cs-snomed-expressions');
 
-const {
-  SnomedProvider,
-  SnomedServicesFactory,
-  SnomedFilterContext
-} = require('../../tx/cs/cs-snomed');
+const { SnomedServicesFactory } = require('../../tx/cs/cs-snomed');
 
 const {SnomedImporter} = require("../../tx/importers/import-sct.module");
 const { TxOperationContext } = require('../../tx/cs/cs-api');
@@ -402,7 +392,7 @@ describe('SNOMED CT Expression Parser (Standalone Tests)', () => {
   /**
    * Helper function to parse and validate basic structure
    */
-  function parseAndValidate(expression, testName) {
+  function parseAndValidate(expression) {
     const result = parser.parse(expression);
     expect(result).toBeDefined();
     expect(result).not.toBeNull();
