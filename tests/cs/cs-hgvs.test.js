@@ -65,13 +65,6 @@ describe('HGVS Provider', () => {
       expect(provider.defaultToLatest()).toBe(true);
     });
 
-    test('should accept any version', () => {
-      expect(provider.defToThisVersion('any')).toBe(true);
-    });
-
-    test('should have no special enumeration', () => {
-      expect(provider.specialEnumeration()).toBeNull();
-    });
   });
 
   describe('Code Validation (External Service)', () => {
@@ -246,7 +239,6 @@ describe('HGVS Provider', () => {
     test('should throw errors for filter operations', async () => {
       await expect(provider.getPrepContext(true)).rejects.toThrow('not supported for HGVS');
       await expect(provider.searchFilter(null, 'filter', false)).rejects.toThrow('not supported for HGVS');
-      await expect(provider.specialFilter(null, 'filter', false)).rejects.toThrow('not supported for HGVS');
       await expect(provider.filter(null, 'prop', 'equal', 'value')).rejects.toThrow('not supported for HGVS');
       await expect(provider.prepare(null)).rejects.toThrow('not supported for HGVS');
       await expect(provider.executeFilters(null)).rejects.toThrow('not supported for HGVS');

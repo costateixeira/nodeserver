@@ -246,7 +246,7 @@ class SnomedServices {
     }
   }
 
-  getDisplayName(reference, langIndex = 0) {
+  getDisplayName(reference = 0) {
     try {
       const concept = this.concepts.getConcept(reference);
       const descriptionsRef = concept.descriptions;

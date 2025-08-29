@@ -493,14 +493,17 @@ class CodeSystemProvider {
   async searchFilter(filterContext, filter, sort) { throw new Error("Must override"); } // ? must override?
 
   /**
-   * I don't know what this does
+   * Used for searching ucum (see specialEnumeration)
    *
    * throws an exception if the search filter can't be handled
    * @param {FilterExecutionContext} filterContext filtering context
-   * @param {String} filter user entered text search
    * @param {boolean} sort ?
    **/
-  async specialFilter(filterContext, filter, sort) { throw new Error("Must override"); } // ? must override?
+  async specialFilter(filterContext, sort) {
+    if (this.specialEnumeration()) {
+      throw new Error("Must override");
+    }
+  } // ? must override?
 
   /**
    * Get a FilterConceptSet for a value set filter
@@ -587,7 +590,9 @@ class CodeSystemProvider {
    *
    @param {FilterExecutionContext} filterContext filtering context
    */
-  async filterFinish(filterContext) {throw new Error("Must override"); }
+  async filterFinish(filterContext) {
+
+  }
 
   /**
    * register the concept maps that are implicitly defined as part of the code system

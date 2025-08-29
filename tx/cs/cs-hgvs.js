@@ -1,3 +1,7 @@
+/*
+  eslint-disable no-unused-vars
+ */
+
 const assert = require('assert');
 const https = require('https');
 const { CodeSystemProvider, Designation, CodeSystemFactoryProvider } = require('./cs-api');
@@ -38,10 +42,6 @@ class HGVSServices extends CodeSystemProvider {
     return true;
   }
 
-  defToThisVersion(specifiedVersion) {
-    return true;
-  }
-
   // Core concept methods
   async code(context) {
     
@@ -57,7 +57,6 @@ class HGVSServices extends CodeSystemProvider {
   }
 
   async definition(context) {
-    
     return '';
   }
 
@@ -202,11 +201,6 @@ class HGVSServices extends CodeSystemProvider {
   }
 
   async searchFilter(filterContext, filter, sort) {
-    
-    throw new Error('Filters are not supported for HGVS');
-  }
-
-  async specialFilter(filterContext, filter, sort) {
     
     throw new Error('Filters are not supported for HGVS');
   }

@@ -1,4 +1,4 @@
-const { CodeSystemProvider, TxOperationContext, Designation, FilterExecutionContext } = require('./cs-api');
+const { CodeSystemProvider, Designation, FilterExecutionContext } = require('./cs-api');
 const assert = require('assert');
 const { CodeSystem } = require("../library/codesystem");
 
@@ -79,25 +79,25 @@ class Iso4217Services extends CodeSystemProvider {
 
   async definition(code) {
     
-    const ctxt = await this.#ensureContext(code);
+    await this.#ensureContext(code);
     return null; // No definitions provided
   }
 
   async isAbstract(code) {
     
-    const ctxt = await this.#ensureContext(code);
+    await this.#ensureContext(code);
     return false; // No abstract concepts
   }
 
   async isInactive(code) {
     
-    const ctxt = await this.#ensureContext(code);
+    await this.#ensureContext(code);
     return false; // No inactive concepts
   }
 
   async isDeprecated(code) {
     
-    const ctxt = await this.#ensureContext(code);
+    await this.#ensureContext(code);
     return false; // No deprecated concepts
   }
 
@@ -183,15 +183,6 @@ class Iso4217Services extends CodeSystemProvider {
     throw new Error('Search filter not implemented for ISO 4217');
   }
 
-  async specialFilter(filterContext, filter, sort) {
-    
-    assert(filterContext && filterContext instanceof FilterExecutionContext, 'filterContext must be a FilterExecutionContext');
-    assert(filter && typeof filter === 'string', 'filter must be a non-null string');
-    assert(typeof sort === 'boolean', 'sort must be a boolean');
-
-    throw new Error('Special filter not implemented for ISO 4217');
-  }
-
   async filter(filterContext, prop, op, value) {
     
     assert(filterContext && filterContext instanceof FilterExecutionContext, 'filterContext must be a FilterExecutionContext');
@@ -272,19 +263,17 @@ class Iso4217Services extends CodeSystemProvider {
     return set.list.includes(ctxt);
   }
 
-  async filterFinish(filterContext) {
-    
-    // No cleanup needed
-  }
 
   // Subsumption
   async subsumesTest(codeA, codeB) {
-    
+    await this.#ensureContext(codeA);
+    await this.#ensureContext(codeB);
     return false; // No subsumption relationships
   }
 
   async locateIsA(code, parent) {
-    
+    await this.#ensureContext(code);
+    await this.#ensureContext(parent);
     return { context: null, message: 'Subsumption not supported for ISO 4217' };
   }
 }

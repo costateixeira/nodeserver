@@ -199,13 +199,6 @@ describe('Iso4217Services', () => {
       ).rejects.toThrow('not implemented');
     });
 
-    test('should throw error for special filter', async () => {
-      const ctxt = await provider.getPrepContext(false);
-      await expect(
-        provider.specialFilter(ctxt, 'test', false)
-      ).rejects.toThrow('not implemented');
-    });
-
     test('should throw error for unsupported filter', async () => {
       const ctxt = await provider.getPrepContext(false);
       await expect(

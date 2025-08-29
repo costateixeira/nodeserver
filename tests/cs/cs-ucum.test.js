@@ -359,19 +359,6 @@ describe('UCUM Provider Integration Tests', () => {
   });
 });
 
-// Performance benchmark helper
-function benchmark(name, fn) {
-  return async (...args) => {
-    const start = process.hrtime.bigint();
-    const result = await fn(...args);
-    const end = process.hrtime.bigint();
-    const durationMs = Number(end - start) / 1_000_000;
-
-    // console.log(`${name}: ${durationMs.toFixed(2)}ms`);
-    return result;
-  };
-}
-
 // Usage example for external integration
 const integrationExample = {
   // Example: FHIR Observation validation
@@ -413,6 +400,5 @@ const integrationExample = {
 };
 
 module.exports = {
-  benchmark,
   integrationExample
 };

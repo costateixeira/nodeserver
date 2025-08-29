@@ -1607,14 +1607,6 @@ describe('FHIR CodeSystem Provider', () => {
         });
       });
 
-      describe('Special Filters', () => {
-        test('should handle special filter placeholder', async () => {
-          const results = await simpleProvider.specialFilter(filterContext, 'special-filter', true);
-          expect(results).toBeDefined();
-          expect(results.size()).toBe(0); // Placeholder returns empty results
-        });
-      });
-
       describe('Error Handling', () => {
         test('should handle null filter context gracefully', async () => {
           const size = await simpleProvider.filterSize(null, null);

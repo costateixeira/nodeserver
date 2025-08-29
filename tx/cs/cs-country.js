@@ -78,25 +78,25 @@ class CountryCodeServices extends CodeSystemProvider {
 
   async definition(code) {
     
-    // const ctxt = await this.#ensureContext(code);
+    await this.#ensureContext(code);
     return null; // No definitions provided
   }
 
   async isAbstract(code) {
     
-    // const ctxt = await this.#ensureContext(code);
+    await this.#ensureContext(code);
     return false; // No abstract concepts
   }
 
   async isInactive(code) {
     
-    // const ctxt = await this.#ensureContext(code);
+    await this.#ensureContext(code);
     return false; // No inactive concepts
   }
 
   async isDeprecated(code) {
     
-    // const ctxt = await this.#ensureContext(code);
+    await this.#ensureContext(code);
     return false; // No deprecated concepts
   }
 
@@ -183,15 +183,6 @@ class CountryCodeServices extends CodeSystemProvider {
     assert(typeof sort === 'boolean', 'sort must be a boolean');
 
     throw new Error('Search filter not implemented for CountryCode');
-  }
-
-  async specialFilter(filterContext, filter, sort) {
-    
-    assert(filterContext && filterContext instanceof FilterExecutionContext, 'filterContext must be a FilterExecutionContext');
-    assert(filter && typeof filter === 'string', 'filter must be a non-null string');
-    assert(typeof sort === 'boolean', 'sort must be a boolean');
-
-    throw new Error('Special filter not implemented for CountryCode');
   }
 
   async filter(filterContext, prop, op, value) {
@@ -283,14 +274,10 @@ class CountryCodeServices extends CodeSystemProvider {
     return set.list.includes(ctxt);
   }
 
-  async filterFinish(filterContext) {
-    
-    // No cleanup needed
-  }
-
   // Subsumption
   async subsumesTest(codeA, codeB) {
-    
+    await this.#ensureContext(codeA);
+    await this.#ensureContext(codeB);
     return 'not-subsumed'; // No subsumption relationships
   }
 }

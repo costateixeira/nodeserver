@@ -404,11 +404,6 @@ describe('CountryCodeServices', () => {
       ).rejects.toThrow('not implemented');
     });
 
-    test('should throw error for special filter', async () => {
-      await expect(
-        provider.specialFilter(await provider.getPrepContext(false), 'test', false)
-      ).rejects.toThrow('not implemented');
-    });
   });
 
   describe('Execute Filters', () => {

@@ -1,9 +1,6 @@
-const fs = require('fs');
-const path = require('path');
 const sqlite3 = require('sqlite3').verbose();
 const assert = require('assert');
 const { CodeSystem } = require('../library/codesystem');
-const { Languages, Language } = require('../../library/languages');
 const { CodeSystemProvider, Designation, FilterExecutionContext, CodeSystemFactoryProvider } = require('./cs-api');
 
 class CPTConceptDesignation {
@@ -483,7 +480,7 @@ class CPTServices extends CodeSystemProvider {
 
   async getPrepContext(iterate) {
     
-    return new CPTPrep();
+    return new CPTPrep(iterate);
   }
 
   async filter(filterContext, prop, op, value) {
@@ -559,10 +556,6 @@ class CPTServices extends CodeSystemProvider {
     return false;
   }
 
-  async filterFinish(filterContext) {
-    
-    // Clean up resources if needed
-  }
 
   async filtersNotClosed(filterContext) {
     
@@ -570,6 +563,7 @@ class CPTServices extends CodeSystemProvider {
   }
 
   // Search filter - not implemented
+  // eslint-disable-next-line no-unused-vars
   async searchFilter(filterContext, filter, sort) {
     
     throw new Error('Text search not implemented yet');
@@ -577,7 +571,8 @@ class CPTServices extends CodeSystemProvider {
 
   // Subsumption testing - not implemented
   async subsumesTest(codeA, codeB) {
-    
+    await this.#ensureContext(codeA);
+    await this.#ensureContext(codeB);
     return false;
   }
 }

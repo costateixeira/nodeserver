@@ -1,7 +1,8 @@
-const { CodeSystem, CodeSystemContentMode}  = require("../library/codesystem");
+const { CodeSystem}  = require("../library/codesystem");
 const { CodeSystemFactoryProvider, CodeSystemProvider, Designation, FilterExecutionContext }  = require( "./cs-api");
 const { VersionUtilities }  = require("../../library/version-utilities");
 const { Language }  = require ("../../library/languages");
+const {validateParameter} = require("../../library/utilities");
 
 /**
  * Context class for FHIR CodeSystem provider concepts
@@ -923,13 +924,14 @@ class FhirCodeSystemProvider extends CodeSystemProvider {
    */
   async getPrepContext(iterate) {
     
-    return new FilterExecutionContext();
+    return new FilterExecutionContext(iterate);
   }
 
   /**
    * @param {FilterExecutionContext} filterContext - Filter context
    * @returns {boolean} True if filters are not closed (infinite results possible)
    */
+  // eslint-disable-next-line no-unused-vars
   async filtersNotClosed(filterContext) {
     
     return false; // FHIR CodeSystems are typically closed/finite
@@ -943,8 +945,7 @@ class FhirCodeSystemProvider extends CodeSystemProvider {
    * @returns {Promise<boolean>} True if filter is supported
    */
   async doesFilter(prop, op, value) {
-    
-
+    validateParameter(value, "value", String);
     // Supported hierarchy filters
     if ((prop === 'concept' || prop === 'code') &&
       ['is-a', 'descendent-of', 'is-not-a', 'in', '=', 'regex'].includes(op)) {
@@ -1462,28 +1463,6 @@ class FhirCodeSystemProvider extends CodeSystemProvider {
     return results;
   }
 
-  /**
-   * Handle special filters (placeholder - extend as needed)
-   * @param {FilterExecutionContext} filterContext - Filter context
-   * @param {string} filter - Special filter
-   * @param {boolean} sort - Whether to sort results
-   * @returns {Promise<FhirCodeSystemProviderFilterContext>} Filter results
-   */
-  async specialFilter(filterContext, filter, sort) {
-    
-
-    // Placeholder for special filter implementation
-    // Can be extended for CodeSystem-specific special filters
-    const results = new FhirCodeSystemProviderFilterContext();
-
-    // Add to filter context
-    if (!filterContext.filters) {
-      filterContext.filters = [];
-    }
-    filterContext.filters.push(results);
-
-    return results;
-  }
 }
 
 class FhirCodeSystemFactory extends CodeSystemFactoryProvider {
