@@ -1,10 +1,7 @@
-const fs = require('fs');
-const path = require('path');
 const sqlite3 = require('sqlite3').verbose();
 const assert = require('assert');
 const { CodeSystem } = require('../library/codesystem');
-const { Languages, Language } = require('../../library/languages');
-const { CodeSystemProvider, Designation, TxOperationContext, FilterExecutionContext, CodeSystemFactoryProvider } = require('./cs-api');
+const { CodeSystemProvider, Designation, CodeSystemFactoryProvider } = require('./cs-api');
 
 // Context for RxNorm concepts
 class RxNormConcept {
@@ -55,8 +52,8 @@ class RxNormIteratorContext {
 }
 
 class RxNormServices extends CodeSystemProvider {
-  constructor(db, supplements, sharedData, isNCI = false) {
-    super(supplements);
+  constructor(opContext, supplements, db, sharedData, isNCI = false) {
+    super(opContext, supplements);
     this.db = db;
     this.isNCI = isNCI;
 
@@ -79,7 +76,7 @@ class RxNormServices extends CodeSystemProvider {
     return this.isNCI ? 'http://ncimeta.nci.nih.gov' : 'http://www.nlm.nih.gov/research/umls/rxnorm';
   }
 
-  async version() {
+  version() {
     return this.dbVersion;
   }
 
@@ -104,21 +101,21 @@ class RxNormServices extends CodeSystemProvider {
   }
 
   // Core concept methods
-  async code(opContext, context) {
-    this._ensureOpContext(opContext);
-    const ctxt = await this.#ensureContext(opContext, context);
+  async code(context) {
+    
+    const ctxt = await this.#ensureContext(context);
     return ctxt ? ctxt.code : null;
   }
 
-  async display(opContext, context) {
-    this._ensureOpContext(opContext);
-    const ctxt = await this.#ensureContext(opContext, context);
+  async display(context) {
+    
+    const ctxt = await this.#ensureContext(context);
     if (!ctxt) {
       return null;
     }
 
     // Check supplements first
-    let disp = this._displayFromSupplements(opContext, ctxt.code);
+    let disp = this._displayFromSupplements(ctxt.code);
     if (disp) {
       return disp;
     }
@@ -126,19 +123,20 @@ class RxNormServices extends CodeSystemProvider {
     return ctxt.display || '';
   }
 
-  async definition(opContext, context) {
-    this._ensureOpContext(opContext);
+  async definition(context) {
+    await this.#ensureContext(context);
     return null; // RxNorm doesn't provide definitions
   }
 
-  async isAbstract(opContext, context) {
-    this._ensureOpContext(opContext);
+  async isAbstract(context) {
+    await this.#ensureContext(context);
+
     return false; // RxNorm codes are not abstract
   }
 
-  async isInactive(opContext, context) {
-    this._ensureOpContext(opContext);
-    const ctxt = await this.#ensureContext(opContext, context);
+  async isInactive(context) {
+    
+    const ctxt = await this.#ensureContext(context);
 
     if (ctxt && ctxt.archived) {
       return true;
@@ -158,15 +156,15 @@ class RxNormServices extends CodeSystemProvider {
     });
   }
 
-  async isDeprecated(opContext, context) {
-    this._ensureOpContext(opContext);
-    const ctxt = await this.#ensureContext(opContext, context);
+  async isDeprecated(context) {
+    
+    const ctxt = await this.#ensureContext(context);
     return ctxt ? ctxt.archived : false;
   }
 
-  async designations(opContext, context) {
-    this._ensureOpContext(opContext);
-    const ctxt = await this.#ensureContext(opContext, context);
+  async designations(context) {
+    
+    const ctxt = await this.#ensureContext(context);
     let designations = [];
 
     if (ctxt) {
@@ -185,12 +183,12 @@ class RxNormServices extends CodeSystemProvider {
     return designations;
   }
 
-  async #ensureContext(opContext, context) {
+  async #ensureContext(context) {
     if (context == null) {
       return null;
     }
     if (typeof context === 'string') {
-      const ctxt = await this.locate(opContext, context);
+      const ctxt = await this.locate(context);
       if (ctxt.context == null) {
         throw new Error(ctxt.message);
       } else {
@@ -204,14 +202,13 @@ class RxNormServices extends CodeSystemProvider {
   }
 
   // Lookup methods
-  async locate(opContext, code) {
-    this._ensureOpContext(opContext);
+  async locate(code) {
+    
     assert(code == null || typeof code === 'string', 'code must be string');
     if (!code) return { context: null, message: 'Empty code' };
 
     return new Promise((resolve, reject) => {
       let sql = `SELECT STR, TTY FROM rxnconso WHERE ${this.getCodeField()} = ? AND SAB = ?`;
-      let archive = false;
 
       this.db.all(sql, [code, this.getSAB()], (err, rows) => {
         if (err) {
@@ -260,8 +257,8 @@ class RxNormServices extends CodeSystemProvider {
   }
 
   // Iterator methods
-  async iterator(opContext, context) {
-    this._ensureOpContext(opContext);
+  async iterator(context) {
+    
 
     if (context === null) {
       // Iterate all codes
@@ -273,8 +270,8 @@ class RxNormServices extends CodeSystemProvider {
     }
   }
 
-  async nextContext(opContext, iteratorContext) {
-    this._ensureOpContext(opContext);
+  async nextContext(iteratorContext) {
+    
 
     if (!iteratorContext.executed) {
       await this.#executeIterator(iteratorContext);
@@ -306,8 +303,8 @@ class RxNormServices extends CodeSystemProvider {
   }
 
   // Filter support
-  async doesFilter(opContext, prop, op, value) {
-    this._ensureOpContext(opContext);
+  async doesFilter(prop, op, value) {
+    
 
     prop = prop.toUpperCase();
 
@@ -339,13 +336,13 @@ class RxNormServices extends CodeSystemProvider {
     return false;
   }
 
-  async getPrepContext(opContext, iterate) {
-    this._ensureOpContext(opContext);
+  // eslint-disable-next-line no-unused-vars
+  async getPrepContext(iterate) {
     return new RxNormPrep();
   }
 
-  async filter(opContext, filterContext, prop, op, value) {
-    this._ensureOpContext(opContext);
+  async filter(filterContext, prop, op, value) {
+    
 
     const filter = new RxNormFilterHolder();
     prop = prop.toUpperCase();
@@ -406,8 +403,8 @@ class RxNormServices extends CodeSystemProvider {
     filterContext.filters.push(filter);
   }
 
-  async searchFilter(opContext, filterContext, filter, sort) {
-    this._ensureOpContext(opContext);
+  async searchFilter(filterContext, filter, sort) {
+    
 
     if (!filter || !filter.stems || filter.stems.length === 0) {
       throw new Error('Invalid search filter');
@@ -422,10 +419,13 @@ class RxNormServices extends CodeSystemProvider {
 
       filterContext.filters.push(rxnormFilter);
     }
+    if (sort) {
+      // TODO
+    }
   }
 
-  async executeFilters(opContext, filterContext) {
-    this._ensureOpContext(opContext);
+  async executeFilters(filterContext) {
+    
 
     if (filterContext.filters.length === 0) {
       return [];
@@ -473,8 +473,8 @@ class RxNormServices extends CodeSystemProvider {
     return [combinedFilter];
   }
 
-  async filterSize(opContext, filterContext, set) {
-    this._ensureOpContext(opContext);
+  async filterSize(filterContext, set) {
+    
 
     if (!set.executed) {
       await this.#executeFilter(set);
@@ -483,8 +483,8 @@ class RxNormServices extends CodeSystemProvider {
     return set.results ? set.results.length : 0;
   }
 
-  async filterMore(opContext, filterContext, set) {
-    this._ensureOpContext(opContext);
+  async filterMore(filterContext, set) {
+    
 
     if (!set.executed) {
       await this.#executeFilter(set);
@@ -493,8 +493,8 @@ class RxNormServices extends CodeSystemProvider {
     return set.cursor < (set.results ? set.results.length : 0);
   }
 
-  async filterConcept(opContext, filterContext, set) {
-    this._ensureOpContext(opContext);
+  async filterConcept(filterContext, set) {
+    
 
     if (!set.executed) {
       await this.#executeFilter(set);
@@ -511,8 +511,8 @@ class RxNormServices extends CodeSystemProvider {
     return concept;
   }
 
-  async filterLocate(opContext, filterContext, set, code) {
-    this._ensureOpContext(opContext);
+  async filterLocate(filterContext, set, code) {
+    
 
     return new Promise((resolve, reject) => {
       // Build query to check if code exists in filter
@@ -533,8 +533,8 @@ class RxNormServices extends CodeSystemProvider {
     });
   }
 
-  async filterCheck(opContext, filterContext, set, concept) {
-    this._ensureOpContext(opContext);
+  async filterCheck(filterContext, set, concept) {
+    
 
     if (!(concept instanceof RxNormConcept)) {
       return false;
@@ -545,11 +545,6 @@ class RxNormServices extends CodeSystemProvider {
     }
 
     return set.results.some(row => row[this.getCodeField()] === concept.code);
-  }
-
-  async filterFinish(opContext, filterContext) {
-    this._ensureOpContext(opContext);
-    // Clean up resources if needed
   }
 
   async #executeFilter(filter) {
@@ -597,17 +592,18 @@ class RxNormServices extends CodeSystemProvider {
   }
 
   // Subsumption testing
-  async subsumesTest(opContext, codeA, codeB) {
-    this._ensureOpContext(opContext);
+  async subsumesTest(codeA, codeB) {
+    await this.#ensureContext(codeA);
+    await this.#ensureContext(codeB);
     return false; // Not implemented yet
   }
 
   // Extension for lookup operation
-  async extendLookup(opContext, ctxt, props, params) {
-    this._ensureOpContext(opContext);
+  async extendLookup(ctxt, props, params) {
+    
 
     if (typeof ctxt === 'string') {
-      const located = await this.locate(opContext, ctxt);
+      const located = await this.locate(ctxt);
       if (!located.context) {
         throw new Error(located.message);
       }
@@ -622,7 +618,7 @@ class RxNormServices extends CodeSystemProvider {
     params.abstract = false;
 
     // Add designations
-    const designations = await this.designations(opContext, ctxt);
+    const designations = await this.designations(ctxt);
     for (const designation of designations) {
       this.#addProperty(params, 'designation', 'display', designation.value, designation.language);
     }
@@ -658,14 +654,21 @@ class RxNormTypeServicesFactory extends CodeSystemFactoryProvider {
     this._sharedData = null;
   }
 
+  system() {
+    return this.isNCI ? 'http://ncimeta.nci.nih.gov' : 'http://www.nlm.nih.gov/research/umls/rxnorm';
+  }
+
+  version() {
+    return this._sharedData.version;
+  }
+
   async #ensureLoaded() {
     if (!this._loaded) {
-      await this.#loadSharedData();
-      this._loaded = true;
+      await this.load();
     }
   }
 
-  async #loadSharedData() {
+  async load() {
     const db = new sqlite3.Database(this.dbPath);
 
     try {
@@ -692,6 +695,7 @@ class RxNormTypeServicesFactory extends CodeSystemFactoryProvider {
     } finally {
       db.close();
     }
+    this._loaded = true;
   }
 
   async #readVersion(db) {
@@ -754,7 +758,7 @@ class RxNormTypeServicesFactory extends CodeSystemFactoryProvider {
     // Create fresh database connection for this provider instance
     const db = new sqlite3.Database(this.dbPath);
 
-    return new RxNormServices(db, supplements, this._sharedData, this.isNCI);
+    return new RxNormServices(opContext, supplements, db, this._sharedData, this.isNCI);
   }
 }
 

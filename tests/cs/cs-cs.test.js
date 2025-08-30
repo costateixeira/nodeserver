@@ -9,7 +9,6 @@ const {Languages, Language} = require('../../library/languages');
 describe('FHIR CodeSystem Provider', () => {
   let factory;
   let simpleCS, deCS, extensionsCS, supplementCS;
-  let opContextEn, opContextDe, opContextMulti;
 
   beforeEach(() => {
     // Initialize factory
@@ -25,11 +24,6 @@ describe('FHIR CodeSystem Provider', () => {
     deCS = new CodeSystem(deData);
     extensionsCS = new CodeSystem(extensionsData);
     supplementCS = new CodeSystem(supplementData);
-
-    // Create operation contexts for different languages
-    opContextEn = new TxOperationContext('en-US');
-    opContextDe = new TxOperationContext('de-DE');
-    opContextMulti = new TxOperationContext('en-US,de;q=0.8,es;q=0.6');
   });
 
   describe('Factory', () => {
@@ -39,32 +33,32 @@ describe('FHIR CodeSystem Provider', () => {
 
     test('should increment use count', () => {
       const initialCount = factory.useCount();
-      factory.build(opContextEn, simpleCS, []);
+      factory.build(new TxOperationContext('en-US'), [], simpleCS);
       expect(factory.useCount()).toBe(initialCount + 1);
     });
 
     test('should validate CodeSystem parameter', () => {
       expect(() => {
-        factory.build(opContextEn, null, []);
+        factory.build(new TxOperationContext('en-US'), [], null);
       }).toThrow('codeSystem parameter is required');
 
       expect(() => {
-        factory.build(opContextEn, {resourceType: 'ValueSet'}, []);
+        factory.build(new TxOperationContext('en-US'), [], {resourceType: 'ValueSet'});
       }).toThrow('codeSystem must be a FHIR CodeSystem resource');
     });
 
     test('should validate supplements parameter', () => {
       expect(() => {
-        factory.build(opContextEn, simpleCS, 'not-an-array');
+        factory.build(new TxOperationContext('en-US'), 'not-an-array', simpleCS);
       }).toThrow('supplements must be an array');
 
       expect(() => {
-        factory.build(opContextEn, simpleCS, [{resourceType: 'ValueSet'}]);
+        factory.build(new TxOperationContext('en-US'), [{resourceType: 'ValueSet'}], simpleCS);
       }).toThrow('Supplement 0 must be a FHIR CodeSystem resource');
     });
 
     test('should build provider with supplements', () => {
-      const provider = factory.build(opContextEn, extensionsCS, [supplementCS]);
+      const provider = factory.build(new TxOperationContext('en-US'), [supplementCS], extensionsCS);
       expect(provider).toBeInstanceOf(FhirCodeSystemProvider);
       expect(provider.supplements).toHaveLength(1);
     });
@@ -74,9 +68,9 @@ describe('FHIR CodeSystem Provider', () => {
     let simpleProvider, deProvider, extensionsProvider;
 
     beforeEach(() => {
-      simpleProvider = factory.build(opContextEn, simpleCS, []);
-      deProvider = factory.build(opContextDe, deCS, []);
-      extensionsProvider = factory.build(opContextEn, extensionsCS, [supplementCS]);
+      simpleProvider = factory.build(new TxOperationContext('en-US'), [], simpleCS);
+      deProvider = factory.build(new TxOperationContext('de-DE'), [], deCS);
+      extensionsProvider = factory.build(new TxOperationContext('en-US'), [supplementCS], extensionsCS);
     });
 
     describe('name()', () => {
@@ -117,7 +111,7 @@ describe('FHIR CodeSystem Provider', () => {
         const noLangData = {...simpleCS.jsonObj};
         delete noLangData.language;
         const noLangCS = new CodeSystem(noLangData);
-        const noLangProvider = factory.build(opContextEn, noLangCS, []);
+        const noLangProvider = factory.build(new TxOperationContext('en-US'), [], noLangCS);
         expect(noLangProvider.defLang()).toBe('en');
       });
     });
@@ -128,7 +122,7 @@ describe('FHIR CodeSystem Provider', () => {
       });
 
       test('should return supplement for supplement CodeSystem', () => {
-        const supplementProvider = factory.build(opContextEn, supplementCS, []);
+        const supplementProvider = factory.build(new TxOperationContext('en-US'), [], supplementCS);
         expect(supplementProvider.contentMode()).toBe('supplement');
       });
     });
@@ -249,7 +243,7 @@ describe('FHIR CodeSystem Provider', () => {
         const noStatusData = {...simpleCS.jsonObj};
         delete noStatusData.status;
         const noStatusCS = new CodeSystem(noStatusData);
-        const noStatusProvider = factory.build(opContextEn, noStatusCS, []);
+        const noStatusProvider = factory.build(new TxOperationContext('en-US'), [], noStatusCS);
         expect(noStatusProvider.status()).toBeNull();
       });
 
@@ -266,12 +260,12 @@ describe('FHIR CodeSystem Provider', () => {
     let simpleProvider;
 
     beforeEach(() => {
-      simpleProvider = factory.build(opContextEn, simpleCS, []);
+      simpleProvider = factory.build(new TxOperationContext('en-US'), [], simpleCS);
     });
 
     describe('locate()', () => {
       test('should locate existing code', async () => {
-        const result = await simpleProvider.locate(opContextEn, 'code1');
+        const result = await simpleProvider.locate('code1');
         expect(result.context).toBeDefined();
         expect(result.context).toBeInstanceOf(FhirCodeSystemProviderContext);
         expect(result.context.code).toBe('code1');
@@ -279,26 +273,26 @@ describe('FHIR CodeSystem Provider', () => {
       });
 
       test('should locate nested code', async () => {
-        const result = await simpleProvider.locate(opContextEn, 'code2a');
+        const result = await simpleProvider.locate('code2a');
         expect(result.context).toBeDefined();
         expect(result.context.code).toBe('code2a');
         expect(result.message).toBeNull();
       });
 
       test('should return null for non-existent code', async () => {
-        const result = await simpleProvider.locate(opContextEn, 'nonexistent');
+        const result = await simpleProvider.locate('nonexistent');
         expect(result.context).toBeNull();
         expect(result.message).toContain('not found');
       });
 
       test('should handle empty code', async () => {
-        const result = await simpleProvider.locate(opContextEn, '');
+        const result = await simpleProvider.locate('');
         expect(result.context).toBeNull();
         expect(result.message).toContain('Empty or invalid code');
       });
 
       test('should handle null code', async () => {
-        const result = await simpleProvider.locate(opContextEn, null);
+        const result = await simpleProvider.locate(null);
         expect(result.context).toBeNull();
         expect(result.message).toContain('Empty or invalid code');
       });
@@ -306,23 +300,23 @@ describe('FHIR CodeSystem Provider', () => {
 
     describe('code()', () => {
       test('should return code from string input', async () => {
-        const code = await simpleProvider.code(opContextEn, 'code1');
+        const code = await simpleProvider.code('code1');
         expect(code).toBe('code1');
       });
 
       test('should return code from context input', async () => {
-        const locateResult = await simpleProvider.locate(opContextEn, 'code2');
-        const code = await simpleProvider.code(opContextEn, locateResult.context);
+        const locateResult = await simpleProvider.locate('code2');
+        const code = await simpleProvider.code(locateResult.context);
         expect(code).toBe('code2');
       });
 
       test('should return null for non-existent code', async () => {
-        await expect(simpleProvider.code(opContextEn, 'nonexistent'))
+        await expect(simpleProvider.code('nonexistent'))
           .rejects.toThrow('not found');
       });
 
       test('should throw error for invalid context type', async () => {
-        await expect(simpleProvider.code(opContextEn, {invalid: 'object'}))
+        await expect(simpleProvider.code({invalid: 'object'}))
           .rejects.toThrow('Unknown Type at #ensureContext');
       });
     });
@@ -332,8 +326,8 @@ describe('FHIR CodeSystem Provider', () => {
     let simpleProvider, deProvider;
 
     beforeEach(() => {
-      simpleProvider = factory.build(opContextEn, simpleCS, []);
-      deProvider = factory.build(opContextEn, deCS, []);
+      simpleProvider = factory.build(new TxOperationContext('en-US'), [], simpleCS);
+      deProvider = factory.build(new TxOperationContext('en-US'), [], deCS);
     });
 
     test('should return status information when present', () => {
@@ -348,7 +342,7 @@ describe('FHIR CodeSystem Provider', () => {
       const noStatusData = {...simpleCS.jsonObj};
       delete noStatusData.status;
       const noStatusCS = new CodeSystem(noStatusData);
-      const noStatusProvider = factory.build(opContextEn, noStatusCS, []);
+      const noStatusProvider = factory.build(new TxOperationContext('en-US'), [], noStatusCS);
       expect(noStatusProvider.status()).toBeNull();
     });
 
@@ -364,12 +358,12 @@ describe('FHIR CodeSystem Provider', () => {
     let simpleProvider;
 
     beforeEach(() => {
-      simpleProvider = factory.build(opContextEn, simpleCS, []);
+      simpleProvider = factory.build(new TxOperationContext('en-US'), [], simpleCS);
     });
 
     describe('locate()', () => {
       test('should locate existing code', async () => {
-        const result = await simpleProvider.locate(opContextEn, 'code1');
+        const result = await simpleProvider.locate('code1');
         expect(result.context).toBeDefined();
         expect(result.context).toBeInstanceOf(FhirCodeSystemProviderContext);
         expect(result.context.code).toBe('code1');
@@ -377,26 +371,26 @@ describe('FHIR CodeSystem Provider', () => {
       });
 
       test('should locate nested code', async () => {
-        const result = await simpleProvider.locate(opContextEn, 'code2a');
+        const result = await simpleProvider.locate('code2a');
         expect(result.context).toBeDefined();
         expect(result.context.code).toBe('code2a');
         expect(result.message).toBeNull();
       });
 
       test('should return null for non-existent code', async () => {
-        const result = await simpleProvider.locate(opContextEn, 'nonexistent');
+        const result = await simpleProvider.locate('nonexistent');
         expect(result.context).toBeNull();
         expect(result.message).toContain('not found');
       });
 
       test('should handle empty code', async () => {
-        const result = await simpleProvider.locate(opContextEn, '');
+        const result = await simpleProvider.locate('');
         expect(result.context).toBeNull();
         expect(result.message).toContain('Empty or invalid code');
       });
 
       test('should handle null code', async () => {
-        const result = await simpleProvider.locate(opContextEn, null);
+        const result = await simpleProvider.locate(null);
         expect(result.context).toBeNull();
         expect(result.message).toContain('Empty or invalid code');
       });
@@ -404,23 +398,23 @@ describe('FHIR CodeSystem Provider', () => {
 
     describe('code()', () => {
       test('should return code from string input', async () => {
-        const code = await simpleProvider.code(opContextEn, 'code1');
+        const code = await simpleProvider.code('code1');
         expect(code).toBe('code1');
       });
 
       test('should return code from context input', async () => {
-        const locateResult = await simpleProvider.locate(opContextEn, 'code2');
-        const code = await simpleProvider.code(opContextEn, locateResult.context);
+        const locateResult = await simpleProvider.locate('code2');
+        const code = await simpleProvider.code(locateResult.context);
         expect(code).toBe('code2');
       });
 
       test('should return null for non-existent code', async () => {
-        await expect(simpleProvider.code(opContextEn, 'nonexistent'))
+        await expect(simpleProvider.code('nonexistent'))
           .rejects.toThrow('not found');
       });
 
       test('should throw error for invalid context type', async () => {
-        await expect(simpleProvider.code(opContextEn, {invalid: 'object'}))
+        await expect(simpleProvider.code({invalid: 'object'}))
           .rejects.toThrow('Unknown Type at #ensureContext');
       });
     });
@@ -430,7 +424,7 @@ describe('FHIR CodeSystem Provider', () => {
     let deProvider;
 
     beforeEach(() => {
-      deProvider = factory.build(opContextDe, deCS, []);
+      deProvider = factory.build(new TxOperationContext('de-DE'), [], deCS);
     });
 
     test('should correctly parse German language', () => {
@@ -461,7 +455,7 @@ describe('FHIR CodeSystem Provider', () => {
     let extensionsProvider;
 
     beforeEach(() => {
-      extensionsProvider = factory.build(opContextEn, extensionsCS, [supplementCS]);
+      extensionsProvider = factory.build(new TxOperationContext('en-US'), [supplementCS], extensionsCS);
     });
 
     test('should include supplement in provider', () => {
@@ -547,7 +541,7 @@ describe('FHIR CodeSystem Provider', () => {
   describe('Real World Scenarios', () => {
 
     test('should handle complex multilingual CodeSystem', () => {
-      const provider = factory.build(opContextMulti, deCS, []);
+      const provider = factory.build(new TxOperationContext('en-US,de;q=0.8,es;q=0.6'), [], deCS);
 
       const langs = Languages.fromAcceptLanguage('en-US,de;q=0.8,es;q=0.6');
       expect(provider.hasAnyDisplays(langs)).toBe(true);
@@ -556,7 +550,7 @@ describe('FHIR CodeSystem Provider', () => {
     });
 
     test('should handle extension-based CodeSystem with supplements', () => {
-      const provider = factory.build(opContextEn, extensionsCS, [supplementCS]);
+      const provider = factory.build(new TxOperationContext('en-US'), [supplementCS], extensionsCS);
 
       expect(provider.system()).toBe('http://hl7.org/fhir/test/CodeSystem/extensions');
       expect(provider.supplements).toHaveLength(1);
@@ -573,116 +567,115 @@ describe('FHIR CodeSystem Provider', () => {
     let simpleProvider;
 
     beforeEach(() => {
-      simpleProvider = factory.build(opContextEn, simpleCS, []);
+      simpleProvider = factory.build(new TxOperationContext('en-US'), [], simpleCS);
     });
 
     describe('display()', () => {
 
       test('should return display for code', async () => {
-        const display = await simpleProvider.display(opContextEn, 'code1');
+        const display = await simpleProvider.display('code1');
         expect(display).toBe('Display 1');
       });
 
       test('should return display for context', async () => {
-        const locateResult = await simpleProvider.locate(opContextEn, 'code2');
-        const display = await simpleProvider.display(opContextEn, locateResult.context);
+        const locateResult = await simpleProvider.locate('code2');
+        const display = await simpleProvider.display(locateResult.context);
         expect(display).toBe('Display 2');
       });
 
       test('should throw error for non-existent code', async () => {
-        await expect(simpleProvider.display(opContextEn, 'nonexistent'))
+        await expect(simpleProvider.display('nonexistent'))
           .rejects.toThrow('not found');
       });
 
       test('should handle language-specific displays', async () => {
-        const deProvider = factory.build(opContextDe, deCS, []);
-        const display = await deProvider.display(opContextDe, 'code1');
+        const deProvider = factory.build(new TxOperationContext('de-DE'), [], deCS);
+        const display = await deProvider.display('code1');
         expect(display).toBe('Anzeige 1');
       });
 
       test('should handle designation-based displays', async () => {
-        const deProvider = factory.build(opContextEn, deCS, []);
-        const esContext = new TxOperationContext('es');
-        const display = await deProvider.display(esContext, 'code2');
+        const deProvider = factory.build(new TxOperationContext('es'), [], deCS);
+        const display = await deProvider.display('code2');
         expect(display).toBe('Mostrar 2');
       });
     });
 
     describe('definition()', () => {
       test('should return definition when present', async () => {
-        const definition = await simpleProvider.definition(opContextEn, 'code1');
+        const definition = await simpleProvider.definition('code1');
         expect(definition).toBe('My first code');
       });
 
       test('should return null for code without definition', async () => {
         // Test with code that might not have definition
-        const definition = await simpleProvider.definition(opContextEn, 'code1');
+        const definition = await simpleProvider.definition('code1');
         expect(typeof definition).toBe('string'); // Should have definition
       });
     });
 
     describe('isAbstract()', () => {
       test('should return false for concrete concepts', async () => {
-        const isAbstract = await simpleProvider.isAbstract(opContextEn, 'code1');
+        const isAbstract = await simpleProvider.isAbstract('code1');
         expect(isAbstract).toBe(false);
       });
 
       test('should return true for abstract concepts', async () => {
         // code2 has notSelectable=true property
-        const isAbstract = await simpleProvider.isAbstract(opContextEn, 'code2');
+        const isAbstract = await simpleProvider.isAbstract('code2');
         expect(isAbstract).toBe(true);
       });
     });
 
     describe('isInactive()', () => {
       test('should return false for active concepts', async () => {
-        const isInactive = await simpleProvider.isInactive(opContextEn, 'code1');
+        const isInactive = await simpleProvider.isInactive('code1');
         expect(isInactive).toBe(false);
       });
     });
 
     describe('isDeprecated()', () => {
       test('should return false for active concepts', async () => {
-        const isDeprecated = await simpleProvider.isDeprecated(opContextEn, 'code1');
+        const isDeprecated = await simpleProvider.isDeprecated('code1');
         expect(isDeprecated).toBe(false);
       });
 
       test('should return true for retired concepts', async () => {
         // code2 has status=retired property
-        const isDeprecated = await simpleProvider.isDeprecated(opContextEn, 'code2');
+        const isDeprecated = await simpleProvider.isDeprecated('code2');
         expect(isDeprecated).toBe(true);
       });
     });
 
     describe('getStatus()', () => {
       test('should return null for concepts without status', async () => {
-        const status = await simpleProvider.getStatus(opContextEn, 'code1');
+        const status = await simpleProvider.getStatus('code1');
         expect(status).toBeNull();
       });
 
       test('should return status when present', async () => {
         // code2 has status=retired property
-        const status = await simpleProvider.getStatus(opContextEn, 'code2');
+        const status = await simpleProvider.getStatus('code2');
         expect(status).toBe('retired');
       });
     });
 
     describe('itemWeight()', () => {
       test('should return null for concepts without itemWeight', async () => {
-        const weight = await simpleProvider.itemWeight(opContextEn, 'code1');
+        const weight = await simpleProvider.itemWeight('code1');
         expect(weight).toBeNull();
       });
 
       test('should return itemWeight from supplement', async () => {
-        const extensionsProvider = factory.build(opContextEn, extensionsCS, [supplementCS]);
-        const weight = await extensionsProvider.itemWeight(opContextEn, 'code1');
+        const extensionsProvider = factory.build(new TxOperationContext('en-US'), [supplementCS], extensionsCS);
+        const weight = await extensionsProvider.itemWeight('code1');
         expect(weight).toBe('1.2');
       });
     });
 
     describe('designations()', () => {
       test('should return designations for code with display', async () => {
-        const designations = await simpleProvider.designations(opContextEn, 'code1');
+        const designations = await simpleProvider.designations('code1');
         expect(designations).toBeDefined();
         expect(Array.isArray(designations)).toBe(true);
         expect(designations.length).toBeGreaterThan(0);
@@ -693,7 +686,7 @@ describe('FHIR CodeSystem Provider', () => {
       });
 
       test('should return designations from concept designations', async () => {
-        const designations = await simpleProvider.designations(opContextEn, 'code1');
+        const designations = await simpleProvider.designations('code1');
         expect(designations).toBeDefined();
 
         // Should include the olde-english designation
@@ -702,8 +695,8 @@ describe('FHIR CodeSystem Provider', () => {
       });
 
       test('should include supplement designations', async () => {
-        const extensionsProvider = factory.build(opContextEn, extensionsCS, [supplementCS]);
-        const designations = await extensionsProvider.designations(opContextEn, 'code1');
+        const extensionsProvider = factory.build(new TxOperationContext('en-US'), [supplementCS], extensionsCS);
+        const designations = await extensionsProvider.designations('code1');
         expect(designations).toBeDefined();
 
         // Should include Dutch designation from supplement
@@ -713,20 +706,20 @@ describe('FHIR CodeSystem Provider', () => {
       });
 
       test('should return null for non-existent code', async () => {
-        await expect(simpleProvider.designations(opContextEn, 'nonexistent'))
+        await expect(simpleProvider.designations('nonexistent'))
           .rejects.toThrow('not found');
       });
     });
 
     describe('extensions()', () => {
       test('should return null for concepts without extensions', async () => {
-        const extensions = await simpleProvider.extensions(opContextEn, 'code1');
+        const extensions = await simpleProvider.extensions('code1');
         expect(extensions).toBeNull();
       });
 
       test('should return extensions when present', async () => {
-        const extensionsProvider = factory.build(opContextEn, extensionsCS, []);
-        const extensions = await extensionsProvider.extensions(opContextEn, 'code1');
+        const extensionsProvider = factory.build(new TxOperationContext('en-US'), [], extensionsCS);
+        const extensions = await extensionsProvider.extensions('code1');
         expect(extensions).toBeDefined();
         expect(Array.isArray(extensions)).toBe(true);
 
@@ -739,8 +732,8 @@ describe('FHIR CodeSystem Provider', () => {
       });
 
       test('should include supplement extensions', async () => {
-        const extensionsProvider = factory.build(opContextEn, extensionsCS, [supplementCS]);
-        const extensions = await extensionsProvider.extensions(opContextEn, 'code1');
+        const extensionsProvider = factory.build(new TxOperationContext('en-US'), [supplementCS], extensionsCS);
+        const extensions = await extensionsProvider.extensions('code1');
         expect(extensions).toBeDefined();
 
         // Should include itemWeight extension from supplement
@@ -754,7 +747,7 @@ describe('FHIR CodeSystem Provider', () => {
 
     describe('properties()', () => {
       test('should return null for concepts without properties', async () => {
-        const properties = await simpleProvider.properties(opContextEn, 'code3');
+        const properties = await simpleProvider.properties('code3');
         expect(properties).toBeDefined();
         expect(Array.isArray(properties)).toBe(true);
 
@@ -764,7 +757,7 @@ describe('FHIR CodeSystem Provider', () => {
       });
 
       test('should return properties when present', async () => {
-        const properties = await simpleProvider.properties(opContextEn, 'code1');
+        const properties = await simpleProvider.properties('code1');
         expect(properties).toBeDefined();
         expect(Array.isArray(properties)).toBe(true);
 
@@ -775,7 +768,7 @@ describe('FHIR CodeSystem Provider', () => {
       });
 
       test('should return multiple properties', async () => {
-        const properties = await simpleProvider.properties(opContextEn, 'code2');
+        const properties = await simpleProvider.properties('code2');
         expect(properties).toBeDefined();
         expect(Array.isArray(properties)).toBe(true);
         expect(properties.length).toBeGreaterThan(1);
@@ -788,8 +781,8 @@ describe('FHIR CodeSystem Provider', () => {
       });
 
       test('should include supplement properties', async () => {
-        const extensionsProvider = factory.build(opContextEn, extensionsCS, [supplementCS]);
-        const properties = await extensionsProvider.properties(opContextEn, 'code1');
+        const extensionsProvider = factory.build(new TxOperationContext('en-US'), [supplementCS], extensionsCS);
+        const properties = await extensionsProvider.properties('code1');
 
         // Extensions CS code1 should have properties, but supplements don't add properties in our test data
         // This test mainly ensures the method doesn't break with supplements
@@ -799,86 +792,86 @@ describe('FHIR CodeSystem Provider', () => {
 
     describe('parent()', () => {
       test('should return null for root concepts', async () => {
-        const parent = await simpleProvider.parent(opContextEn, 'code1');
+        const parent = await simpleProvider.parent('code1');
         expect(parent).toBeNull();
       });
 
       test('should return parent for child concepts', async () => {
-        const parent = await simpleProvider.parent(opContextEn, 'code2a');
+        const parent = await simpleProvider.parent('code2a');
         expect(parent).toBe('code2');
       });
 
       test('should return parent for grandchild concepts', async () => {
-        const parent = await simpleProvider.parent(opContextEn, 'code2aI');
+        const parent = await simpleProvider.parent('code2aI');
         expect(parent).toBe('code2a');
       });
 
       test('should return null for non-existent code', async () => {
-        await expect(simpleProvider.parent(opContextEn, 'nonexistent'))
+        await expect(simpleProvider.parent('nonexistent'))
           .rejects.toThrow('not found');
       });
     });
 
     describe('sameConcept()', () => {
       test('should return true for same code', async () => {
-        const same = await simpleProvider.sameConcept(opContextEn, 'code1', 'code1');
+        const same = await simpleProvider.sameConcept('code1', 'code1');
         expect(same).toBe(true);
       });
 
       test('should return false for different codes', async () => {
-        const same = await simpleProvider.sameConcept(opContextEn, 'code1', 'code2');
+        const same = await simpleProvider.sameConcept('code1', 'code2');
         expect(same).toBe(false);
       });
 
       test('should work with context objects', async () => {
-        const locateResult1 = await simpleProvider.locate(opContextEn, 'code1');
-        const locateResult2 = await simpleProvider.locate(opContextEn, 'code1');
-        const same = await simpleProvider.sameConcept(opContextEn, locateResult1.context, locateResult2.context);
+        const locateResult1 = await simpleProvider.locate('code1');
+        const locateResult2 = await simpleProvider.locate('code1');
+        const same = await simpleProvider.sameConcept(locateResult1.context, locateResult2.context);
         expect(same).toBe(true);
       });
 
       test('should return false for non-existent codes', async () => {
-        await expect(simpleProvider.sameConcept(opContextEn, 'nonexistent', 'code1'))
+        await expect(simpleProvider.sameConcept('nonexistent', 'code1'))
           .rejects.toThrow('not found');
       });
     });
 
     describe('locateIsA()', () => {
       test('should find child in parent relationship', async () => {
-        const result = await simpleProvider.locateIsA(opContextEn, 'code2a', 'code2');
+        const result = await simpleProvider.locateIsA('code2a', 'code2');
         expect(result.context).toBeDefined();
         expect(result.context.code).toBe('code2a');
         expect(result.message).toBeNull();
       });
 
       test('should find grandchild in grandparent relationship', async () => {
-        const result = await simpleProvider.locateIsA(opContextEn, 'code2aI', 'code2');
+        const result = await simpleProvider.locateIsA('code2aI', 'code2');
         expect(result.context).toBeDefined();
         expect(result.context.code).toBe('code2aI');
         expect(result.message).toBeNull();
       });
 
       test('should return null for non-descendant relationship', async () => {
-        const result = await simpleProvider.locateIsA(opContextEn, 'code1', 'code2');
+        const result = await simpleProvider.locateIsA('code1', 'code2');
         expect(result.context).toBeNull();
         expect(result.message).toContain('not a descendant');
       });
 
       test('should handle same code when allowed', async () => {
-        const result = await simpleProvider.locateIsA(opContextEn, 'code2', 'code2', false);
+        const result = await simpleProvider.locateIsA('code2', 'code2', false);
         expect(result.context).toBeDefined();
         expect(result.context.code).toBe('code2');
       });
 
       test('should reject same code when disallowed', async () => {
-        const result = await simpleProvider.locateIsA(opContextEn, 'code2', 'code2', true);
+        const result = await simpleProvider.locateIsA('code2', 'code2', true);
         expect(result.context).toBeNull();
         expect(result.message).toContain('cannot be the same');
       });
 
       test('should return error message for CodeSystem without hierarchy', async () => {
-        const extensionsProvider = factory.build(opContextEn, extensionsCS, []);
-        const result = await extensionsProvider.locateIsA(opContextEn, 'code1', 'code2');
+        const extensionsProvider = factory.build(new TxOperationContext('en-US'), [], extensionsCS);
+        const result = await extensionsProvider.locateIsA('code1', 'code2');
         expect(result.context).toBeNull();
         expect(result.message).toContain('does not have parents');
       });
@@ -886,45 +879,45 @@ describe('FHIR CodeSystem Provider', () => {
 
     describe('subsumesTest()', () => {
       test('should return equivalent for same code', async () => {
-        const result = await simpleProvider.subsumesTest(opContextEn, 'code1', 'code1');
+        const result = await simpleProvider.subsumesTest('code1', 'code1');
         expect(result).toBe('equivalent');
       });
 
       test('should return subsumes for parent-child relationship', async () => {
-        const result = await simpleProvider.subsumesTest(opContextEn, 'code2', 'code2a');
+        const result = await simpleProvider.subsumesTest('code2', 'code2a');
         expect(result).toBe('subsumes');
       });
 
       test('should return subsumed-by for child-parent relationship', async () => {
-        const result = await simpleProvider.subsumesTest(opContextEn, 'code2a', 'code2');
+        const result = await simpleProvider.subsumesTest('code2a', 'code2');
         expect(result).toBe('subsumed-by');
       });
 
       test('should return subsumes for grandparent-grandchild relationship', async () => {
-        const result = await simpleProvider.subsumesTest(opContextEn, 'code2', 'code2aI');
+        const result = await simpleProvider.subsumesTest('code2', 'code2aI');
         expect(result).toBe('subsumes');
       });
 
       test('should return not-subsumed for unrelated codes', async () => {
-        const result = await simpleProvider.subsumesTest(opContextEn, 'code1', 'code3');
+        const result = await simpleProvider.subsumesTest('code1', 'code3');
         expect(result).toBe('not-subsumed');
       });
 
       test('should return not-subsumed for CodeSystem without hierarchy', async () => {
-        const extensionsProvider = factory.build(opContextEn, extensionsCS, []);
-        const result = await extensionsProvider.subsumesTest(opContextEn, 'code1', 'code2');
+        const extensionsProvider = factory.build(new TxOperationContext('en-US'), [], extensionsCS);
+        const result = await extensionsProvider.subsumesTest('code1', 'code2');
         expect(result).toBe('not-subsumed');
       });
 
       test('should throw error for non-existent codes', async () => {
-        await expect(simpleProvider.subsumesTest(opContextEn, 'nonexistent', 'code1'))
+        await expect(simpleProvider.subsumesTest('nonexistent', 'code1'))
           .rejects.toThrow('Unknown Code');
       });
     });
 
     describe('iterator()', () => {
       test('should create iterator for all concepts when context is null', async () => {
-        const iterator = await simpleProvider.iterator(opContextEn, null);
+        const iterator = await simpleProvider.iterator(null);
         expect(iterator).toBeDefined();
         expect(iterator.type).toBe('all');
         expect(iterator.codes).toBeDefined();
@@ -935,7 +928,7 @@ describe('FHIR CodeSystem Provider', () => {
       });
 
       test('should create iterator for children when context is provided', async () => {
-        const iterator = await simpleProvider.iterator(opContextEn, 'code2');
+        const iterator = await simpleProvider.iterator('code2');
         expect(iterator).toBeDefined();
         expect(iterator.type).toBe('children');
         expect(iterator.parentCode).toBe('code2');
@@ -949,7 +942,7 @@ describe('FHIR CodeSystem Provider', () => {
       });
 
       test('should create empty iterator for leaf concepts', async () => {
-        const iterator = await simpleProvider.iterator(opContextEn, 'code1');
+        const iterator = await simpleProvider.iterator('code1');
         expect(iterator).toBeDefined();
         expect(iterator.type).toBe('children');
         expect(iterator.parentCode).toBe('code1');
@@ -961,13 +954,13 @@ describe('FHIR CodeSystem Provider', () => {
       });
 
       test('should return null for non-existent code', async () => {
-        await expect(simpleProvider.iterator(opContextEn, 'nonexistent'))
+        await expect(simpleProvider.iterator('nonexistent'))
           .rejects.toThrow('not found');
       });
 
       test('should work with context object', async () => {
-        const locateResult = await simpleProvider.locate(opContextEn, 'code2');
-        const iterator = await simpleProvider.iterator(opContextEn, locateResult.context);
+        const locateResult = await simpleProvider.locate('code2');
+        const iterator = await simpleProvider.iterator(locateResult.context);
         expect(iterator).toBeDefined();
         expect(iterator.type).toBe('children');
         expect(iterator.parentCode).toBe('code2');
@@ -977,13 +970,13 @@ describe('FHIR CodeSystem Provider', () => {
 
     describe('nextContext()', () => {
       test('should iterate through all concepts', async () => {
-        const iterator = await simpleProvider.iterator(opContextEn, null);
+        const iterator = await simpleProvider.iterator(null);
         const contexts = [];
 
-        let context = await simpleProvider.nextContext(opContextEn, iterator);
+        let context = await simpleProvider.nextContext(iterator);
         while (context) {
           contexts.push(context);
-          context = await simpleProvider.nextContext(opContextEn, iterator);
+          context = await simpleProvider.nextContext(iterator);
         }
 
         expect(contexts.length).toBe(7); // All concepts
@@ -1001,13 +994,13 @@ describe('FHIR CodeSystem Provider', () => {
       });
 
       test('should iterate through children', async () => {
-        const iterator = await simpleProvider.iterator(opContextEn, 'code2');
+        const iterator = await simpleProvider.iterator('code2');
         const contexts = [];
 
-        let context = await simpleProvider.nextContext(opContextEn, iterator);
+        let context = await simpleProvider.nextContext(iterator);
         while (context) {
           contexts.push(context);
-          context = await simpleProvider.nextContext(opContextEn, iterator);
+          context = await simpleProvider.nextContext(iterator);
         }
 
         expect(contexts.length).toBe(2); // code2a and code2b
@@ -1017,44 +1010,44 @@ describe('FHIR CodeSystem Provider', () => {
       });
 
       test('should return null for empty iterator', async () => {
-        const iterator = await simpleProvider.iterator(opContextEn, 'code1');
-        const context = await simpleProvider.nextContext(opContextEn, iterator);
+        const iterator = await simpleProvider.iterator('code1');
+        const context = await simpleProvider.nextContext(iterator);
         expect(context).toBeNull();
       });
 
       test('should return null when iterator is exhausted', async () => {
-        const iterator = await simpleProvider.iterator(opContextEn, 'code2');
+        const iterator = await simpleProvider.iterator('code2');
 
         // Get first context
-        const context1 = await simpleProvider.nextContext(opContextEn, iterator);
+        const context1 = await simpleProvider.nextContext(iterator);
         expect(context1).toBeDefined();
 
         // Get second context
-        const context2 = await simpleProvider.nextContext(opContextEn, iterator);
+        const context2 = await simpleProvider.nextContext(iterator);
         expect(context2).toBeDefined();
 
         // Third call should return null
-        const context3 = await simpleProvider.nextContext(opContextEn, iterator);
+        const context3 = await simpleProvider.nextContext(iterator);
         expect(context3).toBeNull();
       });
 
       test('should return null for invalid iterator', async () => {
-        const context = await simpleProvider.nextContext(opContextEn, null);
+        const context = await simpleProvider.nextContext(null);
         expect(context).toBeNull();
       });
 
       test('should handle iterator state correctly', async () => {
-        const iterator = await simpleProvider.iterator(opContextEn, 'code2');
+        const iterator = await simpleProvider.iterator('code2');
         expect(iterator.current).toBe(0);
 
-        await simpleProvider.nextContext(opContextEn, iterator);
+        await simpleProvider.nextContext(iterator);
         expect(iterator.current).toBe(1);
 
-        await simpleProvider.nextContext(opContextEn, iterator);
+        await simpleProvider.nextContext(iterator);
         expect(iterator.current).toBe(2);
 
         // Should be exhausted now
-        const context = await simpleProvider.nextContext(opContextEn, iterator);
+        const context = await simpleProvider.nextContext(iterator);
         expect(context).toBeNull();
         expect(iterator.current).toBe(2); // Should stay at end
       });
@@ -1062,7 +1055,7 @@ describe('FHIR CodeSystem Provider', () => {
 
     describe('iterator()', () => {
       test('should create iterator for all concepts when context is null', async () => {
-        const iterator = await simpleProvider.iterator(opContextEn, null);
+        const iterator = await simpleProvider.iterator(null);
         expect(iterator).toBeDefined();
         expect(iterator.type).toBe('all');
         expect(iterator.codes).toBeDefined();
@@ -1073,7 +1066,7 @@ describe('FHIR CodeSystem Provider', () => {
       });
 
       test('should create iterator for children when context is provided', async () => {
-        const iterator = await simpleProvider.iterator(opContextEn, 'code2');
+        const iterator = await simpleProvider.iterator('code2');
         expect(iterator).toBeDefined();
         expect(iterator.type).toBe('children');
         expect(iterator.parentCode).toBe('code2');
@@ -1087,7 +1080,7 @@ describe('FHIR CodeSystem Provider', () => {
       });
 
       test('should create empty iterator for leaf concepts', async () => {
-        const iterator = await simpleProvider.iterator(opContextEn, 'code1');
+        const iterator = await simpleProvider.iterator('code1');
         expect(iterator).toBeDefined();
         expect(iterator.type).toBe('children');
         expect(iterator.parentCode).toBe('code1');
@@ -1099,13 +1092,13 @@ describe('FHIR CodeSystem Provider', () => {
       });
 
       test('should return null for non-existent code', async () => {
-        await expect(simpleProvider.iterator(opContextEn, 'nonexistent'))
+        await expect(simpleProvider.iterator('nonexistent'))
           .rejects.toThrow('not found');
       });
 
       test('should work with context object', async () => {
-        const locateResult = await simpleProvider.locate(opContextEn, 'code2');
-        const iterator = await simpleProvider.iterator(opContextEn, locateResult.context);
+        const locateResult = await simpleProvider.locate('code2');
+        const iterator = await simpleProvider.iterator(locateResult.context);
         expect(iterator).toBeDefined();
         expect(iterator.type).toBe('children');
         expect(iterator.parentCode).toBe('code2');
@@ -1115,13 +1108,13 @@ describe('FHIR CodeSystem Provider', () => {
 
     describe('nextContext()', () => {
       test('should iterate through all concepts', async () => {
-        const iterator = await simpleProvider.iterator(opContextEn, null);
+        const iterator = await simpleProvider.iterator(null);
         const contexts = [];
 
-        let context = await simpleProvider.nextContext(opContextEn, iterator);
+        let context = await simpleProvider.nextContext(iterator);
         while (context) {
           contexts.push(context);
-          context = await simpleProvider.nextContext(opContextEn, iterator);
+          context = await simpleProvider.nextContext(iterator);
         }
 
         expect(contexts.length).toBe(7); // All concepts
@@ -1139,13 +1132,13 @@ describe('FHIR CodeSystem Provider', () => {
       });
 
       test('should iterate through children', async () => {
-        const iterator = await simpleProvider.iterator(opContextEn, 'code2');
+        const iterator = await simpleProvider.iterator('code2');
         const contexts = [];
 
-        let context = await simpleProvider.nextContext(opContextEn, iterator);
+        let context = await simpleProvider.nextContext(iterator);
         while (context) {
           contexts.push(context);
-          context = await simpleProvider.nextContext(opContextEn, iterator);
+          context = await simpleProvider.nextContext(iterator);
         }
 
         expect(contexts.length).toBe(2); // code2a and code2b
@@ -1155,44 +1148,44 @@ describe('FHIR CodeSystem Provider', () => {
       });
 
       test('should return null for empty iterator', async () => {
-        const iterator = await simpleProvider.iterator(opContextEn, 'code1');
-        const context = await simpleProvider.nextContext(opContextEn, iterator);
+        const iterator = await simpleProvider.iterator('code1');
+        const context = await simpleProvider.nextContext(iterator);
         expect(context).toBeNull();
       });
 
       test('should return null when iterator is exhausted', async () => {
-        const iterator = await simpleProvider.iterator(opContextEn, 'code2');
+        const iterator = await simpleProvider.iterator('code2');
 
         // Get first context
-        const context1 = await simpleProvider.nextContext(opContextEn, iterator);
+        const context1 = await simpleProvider.nextContext(iterator);
         expect(context1).toBeDefined();
 
         // Get second context
-        const context2 = await simpleProvider.nextContext(opContextEn, iterator);
+        const context2 = await simpleProvider.nextContext(iterator);
         expect(context2).toBeDefined();
 
         // Third call should return null
-        const context3 = await simpleProvider.nextContext(opContextEn, iterator);
+        const context3 = await simpleProvider.nextContext(iterator);
         expect(context3).toBeNull();
       });
 
       test('should return null for invalid iterator', async () => {
-        const context = await simpleProvider.nextContext(opContextEn, null);
+        const context = await simpleProvider.nextContext(null);
         expect(context).toBeNull();
       });
 
       test('should handle iterator state correctly', async () => {
-        const iterator = await simpleProvider.iterator(opContextEn, 'code2');
+        const iterator = await simpleProvider.iterator('code2');
         expect(iterator.current).toBe(0);
 
-        await simpleProvider.nextContext(opContextEn, iterator);
+        await simpleProvider.nextContext(iterator);
         expect(iterator.current).toBe(1);
 
-        await simpleProvider.nextContext(opContextEn, iterator);
+        await simpleProvider.nextContext(iterator);
         expect(iterator.current).toBe(2);
 
         // Should be exhausted now
-        const context = await simpleProvider.nextContext(opContextEn, iterator);
+        const context = await simpleProvider.nextContext(iterator);
         expect(context).toBeNull();
         expect(iterator.current).toBe(2); // Should stay at end
       });
@@ -1200,10 +1193,10 @@ describe('FHIR CodeSystem Provider', () => {
 
     describe('extendLookup()', () => {
       test('should extend lookup with basic properties', async () => {
-        const locateResult = await simpleProvider.locate(opContextEn, 'code1');
+        const locateResult = await simpleProvider.locate('code1');
         const params = {};
 
-        await simpleProvider.extendLookup(opContextEn, locateResult.context, [], params);
+        await simpleProvider.extendLookup(locateResult.context, [], params);
 
         expect(params.abstract).toBe(false);
         expect(params.designation).toBeDefined();
@@ -1216,10 +1209,10 @@ describe('FHIR CodeSystem Provider', () => {
       });
 
       test('should include properties when requested', async () => {
-        const locateResult = await simpleProvider.locate(opContextEn, 'code1');
+        const locateResult = await simpleProvider.locate('code1');
         const params = {};
 
-        await simpleProvider.extendLookup(opContextEn, locateResult.context, ['property'], params);
+        await simpleProvider.extendLookup(locateResult.context, ['property'], params);
 
         expect(params.property).toBeDefined();
         expect(Array.isArray(params.property)).toBe(true);
@@ -1231,10 +1224,10 @@ describe('FHIR CodeSystem Provider', () => {
       });
 
       test('should include parent when requested', async () => {
-        const locateResult = await simpleProvider.locate(opContextEn, 'code2a');
+        const locateResult = await simpleProvider.locate('code2a');
         const params = {};
 
-        await simpleProvider.extendLookup(opContextEn, locateResult.context, ['parent'], params);
+        await simpleProvider.extendLookup(locateResult.context, ['parent'], params);
 
         expect(params.property).toBeDefined();
         const parentProperty = params.property.find(p => p.code === 'parent');
@@ -1244,10 +1237,10 @@ describe('FHIR CodeSystem Provider', () => {
       });
 
       test('should include children when requested', async () => {
-        const locateResult = await simpleProvider.locate(opContextEn, 'code2');
+        const locateResult = await simpleProvider.locate('code2');
         const params = {};
 
-        await simpleProvider.extendLookup(opContextEn, locateResult.context, ['child'], params);
+        await simpleProvider.extendLookup(locateResult.context, ['child'], params);
 
         expect(params.property).toBeDefined();
         const childProperties = params.property.filter(p => p.code === 'child');
@@ -1259,19 +1252,19 @@ describe('FHIR CodeSystem Provider', () => {
       });
 
       test('should handle abstract concepts', async () => {
-        const locateResult = await simpleProvider.locate(opContextEn, 'code2');
+        const locateResult = await simpleProvider.locate('code2');
         const params = {};
 
-        await simpleProvider.extendLookup(opContextEn, locateResult.context, [], params);
+        await simpleProvider.extendLookup(locateResult.context, [], params);
 
         expect(params.abstract).toBe(true); // code2 has notSelectable=true
       });
 
       test('should handle wildcard properties', async () => {
-        const locateResult = await simpleProvider.locate(opContextEn, 'code2');
+        const locateResult = await simpleProvider.locate('code2');
         const params = {};
 
-        await simpleProvider.extendLookup(opContextEn, locateResult.context, ['*'], params);
+        await simpleProvider.extendLookup(locateResult.context, ['*'], params);
 
         expect(params.abstract).toBe(true);
         expect(params.designation).toBeDefined();
@@ -1286,10 +1279,10 @@ describe('FHIR CodeSystem Provider', () => {
       });
 
       test('should handle specific property requests', async () => {
-        const locateResult = await simpleProvider.locate(opContextEn, 'code2a');
+        const locateResult = await simpleProvider.locate('code2a');
         const params = {};
 
-        await simpleProvider.extendLookup(opContextEn, locateResult.context, ['designation', 'parent'], params);
+        await simpleProvider.extendLookup(locateResult.context, ['designation', 'parent'], params);
 
         expect(params.designation).toBeDefined();
         expect(params.property).toBeDefined();
@@ -1305,7 +1298,7 @@ describe('FHIR CodeSystem Provider', () => {
       test('should handle invalid context gracefully', async () => {
         const params = {};
 
-        await simpleProvider.extendLookup(opContextEn, null, [], params);
+        await simpleProvider.extendLookup(null, [], params);
 
         // Should not crash, params should remain empty or minimal
         expect(params).toBeDefined();
@@ -1316,52 +1309,52 @@ describe('FHIR CodeSystem Provider', () => {
       let filterContext;
 
       beforeEach(() => {
-        simpleProvider = factory.build(opContextEn, simpleCS, []);
-        deProvider = factory.build(opContextEn, deCS, []);
-        extensionsProvider = factory.build(opContextEn, extensionsCS, [supplementCS]);
+        simpleProvider = factory.build(new TxOperationContext('en-US'), [], simpleCS);
+        deProvider = factory.build(new TxOperationContext('en-US'), [], deCS);
+        extensionsProvider = factory.build(new TxOperationContext('en-US'), [supplementCS], extensionsCS);
         filterContext = {filters: []};
       });
 
       describe('Filter Infrastructure', () => {
         test('should create filter preparation context', async () => {
-          const prepContext = await simpleProvider.getPrepContext(opContextEn, true);
+          const prepContext = await simpleProvider.getPrepContext(true);
           expect(prepContext).toBeDefined();
           expect(prepContext.filters).toBeDefined();
         });
 
         test('should report filters as closed', async () => {
-          const notClosed = await simpleProvider.filtersNotClosed(opContextEn, filterContext);
+          const notClosed = await simpleProvider.filtersNotClosed(filterContext);
           expect(notClosed).toBe(false);
         });
 
         test('should check filter support correctly', async () => {
           // Hierarchy filters
-          expect(await simpleProvider.doesFilter(opContextEn, 'concept', 'is-a', 'code1')).toBe(true);
-          expect(await simpleProvider.doesFilter(opContextEn, 'code', 'descendent-of', 'code2')).toBe(true);
-          expect(await simpleProvider.doesFilter(opContextEn, 'concept', 'is-not-a', 'code1')).toBe(true);
-          expect(await simpleProvider.doesFilter(opContextEn, 'code', 'in', 'code1,code2')).toBe(true);
-          expect(await simpleProvider.doesFilter(opContextEn, 'code', '=', 'code1')).toBe(true);
-          expect(await simpleProvider.doesFilter(opContextEn, 'code', 'regex', 'code.*')).toBe(true);
+          expect(await simpleProvider.doesFilter('concept', 'is-a', 'code1')).toBe(true);
+          expect(await simpleProvider.doesFilter('code', 'descendent-of', 'code2')).toBe(true);
+          expect(await simpleProvider.doesFilter('concept', 'is-not-a', 'code1')).toBe(true);
+          expect(await simpleProvider.doesFilter('code', 'in', 'code1,code2')).toBe(true);
+          expect(await simpleProvider.doesFilter('code', '=', 'code1')).toBe(true);
+          expect(await simpleProvider.doesFilter('code', 'regex', 'code.*')).toBe(true);
 
           // Child existence
-          expect(await simpleProvider.doesFilter(opContextEn, 'child', 'exists', 'true')).toBe(true);
+          expect(await simpleProvider.doesFilter('child', 'exists', 'true')).toBe(true);
 
           // Property filters
-          expect(await simpleProvider.doesFilter(opContextEn, 'prop', '=', 'old')).toBe(true);
-          expect(await simpleProvider.doesFilter(opContextEn, 'status', 'in', 'active,retired')).toBe(true);
+          expect(await simpleProvider.doesFilter('prop', '=', 'old')).toBe(true);
+          expect(await simpleProvider.doesFilter('status', 'in', 'active,retired')).toBe(true);
 
           // Known properties
-          expect(await simpleProvider.doesFilter(opContextEn, 'notSelectable', '=', 'true')).toBe(true);
+          expect(await simpleProvider.doesFilter('notSelectable', '=', 'true')).toBe(true);
 
           // Unsupported filters
-          expect(await simpleProvider.doesFilter(opContextEn, 'unknown', '=', 'value')).toBe(false);
-          expect(await simpleProvider.doesFilter(opContextEn, 'code', 'unsupported-op', 'value')).toBe(false);
+          expect(await simpleProvider.doesFilter('unknown', '=', 'value')).toBe(false);
+          expect(await simpleProvider.doesFilter('code', 'unsupported-op', 'value')).toBe(false);
         });
       });
 
       describe('Search Filter', () => {
         test('should find concepts by exact code match', async () => {
-          const results = await simpleProvider.searchFilter(opContextEn, filterContext, 'code1', true);
+          const results = await simpleProvider.searchFilter(filterContext, 'code1', true);
           expect(results.size()).toBeGreaterThan(0);
 
           const concept = results.findConceptByCode('code1');
@@ -1370,7 +1363,7 @@ describe('FHIR CodeSystem Provider', () => {
         });
 
         test('should find concepts by display text match', async () => {
-          const results = await simpleProvider.searchFilter(opContextEn, filterContext, 'Display 1', true);
+          const results = await simpleProvider.searchFilter(filterContext, 'Display 1', true);
           expect(results.size()).toBeGreaterThan(0);
 
           const concept = results.findConceptByCode('code1');
@@ -1378,22 +1371,22 @@ describe('FHIR CodeSystem Provider', () => {
         });
 
         test('should find concepts by partial match', async () => {
-          const results = await simpleProvider.searchFilter(opContextEn, filterContext, 'Display', true);
+          const results = await simpleProvider.searchFilter(filterContext, 'Display', true);
           expect(results.size()).toBeGreaterThan(1); // Should find multiple concepts
         });
 
         test('should find concepts by definition match', async () => {
-          const results = await simpleProvider.searchFilter(opContextEn, filterContext, 'first', true);
+          const results = await simpleProvider.searchFilter(filterContext, 'first', true);
           expect(results.size()).toBeGreaterThan(0);
         });
 
         test('should return empty results for non-matching search', async () => {
-          const results = await simpleProvider.searchFilter(opContextEn, filterContext, 'nonexistent', true);
+          const results = await simpleProvider.searchFilter(filterContext, 'nonexistent', true);
           expect(results.size()).toBe(0);
         });
 
         test('should sort results by relevance when requested', async () => {
-          const results = await simpleProvider.searchFilter(opContextEn, filterContext, 'code', true);
+          const results = await simpleProvider.searchFilter(filterContext, 'code', true);
           expect(results.size()).toBeGreaterThan(1);
 
           // Results should be sorted by rating (exact matches first)
@@ -1407,7 +1400,7 @@ describe('FHIR CodeSystem Provider', () => {
 
       describe('Concept/Code Filters', () => {
         test('should filter by is-a relationship', async () => {
-          const results = await simpleProvider.filter(opContextEn, filterContext, 'concept', 'is-a', 'code2');
+          const results = await simpleProvider.filter(filterContext, 'concept', 'is-a', 'code2');
           expect(results.size()).toBe(5); // code2, code2a + children, code2b
 
           expect(results.findConceptByCode('code2')).toBeDefined();
@@ -1417,7 +1410,7 @@ describe('FHIR CodeSystem Provider', () => {
         });
 
         test('should filter by descendent-of relationship', async () => {
-          const results = await simpleProvider.filter(opContextEn, filterContext, 'code', 'descendent-of', 'code2');
+          const results = await simpleProvider.filter(filterContext, 'code', 'descendent-of', 'code2');
           expect(results.size()).toBe(4); // code2a, code2aI, code2aII, code2b (not code2 itself)
 
           expect(results.findConceptByCode('code2')).toBeNull(); // Root not included
@@ -1428,7 +1421,7 @@ describe('FHIR CodeSystem Provider', () => {
         });
 
         test('should filter by is-not-a relationship', async () => {
-          const results = await simpleProvider.filter(opContextEn, filterContext, 'concept', 'is-not-a', 'code2');
+          const results = await simpleProvider.filter(filterContext, 'concept', 'is-not-a', 'code2');
           expect(results.size()).toBe(2); // code1 and code3 (not descendants of code2)
 
           expect(results.findConceptByCode('code1')).toBeDefined();
@@ -1438,7 +1431,7 @@ describe('FHIR CodeSystem Provider', () => {
         });
 
         test('should filter by in relationship', async () => {
-          const results = await simpleProvider.filter(opContextEn, filterContext, 'code', 'in', 'code1,code3');
+          const results = await simpleProvider.filter(filterContext, 'code', 'in', 'code1,code3');
           expect(results.size()).toBe(2);
 
           expect(results.findConceptByCode('code1')).toBeDefined();
@@ -1447,7 +1440,7 @@ describe('FHIR CodeSystem Provider', () => {
         });
 
         test('should filter by exact match', async () => {
-          const results = await simpleProvider.filter(opContextEn, filterContext, 'code', '=', 'code1');
+          const results = await simpleProvider.filter(filterContext, 'code', '=', 'code1');
           expect(results.size()).toBe(1);
 
           expect(results.findConceptByCode('code1')).toBeDefined();
@@ -1455,7 +1448,7 @@ describe('FHIR CodeSystem Provider', () => {
         });
 
         test('should filter by regex pattern', async () => {
-          const results = await simpleProvider.filter(opContextEn, filterContext, 'code', 'regex', 'code2.*');
+          const results = await simpleProvider.filter(filterContext, 'code', 'regex', 'code2.*');
           expect(results.size()).toBeGreaterThan(1); // Should match code2, code2a, code2b, etc.
 
           expect(results.findConceptByCode('code2')).toBeDefined();
@@ -1465,14 +1458,14 @@ describe('FHIR CodeSystem Provider', () => {
 
         test('should handle invalid regex gracefully', async () => {
           await expect(
-            simpleProvider.filter(opContextEn, filterContext, 'code', 'regex', '[invalid')
+            simpleProvider.filter(filterContext, 'code', 'regex', '[invalid')
           ).rejects.toThrow('Invalid regex pattern');
         });
       });
 
       describe('Child Existence Filter', () => {
         test('should find concepts with children', async () => {
-          const results = await simpleProvider.filter(opContextEn, filterContext, 'child', 'exists', 'true');
+          const results = await simpleProvider.filter(filterContext, 'child', 'exists', 'true');
           expect(results.size()).toBe(2); // code2 and code2a have children
 
           expect(results.findConceptByCode('code2')).toBeDefined();
@@ -1481,7 +1474,7 @@ describe('FHIR CodeSystem Provider', () => {
         });
 
         test('should find concepts without children (leaf nodes)', async () => {
-          const results = await simpleProvider.filter(opContextEn, filterContext, 'child', 'exists', 'false');
+          const results = await simpleProvider.filter(filterContext, 'child', 'exists', 'false');
           expect(results.size()).toBe(5); // code1, code2aI, code2aII, code2b, code3
 
           expect(results.findConceptByCode('code1')).toBeDefined();
@@ -1495,7 +1488,7 @@ describe('FHIR CodeSystem Provider', () => {
 
       describe('Property-Based Filters', () => {
         test('should filter by property equality', async () => {
-          const results = await simpleProvider.filter(opContextEn, filterContext, 'prop', '=', 'old');
+          const results = await simpleProvider.filter(filterContext, 'prop', '=', 'old');
           expect(results.size()).toBeGreaterThan(0);
 
           // code1 has prop=old
@@ -1503,7 +1496,7 @@ describe('FHIR CodeSystem Provider', () => {
         });
 
         test('should filter by property in values', async () => {
-          const results = await simpleProvider.filter(opContextEn, filterContext, 'prop', 'in', 'old,new');
+          const results = await simpleProvider.filter(filterContext, 'prop', 'in', 'old,new');
           expect(results.size()).toBeGreaterThan(0);
 
           // Should find concepts with either old or new values
@@ -1511,7 +1504,7 @@ describe('FHIR CodeSystem Provider', () => {
         });
 
         test('should filter by property not in values', async () => {
-          const results = await simpleProvider.filter(opContextEn, filterContext, 'prop', 'not-in', 'retired');
+          const results = await simpleProvider.filter(filterContext, 'prop', 'not-in', 'retired');
           expect(results.size()).toBeGreaterThan(0);
 
           // Should exclude concepts with retired status
@@ -1519,7 +1512,7 @@ describe('FHIR CodeSystem Provider', () => {
         });
 
         test('should filter by property regex', async () => {
-          const results = await simpleProvider.filter(opContextEn, filterContext, 'prop', 'regex', 'ol.*');
+          const results = await simpleProvider.filter(filterContext, 'prop', 'regex', 'ol.*');
           expect(results.size()).toBeGreaterThan(0);
 
           // Should match "old" values
@@ -1529,7 +1522,7 @@ describe('FHIR CodeSystem Provider', () => {
 
       describe('Known Property Filters', () => {
         test('should filter by notSelectable property', async () => {
-          const results = await simpleProvider.filter(opContextEn, filterContext, 'notSelectable', '=', 'true');
+          const results = await simpleProvider.filter(filterContext, 'notSelectable', '=', 'true');
           expect(results.size()).toBe(1);
 
           // code2 has notSelectable=true
@@ -1537,7 +1530,7 @@ describe('FHIR CodeSystem Provider', () => {
         });
 
         test('should filter by status property', async () => {
-          const results = await simpleProvider.filter(opContextEn, filterContext, 'status', '=', 'retired');
+          const results = await simpleProvider.filter(filterContext, 'status', '=', 'retired');
           expect(results.size()).toBe(1);
 
           // code2 has status=retired
@@ -1545,20 +1538,20 @@ describe('FHIR CodeSystem Provider', () => {
         });
 
         test('should filter by status in values', async () => {
-          const results = await simpleProvider.filter(opContextEn, filterContext, 'status', 'in', 'active,retired');
+          const results = await simpleProvider.filter(filterContext, 'status', 'in', 'active,retired');
           expect(results.size()).toBeGreaterThan(0);
         });
       });
 
       describe('Filter Iteration', () => {
         test('should iterate through filter results', async () => {
-          const results = await simpleProvider.filter(opContextEn, filterContext, 'code', 'in', 'code1,code2,code3');
+          const results = await simpleProvider.filter(filterContext, 'code', 'in', 'code1,code2,code3');
           expect(results.size()).toBe(3);
 
           results.reset();
           const concepts = [];
-          while (await simpleProvider.filterMore(opContextEn, filterContext, results)) {
-            const context = await simpleProvider.filterConcept(opContextEn, filterContext, results);
+          while (await simpleProvider.filterMore(filterContext, results)) {
+            const context = await simpleProvider.filterConcept(filterContext, results);
             concepts.push(context);
           }
 
@@ -1567,98 +1560,85 @@ describe('FHIR CodeSystem Provider', () => {
         });
 
         test('should locate specific code in filter results', async () => {
-          const results = await simpleProvider.filter(opContextEn, filterContext, 'code', 'in', 'code1,code2');
+          const results = await simpleProvider.filter(filterContext, 'code', 'in', 'code1,code2');
 
-          const located = await simpleProvider.filterLocate(opContextEn, filterContext, results, 'code1');
+          const located = await simpleProvider.filterLocate(filterContext, results, 'code1');
           expect(located).toBeInstanceOf(FhirCodeSystemProviderContext);
           expect(located.code).toBe('code1');
 
-          const notFound = await simpleProvider.filterLocate(opContextEn, filterContext, results, 'code3');
+          const notFound = await simpleProvider.filterLocate(filterContext, results, 'code3');
           expect(typeof notFound).toBe('string'); // Error message
           expect(notFound).toContain('not found');
         });
 
         test('should check if concept is in filter results', async () => {
-          const results = await simpleProvider.filter(opContextEn, filterContext, 'code', 'in', 'code1,code2');
+          const results = await simpleProvider.filter(filterContext, 'code', 'in', 'code1,code2');
 
           const concept1 = new FhirCodeSystemProviderContext('code1', simpleCS.getConceptByCode('code1'));
           const concept3 = new FhirCodeSystemProviderContext('code3', simpleCS.getConceptByCode('code3'));
 
-          const check1 = await simpleProvider.filterCheck(opContextEn, filterContext, results, concept1);
+          const check1 = await simpleProvider.filterCheck(filterContext, results, concept1);
           expect(check1).toBe(true);
 
-          const check3 = await simpleProvider.filterCheck(opContextEn, filterContext, results, concept3);
+          const check3 = await simpleProvider.filterCheck(filterContext, results, concept3);
           expect(typeof check3).toBe('string'); // Error message
         });
 
         test('should get filter size correctly', async () => {
-          const results = await simpleProvider.filter(opContextEn, filterContext, 'code', 'in', 'code1,code2,code3');
+          const results = await simpleProvider.filter(filterContext, 'code', 'in', 'code1,code2,code3');
 
-          const size = await simpleProvider.filterSize(opContextEn, filterContext, results);
+          const size = await simpleProvider.filterSize(filterContext, results);
           expect(size).toBe(3);
 
-          const emptySize = await simpleProvider.filterSize(opContextEn, filterContext, null);
+          const emptySize = await simpleProvider.filterSize(filterContext, null);
           expect(emptySize).toBe(0);
         });
 
         test('should execute and finish filters properly', async () => {
           filterContext.filters = [];
-          await simpleProvider.filter(opContextEn, filterContext, 'code', '=', 'code1');
+          await simpleProvider.filter(filterContext, 'code', '=', 'code1');
 
-          const executed = await simpleProvider.executeFilters(opContextEn, filterContext);
+          const executed = await simpleProvider.executeFilters(filterContext);
           expect(Array.isArray(executed)).toBe(true);
           expect(executed.length).toBe(1);
 
-          await simpleProvider.filterFinish(opContextEn, filterContext);
+          await simpleProvider.filterFinish(filterContext);
           expect(filterContext.filters.length).toBe(0);
-        });
-      });
-
-      describe('Special Filters', () => {
-        test('should handle special filter placeholder', async () => {
-          const results = await simpleProvider.specialFilter(opContextEn, filterContext, 'special-filter', true);
-          expect(results).toBeDefined();
-          expect(results.size()).toBe(0); // Placeholder returns empty results
         });
       });
 
       describe('Error Handling', () => {
         test('should handle null filter context gracefully', async () => {
-          const size = await simpleProvider.filterSize(opContextEn, null, null);
+          const size = await simpleProvider.filterSize(null, null);
           expect(size).toBe(0);
 
-          const hasMore = await simpleProvider.filterMore(opContextEn, null, null);
+          const hasMore = await simpleProvider.filterMore(null, null);
           expect(hasMore).toBe(false);
 
-          const concept = await simpleProvider.filterConcept(opContextEn, null, null);
+          const concept = await simpleProvider.filterConcept(null, null);
           expect(concept).toBeNull();
         });
 
-        test('should handle invalid operation context', async () => {
-          await expect(
-            simpleProvider.filter(null, filterContext, 'code', '=', 'code1')
-          ).rejects.toThrow('opContext is not an instance of TxOperationContext');
-        });
       });
 
       describe('Complex Filter Scenarios', () => {
         test('should work with German CodeSystem', async () => {
-          const results = await deProvider.searchFilter(opContextEn, filterContext, 'Anzeige', true);
+          const results = await deProvider.searchFilter(filterContext, 'Anzeige', true);
           expect(results.size()).toBeGreaterThan(0);
         });
 
         test('should work with Extensions CodeSystem', async () => {
-          const results = await extensionsProvider.filter(opContextEn, filterContext, 'code', 'regex', 'code[1-3]');
+          const results = await extensionsProvider.filter(filterContext, 'code', 'regex', 'code[1-3]');
           expect(results.size()).toBe(3);
         });
 
         test('should handle multiple filters in sequence', async () => {
           // First filter: get all concepts with children
-          const withChildren = await simpleProvider.filter(opContextEn, filterContext, 'child', 'exists', 'true');
+          const withChildren = await simpleProvider.filter(filterContext, 'child', 'exists', 'true');
           expect(withChildren.size()).toBe(2);
 
           // Second filter: get concepts with specific property
-          const withProperty = await simpleProvider.filter(opContextEn, filterContext, 'prop', '=', 'new');
+          const withProperty = await simpleProvider.filter(filterContext, 'prop', '=', 'new');
           expect(withProperty.size()).toBeGreaterThan(0);
 
           // Both filters should be in context

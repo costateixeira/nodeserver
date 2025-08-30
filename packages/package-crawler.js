@@ -7,7 +7,6 @@
 const axios = require('axios');
 const {XMLParser} = require('fast-xml-parser');
 const crypto = require('crypto');
-const tar = require('tar');
 const fs = require('fs');
 const path = require('path');
 
@@ -133,7 +132,7 @@ class PackageCrawler {
     }
   }
 
-  async fetchUrl(url, expectedContentType = null) {
+  async fetchUrl(url) {
     try {
       const response = await axios.get(url, {
         timeout: 60000,
@@ -255,7 +254,7 @@ class PackageCrawler {
         return;
       }
 
-      // Check package restrictions (simplified for now)
+      // Check package restrictions
       if (!this.isPackageAllowed(id, source, packageRestrictions)) {
         if (!source.includes('simplifier.net')) {
           const error = `The package ${id} is not allowed to come from ${source}`;
@@ -313,9 +312,51 @@ class PackageCrawler {
   }
 
   isPackageAllowed(packageId, source, restrictions) {
-    // Simplified package restriction logic
-    // TODO: Implement proper restriction checking based on the restrictions array
-    return true;
+    if (!restrictions || !Array.isArray(restrictions)) {
+      return { allowed: true, allowedFeeds: '' };
+    }
+
+    // Convert URLs to https for consistent comparison
+    const fixUrl = (url) => url.replace(/^http:/, 'https:');
+
+    const fixedPackageId = fixUrl(packageId);
+    const fixedSource = fixUrl(source);
+
+    for (const restriction of restrictions) {
+      if (!restriction.mask || !restriction.feeds) continue;
+
+      const fixedMask = fixUrl(restriction.mask);
+
+      if (this.matchesPattern(fixedPackageId, fixedMask)) {
+        // This package matches a restriction - check if source is allowed
+        const allowedFeeds = restriction.feeds.map(feed => feed);
+        const feedList = allowedFeeds.join(', ');
+
+        for (const allowedFeed of restriction.feeds) {
+          const fixedFeed = fixUrl(allowedFeed);
+          if (fixedSource === fixedFeed) {
+            return { allowed: true, allowedFeeds: feedList };
+          }
+        }
+
+        // Package matches restriction but source is not in allowed feeds
+        return { allowed: false, allowedFeeds: feedList };
+      }
+    }
+
+    // No restrictions matched - package is allowed from any source
+    return { allowed: true, allowedFeeds: '' };
+  }
+
+  matchesPattern(packageId, mask) {
+    if (mask.includes('*')) {
+      const starIndex = mask.indexOf('*');
+      const maskPrefix = mask.substring(0, starIndex);
+      const packagePrefix = packageId.substring(0, starIndex);
+      return packagePrefix === maskPrefix;
+    } else {
+      return mask === packageId;
+    }
   }
 
   async hasStored(guid) {
@@ -389,7 +430,7 @@ class PackageCrawler {
         throw new Error(`NPM Canonical "${canonical}" is not valid from ${source}`);
       }
 
-      // Extract URLs from package (simplified)
+      // Extract URLs from package
       const urls = this.processPackageUrls(npmPackage);
 
       // Commit to database
@@ -405,7 +446,6 @@ class PackageCrawler {
     try {
       const files = {};
       const zlib = require('zlib');
-      const {Readable} = require('stream');
 
       // First decompress the gzip
       const decompressed = zlib.gunzipSync(packageBuffer);
@@ -444,10 +484,8 @@ class PackageCrawler {
         if (fileSize > 0) {
           const cleanFilename = filename.replace(/^package\//, ''); // Remove package/ prefix
 
-          if (cleanFilename === 'package.json' || cleanFilename === '.index.json' || cleanFilename === 'ig.ini') {
-            const fileContent = decompressed.slice(offset, offset + fileSize);
-            files[cleanFilename] = fileContent.toString('utf8');
-          }
+          const fileContent = decompressed.slice(offset, offset + fileSize);
+          files[cleanFilename] = fileContent.toString('utf8');
         }
 
         // Move to next file (files are padded to 512-byte boundaries)
@@ -530,7 +568,7 @@ class PackageCrawler {
             canonical = indexJson.canonical;
           }
         } catch (indexError) {
-          this.log.this.warn(`Warning: Could not parse .index.json for ${id}: ${indexError.message}`);
+          this.log.warn(`Warning: Could not parse .index.json for ${id}: ${indexError.message}`);
         }
       }
 
@@ -570,7 +608,8 @@ class PackageCrawler {
         url: homepage,
         dependencies,
         kind,
-        notForPublication
+        notForPublication,
+        files
       };
 
     } catch (error) {
@@ -640,11 +679,37 @@ class PackageCrawler {
   }
 
   processPackageUrls(npmPackage) {
-    // Extract URLs from package - simplified implementation
     const urls = [];
+
+    try {
+
+      for (const filename of Object.keys(npmPackage.files)) {
+        try {
+          const bytes = npmPackage.files[filename];
+          if (filename.endsWith('.json')) {
+            try {
+              const jsonContent = JSON.parse(bytes);
+
+              if (jsonContent.url && jsonContent.resourceType) {
+                urls.push(jsonContent.url);
+              }
+            } catch (fileError) {
+              // this.log.warn(`Error processing package file ${npmPackage.name}#${npmPackage.version}/package/${filename}: ${fileError.message}`);
+            }
+          }
+        } catch (fileError) {
+          this.log.warn(`Error processing package file ${npmPackage.name}#${npmPackage.version}/package/${filename}: ${fileError.message}`);
+        }
+      }
+    } catch (error) {
+      this.log.warn(`Error processing package URLs for ${npmPackage.name}#${npmPackage.version}:`, error.message);
+    }
+
+    // Include main package URL
     if (npmPackage.url) {
       urls.push(npmPackage.url);
     }
+
     return urls;
   }
 

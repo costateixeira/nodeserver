@@ -31,3 +31,5 @@ passwords.ini
 test-cache/
 
 tests/vs/.vsac-last-run
+
+.package-cache/

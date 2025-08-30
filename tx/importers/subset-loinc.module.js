@@ -609,9 +609,7 @@ class LoincSubsetModule extends BaseTerminologyModule {
       crlfDelay: Infinity
     });
 
-    let lineNum = 0;
     for await (const line of rl) {
-      lineNum++;
       const code = line.trim();
       if (code && !code.startsWith('#')) { // Allow comments with #
         codes.add(code);

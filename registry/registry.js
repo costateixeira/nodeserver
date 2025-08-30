@@ -289,7 +289,10 @@ class RegistryModule {
         'registry',
         'FHIR Terminology Server Registry',
         this.buildHtmlContent(),
-        this.api.getStatistics()
+        {
+          ...this.api.getStatistics(),
+          templateVars: templateVars
+        }
       );
     } catch (error) {
       this.logger.error('Error rendering page:', error);
@@ -1196,7 +1199,6 @@ class RegistryModule {
     const url = queryParams.url || '';
     const valueSet = queryParams.valueSet || '';
     const authoritativeOnly = queryParams.authoritativeOnly === 'true';
-    const usage = queryParams.usage || '';
 
     let html = '';
 

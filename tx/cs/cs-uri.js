@@ -1,6 +1,4 @@
-const { CodeSystem } = require('../library/codesystem');
-const { CodeSystemProvider, CodeSystemFactoryProvider, TxOperationContext, Designation} = require('./cs-api');
-const { Language, Languages } = require('../../library/languages');
+const { CodeSystemProvider, CodeSystemFactoryProvider} = require('./cs-api');
 const assert = require('assert');
 
 /**
@@ -10,8 +8,8 @@ const assert = require('assert');
  * Enhanced to support supplements for display and definition lookup
  */
 class UriServices extends CodeSystemProvider {
-  constructor(supplements) {
-    super(supplements);
+  constructor(opContext, supplements) {
+    super(opContext, supplements);
   }
 
   // ============================================================================
@@ -59,45 +57,45 @@ class UriServices extends CodeSystemProvider {
   // Getting Information about concepts
   // ============================================================================
 
-  async code(opContext, code) {
-    this._ensureOpContext(opContext);
-    const ctxt = await this.#ensureContext(opContext, code);
+  async code(code) {
+    
+    await this.#ensureContext(code);
     return code; // For URIs, the code is the context
   }
 
-  async display(opContext, code) {
-    this._ensureOpContext(opContext);
-    const ctxt = await this.#ensureContext(opContext, code);
-    return this._displayFromSupplements(opContext, ctxt);
+  async display(code) {
+    
+    const ctxt = await this.#ensureContext(code);
+    return this._displayFromSupplements(ctxt);
   }
 
-  async definition(opContext, code) {
-    this._ensureOpContext(opContext);
-    const ctxt = await this.#ensureContext(opContext, code);
+  async definition(code) {
+    
+    await this.#ensureContext(code);
     return null; // URIs don't have definitions by default
   }
 
-  async isAbstract(opContext, code) {
-    this._ensureOpContext(opContext);
-    const ctxt = await this.#ensureContext(opContext, code);
+  async isAbstract(code) {
+    
+    await this.#ensureContext(code);
     return false; // URIs are not abstract
   }
 
-  async isInactive(opContext, code) {
-    this._ensureOpContext(opContext);
-    const ctxt = await this.#ensureContext(opContext, code);
+  async isInactive(code) {
+    
+    await this.#ensureContext(code);
     return false; // URIs are not inactive
   }
 
-  async isDeprecated(opContext, code) {
-    this._ensureOpContext(opContext);
-    const ctxt = await this.#ensureContext(opContext, code);
+  async isDeprecated(code) {
+    
+    await this.#ensureContext(code);
     return false; // URIs are not deprecated
   }
 
-  async designations(opContext, code) {
-    this._ensureOpContext(opContext);
-    const ctxt = await this.#ensureContext(opContext, code);
+  async designations(code) {
+    
+    const ctxt = await this.#ensureContext(code);
     const designations = [];
     if (ctxt != null) {
       designations.push(...this._listSupplementDesignations(ctxt));
@@ -105,15 +103,15 @@ class UriServices extends CodeSystemProvider {
     return designations;
   }
 
-  async properties(opContext, code) {
-    this._ensureOpContext(opContext);
-    const ctxt = await this.#ensureContext(opContext, code);
+  async properties(code) {
+    
+    const ctxt = await this.#ensureContext(code);
     // Collect properties from all supplements
     let allProperties = [];
 
     if (this.supplements) {
       for (const supplement of this.supplements) {
-        const concept = supplement.getConceptByCode(code);  // ← Uses CodeSystem API
+        const concept = supplement.getConceptByCode(ctxt);  // ← Uses CodeSystem API
         if (concept && concept.property) {
           // Add all properties from this concept
           allProperties = allProperties.concat(concept.property);
@@ -124,15 +122,15 @@ class UriServices extends CodeSystemProvider {
     return allProperties.length > 0 ? allProperties : null;
   }
 
-  async sameConcept(opContext, a, b) {
-    this._ensureOpContext(opContext);
-    const ac = await this.#ensureContext(opContext, a);
-    const bc = await this.#ensureContext(opContext, b);
+  async sameConcept(a, b) {
+    
+    await this.#ensureContext(a);
+    await this.#ensureContext(b);
     return a === b; // For URIs, direct string comparison
   }
 
 
-  async #ensureContext(opContext, code) {
+  async #ensureContext(code) {
     if (code == null || typeof code === 'string') {
       return code;
     }
@@ -143,8 +141,8 @@ class UriServices extends CodeSystemProvider {
   // Finding concepts
   // ============================================================================
 
-  async locate(opContext, code) {
-    this._ensureOpContext(opContext);
+  async locate(code) {
+    
     assert(code == null || typeof code === 'string', 'code must be string');
     if (!code) return { context: null, message: 'Empty code' };
 
@@ -167,15 +165,6 @@ class UriServices extends CodeSystemProvider {
   // ============================================================================
   // Translations and concept maps
   // ============================================================================
-
-  async registerConceptMaps(list) {
-    // No concept maps for URIs
-  }
-
-  async getTranslations(opContext, coding, target) {
-    this._ensureOpContext(opContext);
-    return null; // No translations available
-  }
 }
 
 /**
@@ -187,9 +176,17 @@ class UriServicesFactory extends CodeSystemFactoryProvider {
     return 'n/a';
   }
 
+  system() {
+    return 'urn:ietf:rfc:3986'; // URI_URIs constant equivalent
+  }
+
+  version() {
+    return 'n/a';
+  }
+
   async build(opContext, supplements) {
     this.recordUse();
-    return new UriServices(supplements);
+    return new UriServices(opContext, supplements);
   }
 }
 

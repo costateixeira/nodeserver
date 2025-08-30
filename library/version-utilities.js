@@ -21,9 +21,8 @@ const VersionPrecision = {
     FULL: 'FULL'
 };
 
-// SemverParser - simplified implementation for the needed functionality
 class SemverParser {
-    static parseSemver(version, allowWildcards = false, allowPartial = false) {
+    static parseSemver(version, allowWildcards = false) {
         const result = new ParseResult();
 
         if (Utilities.noString(version)) {

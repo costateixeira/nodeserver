@@ -524,3 +524,6 @@ class ConceptMap {
     };
   }
 }
+
+
+module.exports = { ConceptMap };

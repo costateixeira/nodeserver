@@ -28,7 +28,7 @@ function processVHL(host, uuid, standardResponse) {
     "type": "searchSet",
     "link": [{
       "relation": "self",
-      "url": "http://" + host + "/shl/access/" + uuid
+      "url": "https://" + host + "/shl/access/" + uuid
     }],
     "entry": []
   };

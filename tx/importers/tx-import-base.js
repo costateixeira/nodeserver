@@ -24,6 +24,7 @@ class BaseTerminologyModule {
     throw new Error('getDescription() must be implemented by subclass');
   }
 
+  // eslint-disable-next-line no-unused-vars
   registerCommands(terminologyCommand, globalOptions) {
     throw new Error('registerCommands() must be implemented by subclass');
   }
@@ -290,6 +291,7 @@ class BaseTerminologyModule {
   }
 
   // Abstract method for actual import logic
+  // eslint-disable-next-line no-unused-vars
   async executeImport(config) {
     throw new Error('executeImport() must be implemented by subclass');
   }

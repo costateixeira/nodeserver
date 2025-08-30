@@ -1473,7 +1473,7 @@ class SnomedExpressionServices {
 
     // Validate description if provided
     if (concept.reference !== NO_REFERENCE && concept.description !== '') {
-      const displayNames = this.listDisplayNames(concept.reference, 0, 0xFF);
+      const displayNames = this.listDisplayNames(concept.reference, 0);
       const normalizedDescription = this.normalizeText(concept.description);
 
       let ok = false;
@@ -1504,7 +1504,7 @@ class SnomedExpressionServices {
    * List all display names for a concept
    * Equivalent to Pascal ListDisplayNames procedure
    */
-  listDisplayNames(conceptIndex, languageFilter = 0, flagMask = 0xFF) {
+  listDisplayNames(conceptIndex, languageFilter = 0) {
     const designations = [];
 
     try {
@@ -1682,7 +1682,7 @@ class SnomedExpressionServices {
 
     try {
       // Get the closure (all descendants) for concept a
-      const conceptA = this.concepts.getConcept(a);
+      // ?? const conceptA = this.concepts.getConcept(a);
       const closureRef = this.concepts.getAllDesc(a);
 
       if (closureRef === 0 || closureRef === 0xFFFFFFFF) {

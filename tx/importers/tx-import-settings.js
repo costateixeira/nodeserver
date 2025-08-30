@@ -229,7 +229,7 @@ class ConfigManager {
     return defaults;
   }
 
-  suggestNextDestination(previousDest, terminology) {
+  suggestNextDestination(previousDest) {
     // If previous dest was versioned, suggest incrementing
     const versionMatch = previousDest.match(/-v(\d+)\.db$/);
     if (versionMatch) {
@@ -248,7 +248,7 @@ class ConfigManager {
     return previousDest;
   }
 
-  suggestNextVersion(previousVersion, terminology) {
+  suggestNextVersion(previousVersion) {
     // If version has a date, suggest today's date
     const dateMatch = previousVersion.match(/-(\d{4}-\d{2}-\d{2})$/);
     if (dateMatch) {

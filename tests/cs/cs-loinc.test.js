@@ -4,6 +4,7 @@ const path = require('path');
 const { LoincDataMigrator } = require('../../tx/importers/import-loinc.module');
 const { LoincServices, LoincServicesFactory, LoincProviderContext } = require('../../tx/cs/cs-loinc');
 const { TxOperationContext } = require('../../tx/cs/cs-api');
+const {validateParameter} = require("../../library/utilities");
 
 describe('LOINC Module Import', () => {
   const testSourceDir = path.resolve(__dirname, '../../tx/data/loinc');
@@ -432,7 +433,6 @@ describe('LOINC Provider', () => {
   const testDbPath = path.resolve(__dirname, '../../data/loinc-testing.db');
   let factory;
   let provider;
-  let opContext;
 
   beforeAll(async () => {
     // Verify test database exists (should be created by import tests)
@@ -440,8 +440,7 @@ describe('LOINC Provider', () => {
 
     // Create factory and provider
     factory = new LoincServicesFactory(testDbPath);
-    provider = await factory.build(null, []);
-    opContext = new TxOperationContext('en');
+    provider = await factory.build(new TxOperationContext('en'), []);
   });
 
   afterAll(() => {
@@ -493,7 +492,7 @@ describe('LOINC Provider', () => {
       const testCodes = expectedResults.basic.knownCodes;
 
       for (const code of testCodes) {
-        const result = await provider.locate(opContext, code);
+        const result = await provider.locate(code);
         expect(result.context).toBeDefined();
         expect(result.context).toBeInstanceOf(LoincProviderContext);
         expect(result.context.code).toBe(code);
@@ -504,7 +503,7 @@ describe('LOINC Provider', () => {
     });
 
     test('should return null for non-existent code', async () => {
-      const result = await provider.locate(opContext, '99999-999');
+      const result = await provider.locate('99999-999');
       expect(result.context).toBeNull();
       expect(result.message).toContain('not found');
     });
@@ -513,7 +512,7 @@ describe('LOINC Provider', () => {
       const testCodes = expectedResults.basic.knownCodes;
 
       for (const code of testCodes) {
-        const display = await provider.display(opContext, code);
+        const display = await provider.display(code);
         expect(display).toBeDefined();
         expect(typeof display).toBe('string');
         expect(display.length).toBeGreaterThan(0);
@@ -524,8 +523,8 @@ describe('LOINC Provider', () => {
 
     test('should return correct code for context', async () => {
       const testCode = expectedResults.basic.knownCodes[0];
-      const result = await provider.locate(opContext, testCode);
-      const code = await provider.code(opContext, result.context);
+      const result = await provider.locate(testCode);
+      const code = await provider.code(result.context);
       expect(code).toBe(testCode);
     });
   });
@@ -533,22 +532,22 @@ describe('LOINC Provider', () => {
   describe('Code Properties and Methods', () => {
     test('should return false for abstract concepts', async () => {
       const testCode = expectedResults.basic.knownCodes[0];
-      const result = await provider.locate(opContext, testCode);
-      const isAbstract = await provider.isAbstract(opContext, result.context);
+      const result = await provider.locate(testCode);
+      const isAbstract = await provider.isAbstract(result.context);
       expect(isAbstract).toBe(false);
     });
 
     test('should return false for inactive concepts', async () => {
       const testCode = expectedResults.basic.knownCodes[0];
-      const result = await provider.locate(opContext, testCode);
-      const isInactive = await provider.isInactive(opContext, result.context);
+      const result = await provider.locate(testCode);
+      const isInactive = await provider.isInactive(result.context);
       expect(isInactive).toBe(false);
     });
 
     test('should return null for definition', async () => {
       const testCode = expectedResults.basic.knownCodes[0];
-      const result = await provider.locate(opContext, testCode);
-      const definition = await provider.definition(opContext, result.context);
+      const result = await provider.locate(testCode);
+      const definition = await provider.definition(result.context);
       expect(definition).toBeNull();
     });
   });
@@ -556,7 +555,7 @@ describe('LOINC Provider', () => {
   describe('Designations', () => {
     test('should return designations for codes', async () => {
       const testCode = expectedResults.basic.knownCodes[0];
-      const designations = await provider.designations(opContext, testCode);
+      const designations = await provider.designations(testCode);
 
       expect(Array.isArray(designations)).toBe(true);
       expect(designations.length).toBeGreaterThan(0);
@@ -575,8 +574,8 @@ describe('LOINC Provider', () => {
 
       for (const [filterType, testCases] of Object.entries(filterTests)) {
         for (const testCase of testCases) {
+          validateParameter(filterType, "filterType", String);
           const supports = await provider.doesFilter(
-            opContext,
             testCase.property,
             testCase.operator,
             testCase.value
@@ -589,8 +588,8 @@ describe('LOINC Provider', () => {
     });
 
     test('should reject unsupported filters', async () => {
-      expect(await provider.doesFilter(opContext, 'unsupported', 'equal', 'value')).toBe(false);
-      expect(await provider.doesFilter(opContext, 'COMPONENT', 'unsupported-op', 'value')).toBe(false);
+      expect(await provider.doesFilter('unsupported', 'equal', 'value')).toBe(false);
+      expect(await provider.doesFilter('COMPONENT', 'unsupported-op', 'value')).toBe(false);
     });
   });
 
@@ -599,27 +598,26 @@ describe('LOINC Provider', () => {
       const testCases = expectedResults.filters.LIST;
 
       for (const testCase of testCases) {
-        const filterContext = await provider.getPrepContext(opContext, true);
+        const filterContext = await provider.getPrepContext(true);
         await provider.filter(
-          opContext,
           filterContext,
           testCase.property,
           testCase.operator,
           testCase.value
         );
-        const filters = await provider.executeFilters(opContext, filterContext);
+        const filters = await provider.executeFilters(filterContext);
         const filter = filters[0];
 
         expect(filter).toBeDefined();
 
-        const size = await provider.filterSize(opContext, filterContext, filter);
+        const size = await provider.filterSize(filterContext, filter);
         expect(size).toBeGreaterThanOrEqual(0);
 
         // Check expected codes if provided
         if (testCase.expectedCodes) {
           const foundCodes = [];
-          while (await provider.filterMore(opContext, filterContext, filter)) {
-            const concept = await provider.filterConcept(opContext, filterContext, filter);
+          while (await provider.filterMore(filterContext, filter)) {
+            const concept = await provider.filterConcept(filterContext, filter);
             foundCodes.push(concept.code);
           }
           // console.log('found codes: '+foundCodes);
@@ -639,22 +637,21 @@ describe('LOINC Provider', () => {
       const testCases = expectedResults.filters.relationships;
 
       for (const testCase of testCases) {
-        const filterContext = await provider.getPrepContext(opContext, true);
+        const filterContext = await provider.getPrepContext(true);
         await provider.filter(
-          opContext,
           filterContext,
           testCase.property,
           testCase.operator,
           testCase.value
         );
-        const filters = await provider.executeFilters(opContext, filterContext);
+        const filters = await provider.executeFilters(filterContext);
         const filter = filters[0];
 
         expect(filter).toBeDefined();
-        const size = await provider.filterSize(opContext, filterContext, filter);
+        const size = await provider.filterSize(filterContext, filter);
         const foundCodes = [];
-        while (await provider.filterMore(opContext, filterContext, filter)) {
-          const concept = await provider.filterConcept(opContext, filterContext, filter);
+        while (await provider.filterMore(filterContext, filter)) {
+          const concept = await provider.filterConcept(filterContext, filter);
           foundCodes.push(concept.code);
         }
         // console.log(`found codes for ${testCase.property} ${testCase.operator} ${testCase.value}: `+foundCodes);
@@ -677,23 +674,22 @@ describe('LOINC Provider', () => {
       const testCases = expectedResults.filters.properties;
 
       for (const testCase of testCases) {
-        const filterContext = await provider.getPrepContext(opContext, true);
+        const filterContext = await provider.getPrepContext(true);
         await provider.filter(
-          opContext,
           filterContext,
           testCase.property,
           testCase.operator,
           testCase.value
         );
-        const filters = await provider.executeFilters(opContext, filterContext);
+        const filters = await provider.executeFilters(filterContext);
         const filter = filters[0];
 
         expect(filter).toBeDefined();
 
-        const size = await provider.filterSize(opContext, filterContext, filter);
+        const size = await provider.filterSize(filterContext, filter);
         const foundCodes = [];
-        while (await provider.filterMore(opContext, filterContext, filter)) {
-          const concept = await provider.filterConcept(opContext, filterContext, filter);
+        while (await provider.filterMore(filterContext, filter)) {
+          const concept = await provider.filterConcept(filterContext, filter);
           foundCodes.push(concept.code);
         }
         // console.log(`found codes for ${testCase.property} ${testCase.operator} ${testCase.value}: `+foundCodes);
@@ -713,19 +709,18 @@ describe('LOINC Provider', () => {
       const classTypeTests = expectedResults.filters.classType;
 
       for (const testCase of classTypeTests) {
-        const filterContext = await provider.getPrepContext(opContext, true);
+        const filterContext = await provider.getPrepContext(true);
         await provider.filter(
-          opContext,
           filterContext,
           'CLASSTYPE',
           'equal',
           testCase.value
         );
 
-        const filters = await provider.executeFilters(opContext, filterContext);
+        const filters = await provider.executeFilters(filterContext);
         const filter = filters[0];
 
-        const size = await provider.filterSize(opContext, filterContext, filter);
+        const size = await provider.filterSize(filterContext, filter);
         expect(size).toBeGreaterThanOrEqual(0);
 
         // console.log(`✓ CLASSTYPE filter "${testCase.value}" (${testCase.description}): ${size} results`);
@@ -738,21 +733,20 @@ describe('LOINC Provider', () => {
       const testCases = expectedResults.filters.hierarchy;
 
       for (const testCase of testCases) {
-        const filterContext = await provider.getPrepContext(opContext, true);
+        const filterContext = await provider.getPrepContext(true);
         await provider.filter(
-          opContext,
           filterContext,
           'concept',
           testCase.operator,
           testCase.value
         );
 
-        const filters = await provider.executeFilters(opContext, filterContext);
+        const filters = await provider.executeFilters(filterContext);
         const filter = filters[0];
 
         expect(filter).toBeDefined();
 
-        const size = await provider.filterSize(opContext, filterContext, filter);
+        const size = await provider.filterSize(filterContext, filter);
         expect(size).toBeGreaterThanOrEqual(0);
 
         // console.log(`✓ Hierarchy filter "concept ${testCase.operator} ${testCase.value}": ${size} results`);
@@ -765,18 +759,17 @@ describe('LOINC Provider', () => {
       const testCases = expectedResults.filters.status;
 
       for (const testCase of testCases) {
-        const filterContext = await provider.getPrepContext(opContext, true);
+        const filterContext = await provider.getPrepContext(true);
         await provider.filter(
-          opContext,
           filterContext,
           'STATUS',
           'equal',
           testCase.value
         );
-        const filters = await provider.executeFilters(opContext, filterContext);
+        const filters = await provider.executeFilters(filterContext);
         const filter = filters[0];
 
-        const size = await provider.filterSize(opContext, filterContext, filter);
+        const size = await provider.filterSize(filterContext, filter);
         expect(size).toBeGreaterThanOrEqual(0);
 
         // console.log(`✓ STATUS filter "${testCase.value}": ${size} results`);
@@ -787,18 +780,17 @@ describe('LOINC Provider', () => {
       const testCases = expectedResults.filters.copyright;
 
       for (const testCase of testCases) {
-        const filterContext = await provider.getPrepContext(opContext, true);
+        const filterContext = await provider.getPrepContext(true);
         await provider.filter(
-          opContext,
           filterContext,
           'copyright',
           'equal',
           testCase.value
         );
-        const filters = await provider.executeFilters(opContext, filterContext);
+        const filters = await provider.executeFilters(filterContext);
         const filter = filters[0];
 
-        const size = await provider.filterSize(opContext, filterContext, filter);
+        const size = await provider.filterSize(filterContext, filter);
         expect(size).toBeGreaterThanOrEqual(0);
 
         // console.log(`✓ Copyright filter "${testCase.value}": ${size} results`);
@@ -809,21 +801,20 @@ describe('LOINC Provider', () => {
   describe('Filter Operations', () => {
     test('should locate codes within filters', async () => {
       const testCase = expectedResults.filters.relationships[0]; // Use first relationship filter
-      const filterContext = await provider.getPrepContext(opContext, false);
+      const filterContext = await provider.getPrepContext(false);
       await provider.filter(
-        opContext,
         filterContext,
         testCase.property,
         testCase.operator,
         testCase.value
       );
 
-      const filters = await provider.executeFilters(opContext, filterContext);
+      const filters = await provider.executeFilters(filterContext);
       const filter = filters[0];
 
       if (testCase.expectedCodes && testCase.expectedCodes.length > 0) {
         const codeToFind = testCase.expectedCodes[0];
-        const located = await provider.filterLocate(opContext, filterContext, filter, codeToFind);
+        const located = await provider.filterLocate(filterContext, filter, codeToFind);
         expect(located).toBeInstanceOf(LoincProviderContext);
         expect(located.code).toBe(codeToFind);
 
@@ -833,22 +824,21 @@ describe('LOINC Provider', () => {
 
     test('should check if concepts are in filters', async () => {
       const testCase = expectedResults.filters.relationships[0];
-      const filterContext = await provider.getPrepContext(opContext, true);
+      const filterContext = await provider.getPrepContext(true);
       await provider.filter(
-        opContext,
         filterContext,
         testCase.property,
         testCase.operator,
         testCase.value
       );
-      const filters = await provider.executeFilters(opContext, filterContext);
+      const filters = await provider.executeFilters(filterContext);
       const filter = filters[0];
 
       if (testCase.expectedCodes && testCase.expectedCodes.length > 0) {
         const testCode = testCase.expectedCodes[0];
-        const concept = await provider.locate(opContext, testCode);
+        const concept = await provider.locate(testCode);
 
-        const inFilter = await provider.filterCheck(opContext, filterContext, filter, concept.context);
+        const inFilter = await provider.filterCheck(filterContext, filter, concept.context);
         expect(inFilter).toBe(true);
 
         //console.log(`✓ Concept ${testCode} is in filter`);
@@ -857,23 +847,22 @@ describe('LOINC Provider', () => {
 
     test('should iterate through filter results', async () => {
       const testCase = expectedResults.filters.properties[0]; // Use first property filter
-      const filterContext = await provider.getPrepContext(opContext, true);
+      const filterContext = await provider.getPrepContext(true);
       await provider.filter(
-        opContext,
         filterContext,
         testCase.property,
         testCase.operator,
         testCase.value
       );
 
-      const filters = await provider.executeFilters(opContext, filterContext);
+      const filters = await provider.executeFilters(filterContext);
       const filter = filters[0];
 
       let count = 0;
       const maxIterations = 10; // Limit for test performance
 
-      while (await provider.filterMore(opContext, filterContext, filter) && count < maxIterations) {
-        const concept = await provider.filterConcept(opContext, filterContext, filter);
+      while (await provider.filterMore(filterContext, filter) && count < maxIterations) {
+        const concept = await provider.filterConcept(filterContext, filter);
         expect(concept).toBeInstanceOf(LoincProviderContext);
         expect(concept.code).toBeDefined();
         count++;
@@ -889,7 +878,7 @@ describe('LOINC Provider', () => {
       const testCode = expectedResults.basic.knownCodes[0];
       const params = { parameter: [] };
 
-      await provider.extendLookup(opContext, testCode, [], params);
+      await provider.extendLookup(testCode, [], params);
 
       expect(params.parameter).toBeDefined();
       expect(params.parameter.length).toBeGreaterThan(0);
@@ -913,14 +902,14 @@ describe('LOINC Provider', () => {
 
   describe('Iterator Support', () => {
     test('should iterate all codes', async () => {
-      const iterator = await provider.iterator(opContext, null);
+      const iterator = await provider.iterator(null);
       expect(iterator).toBeDefined();
 
       let count = 0;
       const maxIterations = 10; // Limit for test performance
 
       while (count < maxIterations) {
-        const context = await provider.nextContext(opContext, iterator);
+        const context = await provider.nextContext(iterator);
         if (!context) break;
 
         expect(context).toBeInstanceOf(LoincProviderContext);
@@ -934,16 +923,11 @@ describe('LOINC Provider', () => {
   });
 
   describe('Error Handling', () => {
-    test('should handle invalid operation context', async () => {
-      await expect(provider.locate(null, '1000-9')).rejects.toThrow();
-      await expect(provider.locate('invalid', '1000-9')).rejects.toThrow();
-    });
-
     test('should handle unsupported filters', async () => {
-      const filterContext = await provider.getPrepContext(opContext, true);
+      const filterContext = await provider.getPrepContext(true);
 
       await expect(
-        provider.filter(opContext, filterContext, 'unsupported', 'equal', 'value')
+        provider.filter(filterContext, 'unsupported', 'equal', 'value')
       ).rejects.toThrow('not supported');
     });
 
@@ -951,7 +935,7 @@ describe('LOINC Provider', () => {
       const params = { parameter: [] };
 
       await expect(
-        provider.extendLookup(opContext, 'invalid-code', [], params)
+        provider.extendLookup('invalid-code', [], params)
       ).rejects.toThrow();
     });
   });

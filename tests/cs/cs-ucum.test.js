@@ -6,7 +6,6 @@
 const { readFileSync } = require('fs');
 
 const {
-  UcumCodeSystemProvider,
   UcumCodeSystemFactory
 } = require('../../tx/cs/cs-ucum');
 
@@ -21,7 +20,6 @@ const { Languages, Language } = require('../../library/languages');
 describe('UCUM Provider Integration Tests', () => {
   let ucumService;
   let provider;
-  let opContext;
 
   beforeAll(async () => {
     // Initialize real UCUM service
@@ -31,10 +29,8 @@ describe('UCUM Provider Integration Tests', () => {
 
     const languages = new Languages();
     languages.add(new Language('en'));
-    opContext = new TxOperationContext(languages);
-
     const factory = new UcumCodeSystemFactory(ucumService);
-    provider = factory.build(opContext, null);
+    provider = factory.build(new TxOperationContext(languages), null);
   });
 
   describe('Medical Laboratory Integration', () => {
@@ -55,11 +51,11 @@ describe('UCUM Provider Integration Tests', () => {
 
     test('should validate all common lab units', async () => {
       for (const unit of labUnits) {
-        const result = await provider.locate(opContext, unit.code);
+        const result = await provider.locate(unit.code);
         expect(result.context).toBeTruthy();
         expect(result.message).toBeNull();
 
-        const display = await provider.display(opContext, unit.code);
+        const display = await provider.display(unit.code);
         expect(display).toBeTruthy();
 
         console.log(`✓ ${unit.name}: ${unit.code} → ${display}`);
@@ -87,7 +83,7 @@ describe('UCUM Provider Integration Tests', () => {
       let validCount = 0;
       for (const unit of medicationUnits) {
         try {
-          const result = await provider.locate(opContext, unit);
+          const result = await provider.locate(unit);
           if (result.context) {
             validCount++;
 
@@ -120,13 +116,13 @@ describe('UCUM Provider Integration Tests', () => {
       ];
 
       for (const vital of vitalSigns) {
-        const result = await provider.locate(opContext, vital.unit);
+        const result = await provider.locate(vital.unit);
         const isValid = result.context !== null;
 
         expect(isValid).toBe(vital.expected);
 
         if (isValid) {
-          const display = await provider.display(opContext, vital.unit);
+          const display = await provider.display(vital.unit);
           console.log(`✓ ${vital.parameter}: ${vital.unit} → ${display}`);
         }
       }
@@ -167,7 +163,7 @@ describe('UCUM Provider Integration Tests', () => {
 
       let validCount = 0;
       for (const item of scientificUnits) {
-        const result = await provider.locate(opContext, item.unit);
+        const result = await provider.locate(item.unit);
         if (result.context) {
           validCount++;
 
@@ -200,7 +196,7 @@ describe('UCUM Provider Integration Tests', () => {
       ];
 
       for (const unit of complexUnits) {
-        const result = await provider.locate(opContext, unit);
+        const result = await provider.locate(unit);
         if (result.context) {
           // console.log(`✓ ${unit}`);
         }
@@ -209,55 +205,55 @@ describe('UCUM Provider Integration Tests', () => {
   });
 
   describe('ValueSet Integration', () => {
-    test('should work with common units enumeration', async () => {
-      // Create a mock common units ValueSet
-      const commonUnits = null;
-      //   new ValueSet({
-      //   url: 'http://example.org/fhir/ValueSet/common-units',
-      //   getConcepts: () => [
-      //     { code: 'kg', display: 'kilogram' },
-      //     { code: 'g', display: 'gram' },
-      //     { code: 'm', display: 'meter' },
-      //     { code: 'cm', display: 'centimeter' },
-      //     { code: 'L', display: 'liter' },
-      //     { code: 'mL', display: 'milliliter' },
-      //     { code: 'mg/dL', display: 'milligrams per deciliter' },
-      //     { code: 'mmol/L', display: 'millimoles per liter' }
-      //   ]
-      // }};
-
-      // Create provider with common units
-      const factory = new UcumCodeSystemFactory(ucumService, commonUnits);
-      const commonUnitsProvider = factory.build(opContext, null);
-
-      // Test special enumeration
-      // expect(commonUnitsProvider.specialEnumeration()).toBe(commonUnits.url);
-
-      // Test that common units show custom displays
-      // for (const concept of commonUnits.getConcepts()) {
-      //   const display = await commonUnitsProvider.display(opContext, concept.code);
-      //   expect(display).toBe(concept.display);
-      // }
-    });
+  //   test('should work with common units enumeration', async () => {
+  //     // Create a mock common units ValueSet
+  //     const commonUnits = null;
+  //     //   new ValueSet({
+  //     //   url: 'http://example.org/fhir/ValueSet/common-units',
+  //     //   getConcepts: () => [
+  //     //     { code: 'kg', display: 'kilogram' },
+  //     //     { code: 'g', display: 'gram' },
+  //     //     { code: 'm', display: 'meter' },
+  //     //     { code: 'cm', display: 'centimeter' },
+  //     //     { code: 'L', display: 'liter' },
+  //     //     { code: 'mL', display: 'milliliter' },
+  //     //     { code: 'mg/dL', display: 'milligrams per deciliter' },
+  //     //     { code: 'mmol/L', display: 'millimoles per liter' }
+  //     //   ]
+  //     // }};
+  //
+  //     // Create provider with common units
+  //     const factory = new UcumCodeSystemFactory(ucumService, commonUnits);
+  //     const commonUnitsProvider = factory.build(new TxOperationContext(Languages.fromAcceptLanguage('en')), []);
+  //
+  //     // Test special enumeration
+  //     // expect(commonUnitsProvider.specialEnumeration()).toBe(commonUnits.url);
+  //
+  //     // Test that common units show custom displays
+  //     // for (const concept of commonUnits.getConcepts()) {
+  //     //   const display = await commonUnitsProvider.display(concept.code);
+  //     //   expect(display).toBe(concept.display);
+  //     // }
+  //   });
 
     test('should filter by canonical units', async () => {
       const filterContext = new FilterExecutionContext();
 
       // Create filter for mass units (canonical: 'g')
-      await provider.filter(opContext, filterContext, 'canonical', 'equals', 'g');
-      const filters = await provider.executeFilters(opContext, filterContext);
+      await provider.filter(filterContext, 'canonical', 'equals', 'g');
+      const filters = await provider.executeFilters(filterContext);
 
       // Test units that should match (all mass units)
       const massUnits = ['g', 'kg', 'mg', 'ug', 'ng'];
       for (const unit of massUnits) {
-        const result = await provider.filterLocate(opContext, filterContext, filters[0], unit);
+        const result = await provider.filterLocate(filterContext, filters[0], unit);
         expect(result.code).toBe(unit);
       }
 
       // Test units that shouldn't match (non-mass units)
       const nonMassUnits = ['m', 'L', 's'];
       for (const unit of nonMassUnits) {
-        const result = await provider.filterLocate(opContext, filterContext, filters[0], unit);
+        const result = await provider.filterLocate(filterContext, filters[0], unit);
         expect(typeof result).toBe('string'); // Error message
       }
     });
@@ -283,14 +279,14 @@ describe('UCUM Provider Integration Tests', () => {
       let validCount = 0;
 
       for (const unit of testUnits) {
-        const result = await provider.locate(opContext, unit);
+        const result = await provider.locate(unit);
         if (result.context) {
           validCount++;
         }
       }
 
       const elapsed = Date.now() - start;
-      const opsPerSecond = (testUnits.length / elapsed * 1000).toFixed(2);
+      // const opsPerSecond = (testUnits.length / elapsed * 1000).toFixed(2);
 
       // console.log(`Validated ${testUnits.length} units in ${elapsed}ms (${opsPerSecond} ops/sec)`);
       // console.log(`Valid units: ${validCount}/${testUnits.length} (${(validCount/testUnits.length*100).toFixed(1)}%)`);
@@ -324,7 +320,7 @@ describe('UCUM Provider Integration Tests', () => {
 
       for (const unit of malformedUnits) {
         try {
-          const result = await provider.locate(opContext, unit);
+          const result = await provider.locate(unit);
           // Should either return an error or handle gracefully
           if (result.context === null) {
             expect(typeof result.message).toBe('string');
@@ -345,7 +341,7 @@ describe('UCUM Provider Integration Tests', () => {
       ];
 
       for (const testCase of invalidCases) {
-        const result = await provider.locate(opContext, testCase.unit);
+        const result = await provider.locate(testCase.unit);
         expect(result.context).toBeNull();
         expect(result.message).toBeTruthy();
 
@@ -363,32 +359,19 @@ describe('UCUM Provider Integration Tests', () => {
   });
 });
 
-// Performance benchmark helper
-function benchmark(name, fn) {
-  return async (...args) => {
-    const start = process.hrtime.bigint();
-    const result = await fn(...args);
-    const end = process.hrtime.bigint();
-    const durationMs = Number(end - start) / 1_000_000;
-
-    // console.log(`${name}: ${durationMs.toFixed(2)}ms`);
-    return result;
-  };
-}
-
 // Usage example for external integration
 const integrationExample = {
   // Example: FHIR Observation validation
-  validateFHIRObservation: async (provider, opContext, observation) => {
+  validateFHIRObservation: async (provider, observation) => {
     if (observation.valueQuantity && observation.valueQuantity.unit) {
       const unit = observation.valueQuantity.unit;
-      const result = await provider.locate(opContext, unit);
+      const result = await provider.locate(unit);
 
       return {
         valid: result.context !== null,
         message: result.message,
         canonical: result.context ? await provider.getCanonicalUnits(unit) : null,
-        display: result.context ? await provider.display(opContext, unit) : null
+        display: result.context ? await provider.display(unit) : null
       };
     }
     return { valid: false, message: 'No unit specified' };
@@ -417,6 +400,5 @@ const integrationExample = {
 };
 
 module.exports = {
-  benchmark,
   integrationExample
 };

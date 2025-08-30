@@ -315,3 +315,6 @@ class NamingSystem {
     };
   }
 }
+
+
+module.exports = { NamingSystem };

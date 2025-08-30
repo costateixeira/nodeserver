@@ -3,6 +3,8 @@
  * These tests can be run with Jest, Mocha, or any similar testing framework
  */
 
+import {NamingSystem} from "../library/namingsystem";
+
 describe('NamingSystem', () => {
   // Test data
   const validNamingSystem = {

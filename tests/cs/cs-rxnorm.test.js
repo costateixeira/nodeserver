@@ -175,7 +175,6 @@ describe('RxNorm Provider', () => {
   const testDbPath = path.resolve(__dirname, '../../data/rxnorm-testing.db');
   let factory;
   let provider;
-  let opContext;
 
   beforeAll(async () => {
     // Verify test database exists (should be created by import tests)
@@ -183,8 +182,7 @@ describe('RxNorm Provider', () => {
 
     // Create factory and provider
     factory = new RxNormServicesFactory(testDbPath);
-    provider = await factory.build(null, []);
-    opContext = new TxOperationContext('en');
+    provider = await factory.build(new TxOperationContext('en'), []);
   });
 
   afterAll(() => {
@@ -237,7 +235,7 @@ describe('RxNorm Provider', () => {
       const testCodes = expectedResults.basic.knownCodes;
 
       for (const code of testCodes) {
-        const result = await provider.locate(opContext, code);
+        const result = await provider.locate(code);
         if (result.context) {
           expect(result.context).toBeInstanceOf(RxNormConcept);
           expect(result.context.code).toBe(code);
@@ -257,7 +255,7 @@ describe('RxNorm Provider', () => {
       for (const name of testNames) {
         const result = await findCodeByName(testDbPath, name);
         if (result) {
-          const located = await provider.locate(opContext, result.code);
+          const located = await provider.locate(result.code);
           if (located.context) {
             expect(located.context).toBeInstanceOf(RxNormConcept);
             console.log(`✓ Found "${name}" as code ${result.code}: ${result.display}`);
@@ -273,7 +271,7 @@ describe('RxNorm Provider', () => {
     });
 
     test('should return null for non-existent code', async () => {
-      const result = await provider.locate(opContext, '99999999');
+      const result = await provider.locate('99999999');
       expect(result.context).toBeNull();
       expect(result.message).toContain('not found');
     });
@@ -282,7 +280,7 @@ describe('RxNorm Provider', () => {
       // Find first available code in database
       const sampleCode = await getFirstAvailableCode(testDbPath);
       if (sampleCode) {
-        const display = await provider.display(opContext, sampleCode);
+        const display = await provider.display(sampleCode);
         expect(display).toBeDefined();
         expect(typeof display).toBe('string');
         expect(display.length).toBeGreaterThan(0);
@@ -293,8 +291,8 @@ describe('RxNorm Provider', () => {
     test('should return correct code for context', async () => {
       const sampleCode = await getFirstAvailableCode(testDbPath);
       if (sampleCode) {
-        const result = await provider.locate(opContext, sampleCode);
-        const code = await provider.code(opContext, result.context);
+        const result = await provider.locate(sampleCode);
+        const code = await provider.code(result.context);
         expect(code).toBe(sampleCode);
       }
     });
@@ -304,8 +302,8 @@ describe('RxNorm Provider', () => {
     test('should return false for abstract concepts', async () => {
       const sampleCode = await getFirstAvailableCode(testDbPath);
       if (sampleCode) {
-        const result = await provider.locate(opContext, sampleCode);
-        const isAbstract = await provider.isAbstract(opContext, result.context);
+        const result = await provider.locate(sampleCode);
+        const isAbstract = await provider.isAbstract(result.context);
         expect(isAbstract).toBe(false);
       }
     });
@@ -313,8 +311,8 @@ describe('RxNorm Provider', () => {
     test('should check inactive status', async () => {
       const sampleCode = await getFirstAvailableCode(testDbPath);
       if (sampleCode) {
-        const result = await provider.locate(opContext, sampleCode);
-        const isInactive = await provider.isInactive(opContext, result.context);
+        const result = await provider.locate(sampleCode);
+        const isInactive = await provider.isInactive(result.context);
         expect(typeof isInactive).toBe('boolean');
       }
     });
@@ -322,8 +320,8 @@ describe('RxNorm Provider', () => {
     test('should return null for definition', async () => {
       const sampleCode = await getFirstAvailableCode(testDbPath);
       if (sampleCode) {
-        const result = await provider.locate(opContext, sampleCode);
-        const definition = await provider.definition(opContext, result.context);
+        const result = await provider.locate(sampleCode);
+        const definition = await provider.definition(result.context);
         expect(definition).toBeNull();
       }
     });
@@ -331,10 +329,10 @@ describe('RxNorm Provider', () => {
     test('should handle archived codes', async () => {
       const archivedCode = await getArchivedCode(testDbPath);
       if (archivedCode) {
-        const result = await provider.locate(opContext, archivedCode);
+        const result = await provider.locate(archivedCode);
         if (result.context) {
           expect(result.context.archived).toBe(true);
-          const isDeprecated = await provider.isDeprecated(opContext, result.context);
+          const isDeprecated = await provider.isDeprecated(result.context);
           expect(isDeprecated).toBe(true);
           console.log(`✓ Found archived code: ${archivedCode}`);
         }
@@ -348,7 +346,7 @@ describe('RxNorm Provider', () => {
     test('should return designations for codes', async () => {
       const sampleCode = await getFirstAvailableCode(testDbPath);
       if (sampleCode) {
-        const designations = await provider.designations(opContext, sampleCode);
+        const designations = await provider.designations(sampleCode);
 
         expect(Array.isArray(designations)).toBe(true);
         expect(designations.length).toBeGreaterThan(0);
@@ -368,7 +366,6 @@ describe('RxNorm Provider', () => {
 
       for (const testCase of ttyTests) {
         const supports = await provider.doesFilter(
-          opContext,
           testCase.property,
           testCase.operator,
           testCase.value
@@ -383,7 +380,6 @@ describe('RxNorm Provider', () => {
 
       for (const testCase of styTests) {
         const supports = await provider.doesFilter(
-          opContext,
           testCase.property,
           testCase.operator,
           testCase.value
@@ -398,7 +394,6 @@ describe('RxNorm Provider', () => {
 
       for (const testCase of sabTests) {
         const supports = await provider.doesFilter(
-          opContext,
           testCase.property,
           testCase.operator,
           testCase.value
@@ -413,7 +408,6 @@ describe('RxNorm Provider', () => {
 
       for (const testCase of relTests) {
         const supports = await provider.doesFilter(
-          opContext,
           testCase.property,
           testCase.operator,
           testCase.value
@@ -424,8 +418,8 @@ describe('RxNorm Provider', () => {
     });
 
     test('should reject unsupported filters', async () => {
-      expect(await provider.doesFilter(opContext, 'unsupported', 'equal', 'value')).toBe(false);
-      expect(await provider.doesFilter(opContext, 'TTY', 'unsupported-op', 'value')).toBe(false);
+      expect(await provider.doesFilter('unsupported', 'equal', 'value')).toBe(false);
+      expect(await provider.doesFilter('TTY', 'unsupported-op', 'value')).toBe(false);
     });
   });
 
@@ -434,20 +428,19 @@ describe('RxNorm Provider', () => {
       const testCases = expectedResults.filters.TTY;
 
       for (const testCase of testCases) {
-        const filterContext = await provider.getPrepContext(opContext, true);
+        const filterContext = await provider.getPrepContext(true);
         await provider.filter(
-          opContext,
           filterContext,
           testCase.property,
           testCase.operator,
           testCase.value
         );
-        const filters = await provider.executeFilters(opContext, filterContext);
+        const filters = await provider.executeFilters(filterContext);
         const filter = filters[0];
 
         expect(filter).toBeDefined();
 
-        const size = await provider.filterSize(opContext, filterContext, filter);
+        const size = await provider.filterSize(filterContext, filter);
         expect(size).toBeGreaterThanOrEqual(testCase.expectedMinResults || 0);
 
         if (size > 0) {
@@ -455,8 +448,8 @@ describe('RxNorm Provider', () => {
           let count = 0;
           const maxIterations = 5;
 
-          while (await provider.filterMore(opContext, filterContext, filter) && count < maxIterations) {
-            const concept = await provider.filterConcept(opContext, filterContext, filter);
+          while (await provider.filterMore(filterContext, filter) && count < maxIterations) {
+            const concept = await provider.filterConcept(filterContext, filter);
             expect(concept).toBeInstanceOf(RxNormConcept);
             count++;
           }
@@ -474,18 +467,17 @@ describe('RxNorm Provider', () => {
       const testCases = expectedResults.filters.SAB;
 
       for (const testCase of testCases) {
-        const filterContext = await provider.getPrepContext(opContext, true);
+        const filterContext = await provider.getPrepContext(true);
         await provider.filter(
-          opContext,
           filterContext,
           testCase.property,
           testCase.operator,
           testCase.value
         );
-        const filters = await provider.executeFilters(opContext, filterContext);
+        const filters = await provider.executeFilters(filterContext);
         const filter = filters[0];
 
-        const size = await provider.filterSize(opContext, filterContext, filter);
+        const size = await provider.filterSize(filterContext, filter);
         expect(size).toBeGreaterThanOrEqual(testCase.expectedMinResults || 0);
 
         console.log(`✓ SAB filter "${testCase.value}": ${size} results`);
@@ -498,18 +490,17 @@ describe('RxNorm Provider', () => {
       const testCases = expectedResults.filters.STY;
 
       for (const testCase of testCases) {
-        const filterContext = await provider.getPrepContext(opContext, true);
+        const filterContext = await provider.getPrepContext(true);
         await provider.filter(
-          opContext,
           filterContext,
           testCase.property,
           testCase.operator,
           testCase.value
         );
-        const filters = await provider.executeFilters(opContext, filterContext);
+        const filters = await provider.executeFilters(filterContext);
         const filter = filters[0];
 
-        const size = await provider.filterSize(opContext, filterContext, filter);
+        const size = await provider.filterSize(filterContext, filter);
         expect(size).toBeGreaterThanOrEqual(testCase.expectedMinResults || 0);
 
         console.log(`✓ STY filter "${testCase.value}" (${testCase.description}): ${size} results`);
@@ -523,19 +514,19 @@ describe('RxNorm Provider', () => {
 
       for (const testTerm of testTerms) {
         try {
-          const filterContext = await provider.getPrepContext(opContext, true);
+          const filterContext = await provider.getPrepContext(true);
 
           // Create a mock filter object with stems
           const mockFilter = {
             stems: [testTerm.term]
           };
 
-          await provider.searchFilter(opContext, filterContext, mockFilter, false);
-          const filters = await provider.executeFilters(opContext, filterContext);
+          await provider.searchFilter(filterContext, mockFilter, false);
+          const filters = await provider.executeFilters(filterContext);
 
           if (filters.length > 0) {
             const filter = filters[0];
-            const size = await provider.filterSize(opContext, filterContext, filter);
+            const size = await provider.filterSize(filterContext, filter);
             expect(size).toBeGreaterThanOrEqual(testTerm.expectedMinResults || 0);
 
             console.log(`✓ Text search "${testTerm.term}": ${size} results`);
@@ -550,16 +541,16 @@ describe('RxNorm Provider', () => {
   describe('Filter Operations', () => {
     test('should locate codes within filters', async () => {
       // Use SAB filter as it's most likely to have results
-      const filterContext = await provider.getPrepContext(opContext, false);
-      await provider.filter(opContext, filterContext, 'SAB', 'equal', 'RXNORM');
+      const filterContext = await provider.getPrepContext(false);
+      await provider.filter(filterContext, 'SAB', 'equal', 'RXNORM');
 
-      const filters = await provider.executeFilters(opContext, filterContext);
+      const filters = await provider.executeFilters(filterContext);
       const filter = filters[0];
 
       const sampleCode = await getFirstAvailableCode(testDbPath);
       if (sampleCode) {
         try {
-          const located = await provider.filterLocate(opContext, filterContext, filter, sampleCode);
+          const located = await provider.filterLocate(filterContext, filter, sampleCode);
           if (located instanceof RxNormConcept) {
             expect(located.code).toBe(sampleCode);
             console.log(`✓ Located code ${sampleCode} in RXNORM filter`);
@@ -573,16 +564,16 @@ describe('RxNorm Provider', () => {
     });
 
     test('should check if concepts are in filters', async () => {
-      const filterContext = await provider.getPrepContext(opContext, true);
-      await provider.filter(opContext, filterContext, 'SAB', 'equal', 'RXNORM');
-      const filters = await provider.executeFilters(opContext, filterContext);
+      const filterContext = await provider.getPrepContext(true);
+      await provider.filter(filterContext, 'SAB', 'equal', 'RXNORM');
+      const filters = await provider.executeFilters(filterContext);
       const filter = filters[0];
 
       const sampleCode = await getFirstAvailableCode(testDbPath);
       if (sampleCode) {
-        const concept = await provider.locate(opContext, sampleCode);
+        const concept = await provider.locate(sampleCode);
         if (concept.context) {
-          const inFilter = await provider.filterCheck(opContext, filterContext, filter, concept.context);
+          const inFilter = await provider.filterCheck(filterContext, filter, concept.context);
           expect(typeof inFilter).toBe('boolean');
           console.log(`✓ Concept ${sampleCode} filter check: ${inFilter}`);
         }
@@ -596,7 +587,7 @@ describe('RxNorm Provider', () => {
       if (sampleCode) {
         const params = { parameter: [] };
 
-        await provider.extendLookup(opContext, sampleCode, [], params);
+        await provider.extendLookup(sampleCode, [], params);
 
         expect(params.parameter).toBeDefined();
         expect(params.parameter.length).toBeGreaterThan(0);
@@ -611,14 +602,14 @@ describe('RxNorm Provider', () => {
 
   describe('Iterator Support', () => {
     test('should iterate codes', async () => {
-      const iterator = await provider.iterator(opContext, null);
+      const iterator = await provider.iterator(null);
       expect(iterator).toBeDefined();
 
       let count = 0;
       const maxIterations = 10; // Limit for test performance
 
       while (count < maxIterations) {
-        const context = await provider.nextContext(opContext, iterator);
+        const context = await provider.nextContext(iterator);
         if (!context) break;
 
         expect(context).toBeInstanceOf(RxNormConcept);
@@ -632,16 +623,12 @@ describe('RxNorm Provider', () => {
   });
 
   describe('Error Handling', () => {
-    test('should handle invalid operation context', async () => {
-      await expect(provider.locate(null, '1191')).rejects.toThrow();
-      await expect(provider.locate('invalid', '1191')).rejects.toThrow();
-    });
 
     test('should handle unsupported filters', async () => {
-      const filterContext = await provider.getPrepContext(opContext, true);
+      const filterContext = await provider.getPrepContext(true);
 
       await expect(
-        provider.filter(opContext, filterContext, 'unsupported', 'equal', 'value')
+        provider.filter(filterContext, 'unsupported', 'equal', 'value')
       ).rejects.toThrow();
     });
 
@@ -649,7 +636,7 @@ describe('RxNorm Provider', () => {
       const params = { parameter: [] };
 
       await expect(
-        provider.extendLookup(opContext, 'invalid-code-999999', [], params)
+        provider.extendLookup('invalid-code-999999', [], params)
       ).rejects.toThrow();
     });
   });
@@ -695,7 +682,7 @@ describe('RxNorm Provider', () => {
 
 // Helper functions for database queries
 async function getDatabaseCounts(dbPath) {
-  return new Promise((resolve, reject) => {
+  return new Promise((resolve) => {
     const db = new sqlite3.Database(dbPath);
     const counts = {};
 
@@ -769,7 +756,7 @@ async function getDatabaseSchema(dbPath) {
 }
 
 async function getSampleData(dbPath) {
-  return new Promise((resolve, reject) => {
+  return new Promise((resolve) => {
     const db = new sqlite3.Database(dbPath);
     const samples = {};
 

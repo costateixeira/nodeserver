@@ -1,8 +1,8 @@
-const {Languages, Language} = require("../../library/languages");
+/* eslint-disable no-unused-vars */
+
 const assert = require('assert');
 const {CodeSystem, CodeSystemContentMode} = require("../library/codesystem");
-
-
+const {Languages, Language} = require("../../library/languages");
 
 class TxOperationContext {
 
@@ -38,15 +38,25 @@ class FilterExecutionContext {
 }
 
 class CodeSystemProvider {
+  /**
+   * {TxOperationContext} The context in which this is executing
+   */
+  opContext;
 
   /**
    * @type {CodeSystem[]}
    */
   supplements;
 
-  constructor(supplements) {
+  constructor(opContext, supplements) {
+    this.opContext = opContext;
     this.supplements = supplements;
+    this._ensureOpContext(opContext);
     this._validateSupplements();
+  }
+
+  _ensureOpContext(opContext) {
+    assert(opContext && opContext instanceof TxOperationContext, "opContext is not an instance of TxOperationContext");
   }
 
   /**
@@ -229,36 +239,34 @@ class CodeSystemProvider {
    */
 
   /**
-   * @param {TxOperationContext} opContext operation context (logging, etc)
    * @param {String | CodeSystemProviderContext} code
    * @returns {string} the correct code for the concept specified
    */
-  async code(opContext, code) {throw new Error("Must override"); }
+  async code(code) {throw new Error("Must override"); }
 
   /**
-   * @param {TxOperationContext} opContext operation context (logging, etc)
    * @param {String | CodeSystemProviderContext} code
    * @returns {string} the best display given the languages in the operation context
    */
-  async display(opContext, code) {
+  async display(code) {
     throw new Error("Must override");
   }
 
   /**
    * Protected!
    *
-   * @param {TxOperationContext} opContext operation context (logging, etc)
+   
    * @param {String} code
    * @returns {string} the best display given the languages in the operation context
    */
-  _displayFromSupplements(opContext, code) {
+  _displayFromSupplements(code) {
     assert(typeof code === 'string', 'code must be string');
     if (this.supplements) {
       const concepts = [];
       // displays have preference
       for (const supplement of this.supplements) {
         // Check if supplement language matches and has displays
-        if (this.resourceLanguageMatches(supplement.jsonObj, opContext.langs, false)) {
+        if (this.resourceLanguageMatches(supplement.jsonObj, this.opContext.langs, false)) {
           // Check if any concept has a display
           const concept= supplement.getConceptByCode(code);
           if (concept) {
@@ -273,7 +281,7 @@ class CodeSystemProvider {
       for (const concept in concepts) {
         if (concept.designation) {
           for (const designation of concept.designation) {
-            if (CodeSystem.isUseADisplay(designation.use) && opContext.langs.hasMatch(designation.language)) {
+            if (CodeSystem.isUseADisplay(designation.use) && this.opContext.langs.hasMatch(designation.language)) {
               return designation.value;
             }
           }
@@ -293,60 +301,60 @@ class CodeSystemProvider {
   }
 
   /**
-   * @param {TxOperationContext} opContext operation context (logging, etc)
+   
    * @param {string | CodeSystemProviderContext} code
    * @returns {string} the definition for the concept (if available)
    */
-  async definition(opContext, code) {throw new Error("Must override"); }
+  async definition(code) {throw new Error("Must override"); }
 
   /**
-   * @param {TxOperationContext} opContext operation context (logging, etc)
+   
    * @param {string | CodeSystemProviderContext} code
    * @returns {boolean} if the concept is abstract
    */
-  async isAbstract(opContext, code) { return false; }
+  async isAbstract(code) { return false; }
 
   /**
-   * @param {TxOperationContext} opContext operation context (logging, etc)
+   
    * @param {string | CodeSystemProviderContext} code
    * @returns {boolean} if the concept is inactive
    */
-  async isInactive(opContext, code) { return false; }
+  async isInactive(code) { return false; }
 
   /**
-   * @param {TxOperationContext} opContext operation context (logging, etc)
+   
    * @param {string | CodeSystemProviderContext} code
    * @returns {boolean} if the concept is inactive
    */
-  async isDeprecated(opContext, code) { return false; }
+  async isDeprecated(code) { return false; }
 
   /**
-   * @param {TxOperationContext} opContext operation context (logging, etc)
+   
    * @param {string | CodeSystemProviderContext} code
    * @returns {string} status
    */
-  async getStatus(opContext, code) { return null; }
+  async getStatus(code) { return null; }
 
   /**
-   * @param {TxOperationContext} opContext operation context (logging, etc)
+   
    * @param {string | CodeSystemProviderContext} code
    * @returns {string} assigned itemWeight - if there is one
    */
-  async itemWeight(opContext, code) { return null; }
+  async itemWeight(code) { return null; }
 
   /**
-   * @param {TxOperationContext} opContext operation context (logging, etc)
+   
    * @param {string | CodeSystemProviderContext} code
    * @returns {string} parent, if there is one
    */
-  async parent(opContext, code) { return null; }
+  async parent(code) { return null; }
 
   /**
-   * @param {TxOperationContext} opContext operation context (logging, etc)
+   
    * @param {string | CodeSystemProviderContext} code
    * @returns {Designation[]} whatever designations exist (in all languages)
    */
-  async designations(opContext, code) { return null; }
+  async designations(code) { return null; }
 
   _listSupplementDesignations(code) {
     assert(typeof code === 'string', 'code must be string');
@@ -371,144 +379,143 @@ class CodeSystemProvider {
   }
 
   /**
-   * @param {TxOperationContext} opContext operation context (logging, etc)
+   
    * @param {string | CodeSystemProviderContext} code
    * @returns {Extension[]} extensions, if any
    */
-  async extensions(opContext, code) { return null; }
+  async extensions(code) { return null; }
 
   /**
-   * @param {TxOperationContext} opContext operation context (logging, etc)
+   
    * @param {string | CodeSystemProviderContext} code
    * @returns {CodeSystem.concept.property[]} parent, if there is one
    */
-  async properties(opContext, code) { return null; }
+  async properties(code) { return null; }
 
   /**
-   * @param {TxOperationContext} opContext operation context (logging, etc)
+   
    * @param {string | CodeSystemProviderContext} code
    * @returns {string} information about incomplete validation on the concept, if there is any information (SCT)
    */
-  async incompleteValidationMessage(opContext, code) { return null; }
+  async incompleteValidationMessage(code) { return null; }
 
   /**
-   * @param {TxOperationContext} opContext operation context (logging, etc)
+   
    * @param {string | CodeSystemProviderContext} a
    * @param {string | CodeSystemProviderContext} b
    * @returns {boolean} true if they're the same
    */
-  async sameConcept(/*TxOperationContext*/ opContext, a, b) { return false; }
+  async sameConcept(a, b) { return false; }
 
   /**
    * @section Finding concepts in the CodeSystem
    */
 
   /**
-   * @param {TxOperationContext} opContext operation context (logging, etc)
+   
    * @param {string } code
    * @returns {{context : CodeSystemProviderContext, message : String} the result of looking for the code
    */
-  async locate(opContext, code) { throw new Error("Must override"); }
+  async locate(code) { throw new Error("Must override"); }
 
   /**
-   * @param {TxOperationContext} opContext operation context (logging, etc)
+   
    * @param {string} code
    * @param {string} parent
    * @param {boolean} disallowParent
    * @returns {{context : CodeSystemProviderContext, message : String} the result of looking for the code in the context of the parent
    */
-  async locateIsA(opContext, code) {
+  async locateIsA(code) {
     if (this.hasParents()) throw new Error("Must override"); else return { context : null, message: "The CodeSystem "+this.name()+" does not have parents"}
   }
 
   /**
-   * @param {TxOperationContext} opContext operation context (logging, etc)
+   
    * @param {string | CodeSystemProviderContext} code
    * @returns {CodeSystemIterator} a handle that can be passed to nextConcept (or null, if it can't be iterated)
    */
-  async iterator(opContext, code) { return null }
+  async iterator(code) { return null }
 
   /**
-   * @param {TxOperationContext} opContext operation context (logging, etc)
+   
    * @param {CodeSystemIterator} context
    * @returns {CodeSystemProviderContext} the next concept, or null
    */
-  async nextContext(opContext,context) { return null; }
+  async nextContext(context) { return null; }
 
   /**
-   * @param {TxOperationContext} opContext operation context (logging, etc)
-   * @param {string | CodeSystemIterator} codeA
-   * @param {string | CodeSystemIterator} codeB
+   
+   * @param {string | CodeSystemProviderContext} codeA
+   * @param {string | CodeSystemProviderContext} codeB
    * @returns {boolean} true if codeA subsumes codeB
    */
-  async subsumesTest(opContext, codeA, codeB) { return false; }
+  async subsumesTest(codeA, codeB) { return false; }
 
   /**
-   * @param {TxOperationContext} opContext operation context (logging, etc)
+   
    * @param {CodeSystemProviderContext} ctxt the context to add properties for
    * @param {string[]} props the properties requested
    * @param {Parameters} params the parameters response to add to
    */
-  async extendLookup(opContext, ctxt, props, params) { }
 
-  // procedure getCDSInfo(/*TxOperationContext*/ opContext; card : TCDSHookCard; langList : THTTPLanguageList; baseURL, code, display : String); virtual;
+  async extendLookup(ctxt, props, params) { }
+
+  // procedure getCDSInfo(card : TCDSHookCard; langList : THTTPLanguageList; baseURL, code, display : String); virtual;
 
   /**
    * returns true if a filter is supported
    *
-   * @param {TxOperationContext} opContext  operation context (logging, etc)
    * @param {String} prop
    * @param {ValueSetFilterOperator} op
    * @param {String} prop
    * @returns {boolean} true if suppoted
    * */
-  async doesFilter(/*TxOperationContext*/ opContext, prop, op, value) { return false; }
+  async doesFilter(prop, op, value) { return false; }
 
   /**
    * gets a single context in which filters will be evaluated. The application doesn't make use of this context;
    * it's only use is to be passed back to the CodeSystem provider so it can make use of it - if it wants
    *
-   * @param {TxOperationContext} opContext  operation context (logging, etc)
    * @param {boolean} iterate true if the conceptSets that result from this will be iterated, and false if they'll be used to locate a single code
    * @returns {FilterExecutionContext} filter (or null, it no use for this)
    * */
-  async getPrepContext(opContext, iterate) { return new FilterExecutionContext(); }
+  async getPrepContext(iterate) { return new FilterExecutionContext(); }
 
   /**
    * executes a text search filter (whatever that means) and returns a FilterConceptSet
    *
    * throws an exception if the search filter can't be handled
    *
-   * @param {TxOperationContext} opContext  operation context (logging, etc)
    * @param {FilterExecutionContext} filterContext filtering context
    * @param {String} filter user entered text search
    * @param {boolean} sort ?
    **/
-  async searchFilter(opContext, filterContext, filter, sort) { throw new Error("Must override"); } // ? must override?
+  async searchFilter(filterContext, filter, sort) { throw new Error("Must override"); } // ? must override?
 
   /**
-   * I don't know what this does
+   * Used for searching ucum (see specialEnumeration)
    *
    * throws an exception if the search filter can't be handled
-   * @param {TxOperationContext} opContext  operation context (logging, etc)
    * @param {FilterExecutionContext} filterContext filtering context
-   * @param {String} filter user entered text search
    * @param {boolean} sort ?
    **/
-  async specialFilter(opContext, filterContext, filter, sort) { throw new Error("Must override"); } // ? must override?
+  async specialFilter(filterContext, sort) {
+    if (this.specialEnumeration()) {
+      throw new Error("Must override");
+    }
+  } // ? must override?
 
   /**
    * Get a FilterConceptSet for a value set filter
    *
    * throws an exception if the search filter can't be handled
    *
-   * @param {TxOperationContext} opContext  operation context (logging, etc)
    * @param {FilterExecutionContext} filterContext filtering context
    * @param {String} prop
    * @param {ValueSetFilterOperator} op
    * @param {String} prop
    **/
-  async filter(opContext, filterContext, prop, op, value) { throw new Error("Must override"); } // well, only if any filters are actually supported
+  async filter(filterContext, prop, op, value) { throw new Error("Must override"); } // well, only if any filters are actually supported
 
   /**
    * called once all the filters have been handled, and iteration is about to happen.
@@ -516,82 +523,76 @@ class CodeSystemProvider {
    * one FilterConceptSet, then the code system provider has done the join across the
    * filters, otherwise the engine will do so as required
    *
-   * @param {TxOperationContext} opContext  operation context (logging, etc)
    * @param {FilterExecutionContext} filterContext filtering context
    * @returns {FilterConceptSet[]} filter sets
    **/
-  async executeFilters(opContext, filterContext) { throw new Error("Must override"); } // well, only if any filters are actually supported
+  async executeFilters(filterContext) { throw new Error("Must override"); } // well, only if any filters are actually supported
 
   /**
    * return how many concepts are in the filter set
-   @param {TxOperationContext} opContext  operation context (logging, etc)
    @param {FilterExecutionContext} filterContext filtering context
    @param {FilterConceptSet} set of interest
    @returns {int} number of concepts in the set
    */
-  async filterSize(opContext, filterContext, set) {throw new Error("Must override"); }
+  async filterSize(filterContext, set) {throw new Error("Must override"); }
 
   /**
    * return true if there's an infinite number of members (or at least, beyond knowing)
    *
    * This is true if the code system defines a grammar
    *
-   @param {TxOperationContext} opContext  operation context (logging, etc)
    @param {FilterExecutionContext} filterContext filtering context
    @returns {boolean} true if not closed
    */
-  async filtersNotClosed(opContext, filterContext) { return false; }
+  async filtersNotClosed(filterContext) { return false; }
 
   /**
    * iterate the filter set. Iteration is forwards only, using the style
    * while (filterMore()) { something(filterConcept()};
    *
-   @param {TxOperationContext} opContext  operation context (logging, etc)
    @param {FilterExecutionContext} filterContext filtering context
    @param {FilterConceptSet} set of interest
    @returns {boolean} if there is a concept
    */
-  async filterMore(opContext, filterContext, set) {throw new Error("Must override"); }
+  async filterMore(filterContext, set) {throw new Error("Must override"); }
 
   /**
    * get the current concept
    *
-   @param {TxOperationContext} opContext  operation context (logging, etc)
    @param {FilterExecutionContext} filterContext filtering context
    @param {FilterConceptSet} set of interest
    @returns {CodeSystemProviderContext} if there is a concept
    */
-  async filterConcept(opContext, filterContext, set) {throw new Error("Must override"); }
+  async filterConcept(filterContext, set) {throw new Error("Must override"); }
 
   /**
    * filterLocate - instead of iterating, find a code in the FilterConceptSet
    *
-   @param {TxOperationContext} opContext  operation context (logging, etc)
    @param {FilterExecutionContext} filterContext filtering context
    @param {FilterConceptSet} set of interest
    @param {string} code the code to find
    @returns {string | CodeSystemProviderContext} an error explaining why it isn't in the set, or a handle to the concept
    */
-   async filterLocate(opContext, filterContext, set, code) {throw new Error("Must override"); }
+   async filterLocate(filterContext, set, code) {throw new Error("Must override"); }
 
    /**
    * filterLocate - instead of iterating, find a code in the FilterConceptSet
    *
-   @param {TxOperationContext} opContext  operation context (logging, etc)
    @param {FilterExecutionContext} filterContext filtering context
    @param {FilterConceptSet} set of interest
    @param {CodeSystemProviderContext} concept the code to find
    @returns {string | boolean } an error explaining why it isn't in the set, or true if it is
    */
-   async filterCheck(opContext, filterContext, set, concept) {throw new Error("Must override"); }
+   async filterCheck(filterContext, set, concept) {throw new Error("Must override"); }
 
   /**
    * filterFinish - opportunity for the provider to close up and recover resources etc
    *
-   @param {TxOperationContext} opContext  operation context (logging, etc)
    @param {FilterExecutionContext} filterContext filtering context
    */
-  async filterFinish(opContext, filterContext) {throw new Error("Must override"); }
+  async filterFinish(filterContext) {
+
+  }
 
   /**
    * register the concept maps that are implicitly defined as part of the code system
@@ -605,12 +606,11 @@ class CodeSystemProvider {
   /**
    * register the concept maps that are implicitly defined as part of the code system
    *
-   * @param {TxOperationContext} opContext  operation context (logging, etc)
    * @param {Coding} coding the coding to translate
    * @param {String} target
    * @returns {CodeTranslation[]} the list of translations
    */
-  async getTranslations(opContext, coding, target) { return null;}
+  async getTranslations(coding, target) { return null;}
 
   // ==== Parameter checking methods =========
   _ensureLanguages(param) {
@@ -635,10 +635,6 @@ class CodeSystemProvider {
     }
   }
 
-  _ensureOpContext(opContext) {
-    assert(opContext && opContext instanceof TxOperationContext, "opContext is not an instance of TxOperationContext");
-  }
-
 }
 
 class CodeSystemFactoryProvider {
@@ -649,14 +645,33 @@ class CodeSystemFactoryProvider {
    */
   defaultVersion() { throw new Error("Must override"); }
 
+  async load() {
+    // nothing here
+  }
+
+
+
   /**
-   * @param {TxOperationContext} opContext operation context (logging, etc)
+   
    * @param {CodeSystem[]} supplements any supplements that are in scope
    * @returns {CodeSystemProvider} a built provider - or an exception
    */
   build(opContext, supplements) { throw new Error("Must override Factory"); }
 
   /**
+   * @returns {string} uri for the code system
+   */
+  system() {
+    throw new Error("Must override");
+  }
+
+  /**
+   * @returns {string} version for the code system
+   */
+  version() { throw new Error("Must override"); }
+
+
+/**
    * @returns {number} how many times the factory has been asked to construct a provider
    */
   useCount() {return this.uses}

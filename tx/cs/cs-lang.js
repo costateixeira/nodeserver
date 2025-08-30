@@ -1,5 +1,5 @@
-const { CodeSystemProvider, TxOperationContext, Designation, FilterExecutionContext } = require('./cs-api');
-const { Language, LanguageDefinitions, Languages} = require('../../library/languages');
+const { CodeSystemProvider, Designation, FilterExecutionContext, CodeSystemFactoryProvider} = require('./cs-api');
+const { Language } = require('../../library/languages');
 const { CodeSystem } = require("../library/codesystem");
 const assert = require('assert');
 
@@ -33,8 +33,8 @@ class IETFLanguageCodeFilter {
  * Provides validation and lookup for BCP 47 language tags
  */
 class IETFLanguageCodeProvider extends CodeSystemProvider {
-  constructor(languageDefinitions, supplements = null) {
-    super(supplements);
+  constructor(opContext, supplements, languageDefinitions) {
+    super(opContext, supplements);
     this.languageDefinitions = languageDefinitions; // LanguageDefinitions instance
   }
 
@@ -45,7 +45,7 @@ class IETFLanguageCodeProvider extends CodeSystemProvider {
   }
 
   version() {
-    return ''; // No specific version for BCP 47. Could be date?
+    return null; // No specific version for BCP 47. Could be date?
   }
 
   description() {
@@ -84,58 +84,58 @@ class IETFLanguageCodeProvider extends CodeSystemProvider {
 
   // ========== Code Information Methods ==========
 
-  async code(opContext, code) {
-    this._ensureOpContext(opContext);
-    const ctxt = await this.#ensureContext(opContext, code);
+  async code(code) {
+    
+    const ctxt = await this.#ensureContext(code);
     if (ctxt instanceof Language) {
       return ctxt.code;
     }
     throw new Error('Invalid context type');
   }
 
-  async display(opContext, code) {
-    this._ensureOpContext(opContext);
-    const ctxt = await this.#ensureContext(opContext, code);
+  async display(code) {
+    
+    const ctxt = await this.#ensureContext(code);
     if (!ctxt) {
       return null;
     }
-    if (opContext.langs.isEnglishOrNothing()) {
+    if (this.opContext.langs.isEnglishOrNothing()) {
       return this.languageDefinitions.present(ctxt).trim();
     }
-    let disp = this._displayFromSupplements(opContext);
+    let disp = this._displayFromSupplements(ctxt.code);
     if (disp) {
       return disp;
     }
     return this.languageDefinitions.present(ctxt).trim();
   }
 
-  async definition(opContext, code) {
-    this._ensureOpContext(opContext);
-    const ctxt = await this.#ensureContext(opContext, code);
+  async definition(code) {
+    
+    await this.#ensureContext(code);
     return null; // No definitions for language codes
   }
 
-  async isAbstract(opContext, code) {
-    this._ensureOpContext(opContext);
-    const ctxt = await this.#ensureContext(opContext, code);
+  async isAbstract(code) {
+    
+    await this.#ensureContext(code);
     return false; // Language codes are not abstract
   }
 
-  async isInactive(opContext, code) {
-    this._ensureOpContext(opContext);
-    const ctxt = await this.#ensureContext(opContext, code);
+  async isInactive(code) {
+    
+    await this.#ensureContext(code);
     return false; // We don't track inactive language codes
   }
 
-  async isDeprecated(opContext, code) {
-    this._ensureOpContext(opContext);
-    const ctxt = await this.#ensureContext(opContext, code);
+  async isDeprecated(code) {
+    
+    await this.#ensureContext(code);
     return false; // We don't track deprecated language codes
   }
 
-  async designations(opContext, code) {
-    this._ensureOpContext(opContext);
-    const ctxt = await this.#ensureContext(opContext, code);
+  async designations(code) {
+    
+    const ctxt = await this.#ensureContext(code);
     const designations = [];
     if (ctxt != null) {
       const primaryDisplay = this.languageDefinitions.present(ctxt).trim();
@@ -169,12 +169,12 @@ class IETFLanguageCodeProvider extends CodeSystemProvider {
   }
 
 
-  async #ensureContext(opContext, code) {
+  async #ensureContext(code) {
     if (code == null) {
       return code;
     }
     if (typeof code === 'string') {
-      const ctxt = await this.locate(opContext, code);
+      const ctxt = await this.locate(code);
       if (ctxt.context == null) {
         throw new Error(ctxt.message);
       } else {
@@ -189,8 +189,8 @@ class IETFLanguageCodeProvider extends CodeSystemProvider {
 
   // ========== Lookup Methods ==========
 
-  async locate(opContext, code) {
-    this._ensureOpContext(opContext);
+  async locate(code) {
+    
     assert(code == null || typeof code === 'string', 'code must be string');
     if (!code) return { context: null, message: 'Empty code' };
 
@@ -204,8 +204,8 @@ class IETFLanguageCodeProvider extends CodeSystemProvider {
 
   // ========== Filter Methods ==========
 
-  async doesFilter(opContext, prop, op, value) {
-    this._ensureOpContext(opContext);
+  async doesFilter(prop, op, value) {
+    
     assert(prop != null && typeof prop === 'string', 'prop must be a non-null string');
     assert(op != null && typeof op === 'string', 'op must be a non-null string');
     assert(value != null && typeof value === 'string', 'value must be a non-null string');
@@ -217,8 +217,8 @@ class IETFLanguageCodeProvider extends CodeSystemProvider {
     return false;
   }
 
-  async searchFilter(opContext, filterContext, filter, sort) {
-    this._ensureOpContext(opContext);
+  async searchFilter(filterContext, filter, sort) {
+    
     assert(filterContext && filterContext instanceof FilterExecutionContext, 'filterContext must be a FilterExecutionContext');
     assert(filter && typeof filter === 'string', 'filter must be a non-null string');
     assert(typeof sort === 'boolean', 'sort must be a boolean');
@@ -226,17 +226,9 @@ class IETFLanguageCodeProvider extends CodeSystemProvider {
     throw new Error('Text search not supported');
   }
 
-  async specialFilter(opContext, filterContext, filter, sort) {
-    this._ensureOpContext(opContext);
-    assert(filterContext && filterContext instanceof FilterExecutionContext, 'filterContext must be a FilterExecutionContext');
-    assert(filter && typeof filter === 'string', 'filter must be a non-null string');
-    assert(typeof sort === 'boolean', 'sort must be a boolean');
 
-    throw new Error('Special filter not implemented for Language Codes');
-  }
-
-  async filter(opContext, filterContext, prop, op, value) {
-    this._ensureOpContext(opContext);
+  async filter(filterContext, prop, op, value) {
+    
     assert(filterContext && filterContext instanceof FilterExecutionContext, 'filterContext must be a FilterExecutionContext');
     assert(prop != null && typeof prop === 'string', 'prop must be a non-null string');
     assert(op != null && typeof op === 'string', 'op must be a non-null string');
@@ -261,42 +253,42 @@ class IETFLanguageCodeProvider extends CodeSystemProvider {
     filterContext.filters.push(new IETFLanguageCodeFilter(component, status));
   }
 
-  async executeFilters(opContext, filterContext) {
-    this._ensureOpContext(opContext);
+  async executeFilters(filterContext) {
+    
     assert(filterContext && filterContext instanceof FilterExecutionContext, 'filterContext must be a FilterExecutionContext');
     return filterContext.filters;
   }
 
-  async filterSize(opContext, filterContext, set) {
-    this._ensureOpContext(opContext);
+  async filterSize(filterContext, set) {
+    
     assert(filterContext && filterContext instanceof FilterExecutionContext, 'filterContext must be a FilterExecutionContext');
     assert(set && set instanceof IETFLanguageCodeFilter, 'set must be a IETFLanguageCodeFilter');
 
     throw new Error('Language valuesets cannot be expanded as they are based on a grammar');
   }
 
-  async filtersNotClosed(opContext, filterContext) {
-    this._ensureOpContext(opContext);
+  async filtersNotClosed(filterContext) {
+    
     assert(filterContext && filterContext instanceof FilterExecutionContext, 'filterContext must be a FilterExecutionContext');
     return true; // Grammar-based system is not closed
   }
 
-  async filterMore(opContext, filterContext, set) {
-    this._ensureOpContext(opContext);
+  async filterMore(filterContext, set) {
+    
     assert(filterContext && filterContext instanceof FilterExecutionContext, 'filterContext must be a FilterExecutionContext');
     assert(set && set instanceof IETFLanguageCodeFilter, 'set must be a IETFLanguageCodeFilter');
     throw new Error('Language valuesets cannot be expanded as they are based on a grammar');
   }
 
-  async filterConcept(opContext, filterContext, set) {
-    this._ensureOpContext(opContext);
+  async filterConcept(filterContext, set) {
+    
     assert(filterContext && filterContext instanceof FilterExecutionContext, 'filterContext must be a FilterExecutionContext');
     assert(set && set instanceof IETFLanguageCodeFilter, 'set must be a IETFLanguageCodeFilter');
     throw new Error('Language valuesets cannot be expanded as they are based on a grammar');
   }
 
-  async filterLocate(opContext, filterContext, set, code) {
-    this._ensureOpContext(opContext);
+  async filterLocate(filterContext, set, code) {
+    
     assert(filterContext && filterContext instanceof FilterExecutionContext, 'filterContext must be a FilterExecutionContext');
     assert(set && set instanceof IETFLanguageCodeFilter, 'set must be a IETFLanguageCodeFilter');
     assert(typeof code === 'string', 'code must be non-null string');
@@ -344,11 +336,11 @@ class IETFLanguageCodeProvider extends CodeSystemProvider {
     }
   }
 
-  async filterCheck(opContext, filterContext, set, concept) {
-    this._ensureOpContext(opContext);
+  async filterCheck(filterContext, set, concept) {
+    
     assert(filterContext && filterContext instanceof FilterExecutionContext, 'filterContext must be a FilterExecutionContext');
     assert(set && set instanceof IETFLanguageCodeFilter, 'set must be a IETFLanguageCodeFilter');
-    const ctxt = await this.#ensureContext(opContext, concept);
+    const ctxt = await this.#ensureContext(concept);
 
 
     const filter = set;
@@ -383,57 +375,33 @@ class IETFLanguageCodeProvider extends CodeSystemProvider {
     return hasComponent === filter.status;
   }
 
-  async filterFinish(opContext, filterContext) {
-    this._ensureOpContext(opContext);
-    // Nothing to clean up
-  }
 
   // ========== Iterator Methods ==========
-
-  async iterator(opContext, context) {
-    this._ensureOpContext(opContext);
-    return null; // Cannot iterate language codes (grammar-based)
-  }
-
-  async nextContext(opContext, iterator) {
-    this._ensureOpContext(opContext);
-    return null; // Cannot iterate language codes
-  }
+  // Cannot iterate language codes (grammar-based)
 
   // ========== Additional Methods ==========
 
-  async sameConcept(opContext, a, b) {
-    this._ensureOpContext(opContext);
-    const codeA = await this.code(opContext, a);
-    const codeB = await this.code(opContext, b);
+  async sameConcept(a, b) {
+    
+    const codeA = await this.code(a);
+    const codeB = await this.code(b);
     return codeA === codeB;
   }
 
-  async subsumesTest(opContext, codeA, codeB) {
-    this._ensureOpContext(opContext);
+  async subsumesTest(codeA, codeB) {
+    await this.#ensureContext(codeA);
+    await this.#ensureContext(codeB);
     return false; // No subsumption in language codes
   }
 
-  async extendLookup(opContext, ctxt, props, params) {
-    this._ensureOpContext(opContext);
-    // No additional properties to add
-  }
-
-  async registerConceptMaps(list) {
-    // No concept maps for language codes
-  }
-
-  async getTranslations(opContext, coding, target) {
-    this._ensureOpContext(opContext);
-    return null; // No translations available
-  }
 }
 
 /**
  * Factory for creating IETF Language CodeSystem providers
  */
-class IETFLanguageCodeFactory {
+class IETFLanguageCodeFactory extends CodeSystemFactoryProvider  {
   constructor(languageDefinitions) {
+    super();
     this.languageDefinitions = languageDefinitions;
     this.uses = 0;
   }
@@ -442,9 +410,17 @@ class IETFLanguageCodeFactory {
     return ''; // No versioning for BCP 47
   }
 
+  system() {
+    return 'urn:ietf:bcp:47'; // BCP 47 URI
+  }
+
+  version() {
+    return null; // No specific version for BCP 47. Could be date?
+  }
+
   build(opContext, supplements) {
     this.recordUse();
-    return new IETFLanguageCodeProvider(this.languageDefinitions, supplements);
+    return new IETFLanguageCodeProvider(opContext, supplements, this.languageDefinitions);
   }
 
   useCount() {

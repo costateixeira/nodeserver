@@ -1,3 +1,7 @@
+/*
+  eslint-disable no-unused-vars
+ */
+
 const assert = require('assert');
 const https = require('https');
 const { CodeSystemProvider, Designation, CodeSystemFactoryProvider } = require('./cs-api');
@@ -9,8 +13,8 @@ class HGVSCode {
 }
 
 class HGVSServices extends CodeSystemProvider {
-  constructor(supplements) {
-    super(supplements);
+  constructor(opContext, supplements) {
+    super(opContext, supplements);
   }
 
   // Metadata methods
@@ -18,7 +22,7 @@ class HGVSServices extends CodeSystemProvider {
     return 'http://varnomen.hgvs.org';
   }
 
-  async version() {
+  version() {
     return '2.0';
   }
 
@@ -38,46 +42,41 @@ class HGVSServices extends CodeSystemProvider {
     return true;
   }
 
-  defToThisVersion(specifiedVersion) {
-    return true;
-  }
-
   // Core concept methods
-  async code(opContext, context) {
-    this._ensureOpContext(opContext);
+  async code(context) {
+    
     if (context instanceof HGVSCode) {
       return context.code;
     }
     return null;
   }
 
-  async display(opContext, context) {
-    this._ensureOpContext(opContext);
-    return this.code(opContext, context);
+  async display(context) {
+    
+    return this.code(context);
   }
 
-  async definition(opContext, context) {
-    this._ensureOpContext(opContext);
+  async definition(context) {
     return '';
   }
 
-  async isAbstract(opContext, context) {
-    this._ensureOpContext(opContext);
+  async isAbstract(context) {
+    
     return false;
   }
 
-  async isInactive(opContext, context) {
-    this._ensureOpContext(opContext);
+  async isInactive(context) {
+    
     return false;
   }
 
-  async isDeprecated(opContext, context) {
-    this._ensureOpContext(opContext);
+  async isDeprecated(context) {
+    
     return false;
   }
 
-  async designations(opContext, context) {
-    this._ensureOpContext(opContext);
+  async designations(context) {
+    
     const designations = [];
 
     if (context instanceof HGVSCode) {
@@ -90,14 +89,14 @@ class HGVSServices extends CodeSystemProvider {
     return designations;
   }
 
-  async extendLookup(opContext, ctxt, props, params) {
-    this._ensureOpContext(opContext);
+  async extendLookup(ctxt, props, params) {
+    
     // No additional properties to add for HGVS codes
   }
 
   // Lookup methods - this is the main functionality
-  async locate(opContext, code) {
-    this._ensureOpContext(opContext);
+  async locate(code) {
+    
     assert(code == null || typeof code === 'string', 'code must be string');
     if (!code) return { context: null, message: 'Empty code' };
 
@@ -167,14 +166,14 @@ class HGVSServices extends CodeSystemProvider {
     });
   }
 
-  async locateIsA(opContext, code, parent, disallowParent = false) {
-    this._ensureOpContext(opContext);
+  async locateIsA(code, parent, disallowParent = false) {
+    
     return null; // No hierarchy support
   }
 
   // Iterator methods - not supported
-  async iterator(opContext, context) {
-    this._ensureOpContext(opContext);
+  async iterator(context) {
+    
     // Return empty iterator
     return {
       total: 0,
@@ -184,97 +183,92 @@ class HGVSServices extends CodeSystemProvider {
     };
   }
 
-  async nextContext(opContext, iteratorContext) {
-    this._ensureOpContext(opContext);
+  async nextContext(iteratorContext) {
+    
     iteratorContext.next();
     return null;
   }
 
   // Filter support - not supported
-  async doesFilter(opContext, prop, op, value) {
-    this._ensureOpContext(opContext);
+  async doesFilter(prop, op, value) {
+    
     return false;
   }
 
-  async getPrepContext(opContext, iterate) {
-    this._ensureOpContext(opContext);
+  async getPrepContext(iterate) {
+    
     throw new Error('Filters are not supported for HGVS');
   }
 
-  async searchFilter(opContext, filterContext, filter, sort) {
-    this._ensureOpContext(opContext);
+  async searchFilter(filterContext, filter, sort) {
+    
     throw new Error('Filters are not supported for HGVS');
   }
 
-  async specialFilter(opContext, filterContext, filter, sort) {
-    this._ensureOpContext(opContext);
+  async filter(filterContext, prop, op, value) {
+    
     throw new Error('Filters are not supported for HGVS');
   }
 
-  async filter(opContext, filterContext, prop, op, value) {
-    this._ensureOpContext(opContext);
+  async prepare(filterContext) {
+    
     throw new Error('Filters are not supported for HGVS');
   }
 
-  async prepare(opContext, filterContext) {
-    this._ensureOpContext(opContext);
+  async executeFilters(filterContext) {
+    
     throw new Error('Filters are not supported for HGVS');
   }
 
-  async executeFilters(opContext, filterContext) {
-    this._ensureOpContext(opContext);
+  async filterSize(filterContext, set) {
+    
     throw new Error('Filters are not supported for HGVS');
   }
 
-  async filterSize(opContext, filterContext, set) {
-    this._ensureOpContext(opContext);
+  async filterMore(filterContext, set) {
+    
     throw new Error('Filters are not supported for HGVS');
   }
 
-  async filterMore(opContext, filterContext, set) {
-    this._ensureOpContext(opContext);
+  async filterConcept(filterContext, set) {
+    
     throw new Error('Filters are not supported for HGVS');
   }
 
-  async filterConcept(opContext, filterContext, set) {
-    this._ensureOpContext(opContext);
+  async filterLocate(filterContext, set, code) {
+    
     throw new Error('Filters are not supported for HGVS');
   }
 
-  async filterLocate(opContext, filterContext, set, code) {
-    this._ensureOpContext(opContext);
+  async filterCheck(filterContext, set, concept) {
+    
     throw new Error('Filters are not supported for HGVS');
   }
 
-  async filterCheck(opContext, filterContext, set, concept) {
-    this._ensureOpContext(opContext);
+  async filterFinish(filterContext) {
+    
     throw new Error('Filters are not supported for HGVS');
   }
 
-  async filterFinish(opContext, filterContext) {
-    this._ensureOpContext(opContext);
-    throw new Error('Filters are not supported for HGVS');
-  }
-
-  async filtersNotClosed(opContext, filterContext) {
-    this._ensureOpContext(opContext);
+  async filtersNotClosed(filterContext) {
+    
     return false;
   }
 
   // Subsumption testing - not supported
-  async subsumesTest(opContext, codeA, codeB) {
-    this._ensureOpContext(opContext);
+  async subsumesTest(codeA, codeB) {
+    
     throw new Error('Subsumption is not supported for HGVS');
   }
 
   // Other methods
-  async getCDSInfo(opContext, card, langList, baseURL, code, display) {
-    this._ensureOpContext(opContext);
+  async getCDSInfo(card, langList, baseURL, code, display) {
+    
     // No CDS info for HGVS
   }
 
-  async defineFeatures(opContext, features) {
-    this._ensureOpContext(opContext);
+  async defineFeatures(features) {
+    
     // No special features
   }
 }
@@ -289,9 +283,18 @@ class HGVSServicesFactory extends CodeSystemFactoryProvider {
     return '2.0';
   }
 
+  // Metadata methods
+  system() {
+    return 'http://varnomen.hgvs.org';
+  }
+
+  version() {
+    return '2.0';
+  }
+
   async build(opContext, supplements) {
     this.recordUse();
-    return new HGVSServices(supplements);
+    return new HGVSServices(opContext, supplements);
   }
 
   static checkService() {

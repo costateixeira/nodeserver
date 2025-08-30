@@ -10,6 +10,7 @@ class AbstractValueSetProvider {
    * @returns {Promise<ValueSet>} The requested value set
    * @throws {Error} Must be implemented by subclasses
    */
+  // eslint-disable-next-line no-unused-vars
   async fetchValueSet(url, version) {
     throw new Error('fetchValueSet must be implemented by subclass');
   }
@@ -20,6 +21,7 @@ class AbstractValueSetProvider {
    * @returns {Promise<Array<ValueSet>>} List of matching value sets
    * @throws {Error} Must be implemented by subclasses
    */
+  // eslint-disable-next-line no-unused-vars
   async searchValueSets(searchParams) {
     throw new Error('searchValueSets must be implemented by subclass');
   }

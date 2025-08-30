@@ -233,7 +233,7 @@ class SHLModule {
       '=': '&#x3D;'
     };
     
-    return str.replace(/[&<>"'`=\/]/g, (match) => escapeMap[match]);
+    return str.replace(/[&<>"'`=/]/g, (match) => escapeMap[match]);
   }
 
   // URL validation
@@ -578,7 +578,6 @@ class SHLModule {
       }
       
       try {
-        const contentType = req.get('Content-Type') || 'application/fhir+json';
         const options = {};
         
         if (req.query.profiles) {
