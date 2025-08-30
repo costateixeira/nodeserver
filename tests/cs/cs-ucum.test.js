@@ -205,36 +205,36 @@ describe('UCUM Provider Integration Tests', () => {
   });
 
   describe('ValueSet Integration', () => {
-    test('should work with common units enumeration', async () => {
-      // Create a mock common units ValueSet
-      const commonUnits = null;
-      //   new ValueSet({
-      //   url: 'http://example.org/fhir/ValueSet/common-units',
-      //   getConcepts: () => [
-      //     { code: 'kg', display: 'kilogram' },
-      //     { code: 'g', display: 'gram' },
-      //     { code: 'm', display: 'meter' },
-      //     { code: 'cm', display: 'centimeter' },
-      //     { code: 'L', display: 'liter' },
-      //     { code: 'mL', display: 'milliliter' },
-      //     { code: 'mg/dL', display: 'milligrams per deciliter' },
-      //     { code: 'mmol/L', display: 'millimoles per liter' }
-      //   ]
-      // }};
-
-      // Create provider with common units
-      const factory = new UcumCodeSystemFactory(ucumService, commonUnits);
-      const commonUnitsProvider = factory.build(new TxOperationContext(Languages.fromAcceptLanguage('en')), []);
-
-      // Test special enumeration
-      // expect(commonUnitsProvider.specialEnumeration()).toBe(commonUnits.url);
-
-      // Test that common units show custom displays
-      // for (const concept of commonUnits.getConcepts()) {
-      //   const display = await commonUnitsProvider.display(concept.code);
-      //   expect(display).toBe(concept.display);
-      // }
-    });
+  //   test('should work with common units enumeration', async () => {
+  //     // Create a mock common units ValueSet
+  //     const commonUnits = null;
+  //     //   new ValueSet({
+  //     //   url: 'http://example.org/fhir/ValueSet/common-units',
+  //     //   getConcepts: () => [
+  //     //     { code: 'kg', display: 'kilogram' },
+  //     //     { code: 'g', display: 'gram' },
+  //     //     { code: 'm', display: 'meter' },
+  //     //     { code: 'cm', display: 'centimeter' },
+  //     //     { code: 'L', display: 'liter' },
+  //     //     { code: 'mL', display: 'milliliter' },
+  //     //     { code: 'mg/dL', display: 'milligrams per deciliter' },
+  //     //     { code: 'mmol/L', display: 'millimoles per liter' }
+  //     //   ]
+  //     // }};
+  //
+  //     // Create provider with common units
+  //     const factory = new UcumCodeSystemFactory(ucumService, commonUnits);
+  //     const commonUnitsProvider = factory.build(new TxOperationContext(Languages.fromAcceptLanguage('en')), []);
+  //
+  //     // Test special enumeration
+  //     // expect(commonUnitsProvider.specialEnumeration()).toBe(commonUnits.url);
+  //
+  //     // Test that common units show custom displays
+  //     // for (const concept of commonUnits.getConcepts()) {
+  //     //   const display = await commonUnitsProvider.display(concept.code);
+  //     //   expect(display).toBe(concept.display);
+  //     // }
+  //   });
 
     test('should filter by canonical units', async () => {
       const filterContext = new FilterExecutionContext();
@@ -286,7 +286,7 @@ describe('UCUM Provider Integration Tests', () => {
       }
 
       const elapsed = Date.now() - start;
-      const opsPerSecond = (testUnits.length / elapsed * 1000).toFixed(2);
+      // const opsPerSecond = (testUnits.length / elapsed * 1000).toFixed(2);
 
       // console.log(`Validated ${testUnits.length} units in ${elapsed}ms (${opsPerSecond} ops/sec)`);
       // console.log(`Valid units: ${validCount}/${testUnits.length} (${(validCount/testUnits.length*100).toFixed(1)}%)`);

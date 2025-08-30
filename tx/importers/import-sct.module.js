@@ -162,7 +162,7 @@ class SnomedModule extends BaseTerminologyModule {
       "731000124108": { name: "US Edition", needsBase: true, lang: "en-US" },
       "32506021000036107": { name: "Australian Edition", needsBase: true, lang: "en-AU" },
       "449081005": { name: "Spanish Edition (International)", needsBase: true, lang: "es" },
-      "11000279109": { name: "Czech Edition", needsBase: false, lang: "cs-CZ" },
+      "11000279109": { name: "Czech Edition", needsBase: true, lang: "cs-CZ" },
       "554471000005108": { name: "Danish Edition", needsBase: true, lang: "da-DK" },
       "11000146104": { name: "Dutch Edition", needsBase: true, lang: "nl-NL" },
       "45991000052106": { name: "Swedish Edition", needsBase: true, lang: "sv-SE" },
@@ -564,8 +564,27 @@ class SnomedImporterWithProgress {
       // Stop the progress bar
       this.currentProgressBar.stop();
 
-      // Just print a simple completion line without trying to overwrite
-      console.log(`✓ ${taskName} completed: ${current.toLocaleString()} items in ${elapsedSec}sec`);
+      // Build completion message
+      let message = `✓ ${taskName} completed: ${current.toLocaleString()}`;
+
+      if (total && total !== current) {
+        message += ` of ${total.toLocaleString()}`;
+        // Optional warning if counts don't match
+        if (current < total * 0.95) { // More than 5% difference
+          message += ` (WARNING: Expected ${total.toLocaleString()})`;
+        }
+      }
+
+      // Add timing info
+      message += ` items in ${elapsedSec}sec`;
+
+      // Add rate if meaningful
+      if (elapsedMs > 1000 && current > 0) {
+        const rate = Math.round(current / (elapsedMs / 1000));
+        message += ` (${rate.toLocaleString()} items/sec)`;
+      }
+
+      console.log(message);
 
       // Clean up
       this.taskStartTimes.delete(taskName);
@@ -591,7 +610,7 @@ class SnomedImporterWithProgress {
 }
 
 const IS_A_MAGIC = BigInt('116680003');
-const RF2_MAGIC_FSN = BigInt('900000000000003001');
+// const RF2_MAGIC_FSN = BigInt('900000000000003001');
 const RF2_MAGIC_RELN_DEFINING = BigInt('900000000000011006');
 const RF2_MAGIC_RELN_STATED = BigInt('900000000000010007');
 const RF2_MAGIC_RELN_INFERRED = BigInt('900000000000006009');
@@ -917,8 +936,12 @@ class SnomedImporter {
             index: 0 // Will be set later
           };
 
-          this.conceptList.push(concept);
-          this.conceptMap.set(concept.id, concept);
+          if (this.conceptMap.has(concept.id)) {
+            throw new Error(`Duplicate Concept Id at line ${lineCount}: ${concept.id} - check you are processing the snapshot not the full edition`);
+          } else {
+            this.conceptList.push(concept);
+            this.conceptMap.set(concept.id, concept);
+          }
         }
 
         processedLines++;
@@ -1251,7 +1274,7 @@ class SnomedImporter {
     const stemmer = SnomedImporter.LANGUAGE_STEMMERS[languageCode] || natural.PorterStemmer;
 
     // Split text on punctuation and whitespace (matching Pascal logic)
-    const separators = /[,\s:.!@#$%^&*(){}[\]|\\;\"<>?\/~`\-_+=]+/;
+    const separators = /[,\s:.!@#$%^&*(){}[\]|\\;"<>?/~`\-_+=]+/;
     const words = text.split(separators);
 
     for (let word of words) {
@@ -1313,7 +1336,6 @@ class SnomedImporter {
     progressBar?.start(totalLines, 0);
 
     let processedLines = 0;
-    let totalRelationships = 0;
 
     // Find the is-a concept index
     const isAConcept = this.conceptMap.get(IS_A_MAGIC);
@@ -1382,7 +1404,6 @@ class SnomedImporter {
             sourceTracker.addOutbound(relationshipIndex);
             destTracker.addInbound(relationshipIndex);
 
-            totalRelationships++;
           }
         }
 
@@ -2042,7 +2063,8 @@ class SnomedImporter {
   getLanguageForDescription(descIndex) {
     // This would need to look up the actual description language
     // For now, return default language
-    return 1; // Default to English
+    var d = this.descriptions.getDescription(descIndex);
+    return d.lang;
   }
 
   // Sort and index reference sets

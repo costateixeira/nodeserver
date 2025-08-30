@@ -194,6 +194,7 @@ class PackagesModule {
 
         // Add the missing dependency search logic
         if (dependson) {
+          validateParameter(dependson, "dependson", String);
           versioned = dependson.includes('#');
           // This requires a subquery to PackageDependencies table
           conditions.push({
