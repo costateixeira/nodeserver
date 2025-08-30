@@ -3,8 +3,8 @@ const path = require('path');
 
 const {CodeSystem} = require('../../tx/library/codesystem');
 const {FhirCodeSystemFactory, FhirCodeSystemProvider, FhirCodeSystemProviderContext} = require('../../tx/cs/cs-cs');
-const {OperationContext} = require('../../tx/cs/cs-api');
 const {Languages, Language} = require('../../library/languages');
+const {OperationContext} = require("../../tx/operation-context");
 
 describe('FHIR CodeSystem Provider', () => {
   let factory;

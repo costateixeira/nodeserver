@@ -10,12 +10,12 @@ const {
 } = require('../../tx/cs/cs-ucum');
 
 const {
-  OperationContext,
   FilterExecutionContext
 } = require('../../tx/cs/cs-api');
 
 const { UcumService } = require('../../tx/library/ucum-service');
 const { Languages, Language } = require('../../library/languages');
+const {OperationContext} = require("../../tx/operation-context");
 
 describe('UCUM Provider Integration Tests', () => {
   let ucumService;

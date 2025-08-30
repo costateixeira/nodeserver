@@ -6,7 +6,8 @@ const {
   LanguageComponent 
 } = require('../../tx/cs/cs-lang');
 const { LanguageDefinitions, Languages, Language } = require('../../library/languages');
-const { OperationContext, FilterExecutionContext} = require('../../tx/cs/cs-api');
+const { FilterExecutionContext} = require('../../tx/cs/cs-api');
+const {OperationContext} = require("../../tx/operation-context");
 
 describe('IETF Language CodeSystem Provider', () => {
   let languageDefinitions;

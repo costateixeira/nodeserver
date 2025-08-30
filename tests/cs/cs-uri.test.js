@@ -1,7 +1,7 @@
 const { UriServices } = require('../../tx/cs/cs-uri');
 const { Languages } = require('../../library/languages');
 const { CodeSystem } = require('../../tx/library/codesystem');
-const {OperationContext} = require("../../tx/cs/cs-api");
+const {OperationContext} = require("../../tx/operation-context");
 
 describe('Enhanced UriServices with Language Support', () => {
   let uriServicesEn;
