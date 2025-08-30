@@ -1,4 +1,4 @@
-const { TxOperationContext } = require('../../tx/cs/cs-api');
+const { OperationContext } = require('../../tx/operation-context');
 const { Iso4217FactoryProvider } = require('../../tx/cs/cs-currency');
 const { Languages } = require('../../library/languages');
 
@@ -9,7 +9,7 @@ describe('Iso4217Services', () => {
   beforeEach(async () => {
     factory = new Iso4217FactoryProvider();
     await factory.load();
-    provider = factory.build(new TxOperationContext(Languages.fromAcceptLanguage('en')), []);
+    provider = factory.build(new OperationContext(Languages.fromAcceptLanguage('en')), []);
   });
 
   describe('Basic Functionality', () => {
@@ -465,10 +465,10 @@ describe('Iso4217Services', () => {
       const factory = new Iso4217FactoryProvider();
       expect(factory.useCount()).toBe(0);
 
-      factory.build(new TxOperationContext(Languages.fromAcceptLanguage('en')), []);
+      factory.build(new OperationContext(Languages.fromAcceptLanguage('en')), []);
       expect(factory.useCount()).toBe(1);
 
-      factory.build(new TxOperationContext(Languages.fromAcceptLanguage('en')), []);
+      factory.build(new OperationContext(Languages.fromAcceptLanguage('en')), []);
       expect(factory.useCount()).toBe(2);
     });
 
@@ -477,8 +477,8 @@ describe('Iso4217Services', () => {
     });
 
     test('should build working providers', () => {
-      const provider1 = factory.build(new TxOperationContext(Languages.fromAcceptLanguage('en')), []);
-      const provider2 = factory.build(new TxOperationContext(Languages.fromAcceptLanguage('en')), []);
+      const provider1 = factory.build(new OperationContext(Languages.fromAcceptLanguage('en')), []);
+      const provider2 = factory.build(new OperationContext(Languages.fromAcceptLanguage('en')), []);
 
       expect(provider1).toBeTruthy();
       expect(provider2).toBeTruthy();

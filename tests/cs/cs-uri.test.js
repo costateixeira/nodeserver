@@ -1,7 +1,7 @@
 const { UriServices } = require('../../tx/cs/cs-uri');
 const { Languages } = require('../../library/languages');
 const { CodeSystem } = require('../../tx/library/codesystem');
-const {TxOperationContext} = require("../../tx/cs/cs-api");
+const {OperationContext} = require("../../tx/cs/cs-api");
 
 describe('Enhanced UriServices with Language Support', () => {
   let uriServicesEn;
@@ -36,8 +36,8 @@ describe('Enhanced UriServices with Language Support', () => {
     };
 
     const supplement = new CodeSystem(supplData);
-    uriServicesEn = new UriServices(new TxOperationContext(new Languages()), [supplement]);
-    uriServicesFr = new UriServices(new TxOperationContext(Languages.fromAcceptLanguage('fr')), [supplement]);
+    uriServicesEn = new UriServices(new OperationContext(new Languages()), [supplement]);
+    uriServicesFr = new UriServices(new OperationContext(Languages.fromAcceptLanguage('fr')), [supplement]);
   });
 
   describe('Language-aware Display Detection', () => {
@@ -165,7 +165,7 @@ describe('Enhanced UriServices with Language Support', () => {
       const validSupplement = new CodeSystem(validSupplementData);
 
       expect(() => {
-        new UriServices(new TxOperationContext(new Languages()), [validSupplement]);
+        new UriServices(new OperationContext(new Languages()), [validSupplement]);
       }).not.toThrow();
     });
 
@@ -176,7 +176,7 @@ describe('Enhanced UriServices with Language Support', () => {
       };
 
       expect(() => {
-        new UriServices(new TxOperationContext(new Languages()), [rawObject]);
+        new UriServices(new OperationContext(new Languages()), [rawObject]);
       }).toThrow('Supplement 0 must be a CodeSystem instance, got object');
     });
 
@@ -189,7 +189,7 @@ describe('Enhanced UriServices with Language Support', () => {
       });
 
       expect(() => {
-        new UriServices(new TxOperationContext(new Languages()), singleSupplement);  // Not wrapped in array
+        new UriServices(new OperationContext(new Languages()), singleSupplement);  // Not wrapped in array
       }).toThrow('Supplements must be an array');
     });
 
@@ -206,19 +206,19 @@ describe('Enhanced UriServices with Language Support', () => {
       const supplNoConcepts = new CodeSystem(supplNoConceptsData);
 
       expect(() => {
-        new UriServices(new TxOperationContext(new Languages()), [supplNoConcepts]);
+        new UriServices(new OperationContext(new Languages()), [supplNoConcepts]);
       }).not.toThrow();
     });
 
     test('should handle empty supplements array', () => {
       expect(() => {
-        new UriServices(new TxOperationContext(new Languages()), []);
+        new UriServices(new OperationContext(new Languages()), []);
       }).not.toThrow();
     });
 
     test('should handle null supplements', () => {
       expect(() => {
-        new UriServices(new TxOperationContext(new Languages()), null);
+        new UriServices(new OperationContext(new Languages()), null);
       }).not.toThrow();
     });
 
@@ -235,7 +235,7 @@ describe('Enhanced UriServices with Language Support', () => {
       };
 
       const supplWithoutLang = new CodeSystem(supplWithoutLangData);
-      const services = new UriServices(new TxOperationContext(new Languages()), [supplWithoutLang]);
+      const services = new UriServices(new OperationContext(new Languages()), [supplWithoutLang]);
       const languages = Languages.fromAcceptLanguage('en');
 
       // Should still work by checking designations
@@ -253,7 +253,7 @@ describe('Enhanced UriServices with Language Support', () => {
       };
 
       const supplEmpty = new CodeSystem(supplEmptyData);
-      const services = new UriServices(new TxOperationContext(new Languages()), [supplEmpty]);
+      const services = new UriServices(new OperationContext(new Languages()), [supplEmpty]);
       const languages = Languages.fromAcceptLanguage('en');
 
       expect(services.hasAnyDisplays(languages)).toBe(false);

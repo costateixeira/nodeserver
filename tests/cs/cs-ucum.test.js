@@ -10,7 +10,7 @@ const {
 } = require('../../tx/cs/cs-ucum');
 
 const {
-  TxOperationContext,
+  OperationContext,
   FilterExecutionContext
 } = require('../../tx/cs/cs-api');
 
@@ -30,7 +30,7 @@ describe('UCUM Provider Integration Tests', () => {
     const languages = new Languages();
     languages.add(new Language('en'));
     const factory = new UcumCodeSystemFactory(ucumService);
-    provider = factory.build(new TxOperationContext(languages), null);
+    provider = factory.build(new OperationContext(languages), null);
   });
 
   describe('Medical Laboratory Integration', () => {
@@ -224,7 +224,7 @@ describe('UCUM Provider Integration Tests', () => {
   //
   //     // Create provider with common units
   //     const factory = new UcumCodeSystemFactory(ucumService, commonUnits);
-  //     const commonUnitsProvider = factory.build(new TxOperationContext(Languages.fromAcceptLanguage('en')), []);
+  //     const commonUnitsProvider = factory.build(new OperationContext(Languages.fromAcceptLanguage('en')), []);
   //
   //     // Test special enumeration
   //     // expect(commonUnitsProvider.specialEnumeration()).toBe(commonUnits.url);

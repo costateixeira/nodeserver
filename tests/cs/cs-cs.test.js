@@ -3,7 +3,7 @@ const path = require('path');
 
 const {CodeSystem} = require('../../tx/library/codesystem');
 const {FhirCodeSystemFactory, FhirCodeSystemProvider, FhirCodeSystemProviderContext} = require('../../tx/cs/cs-cs');
-const {TxOperationContext} = require('../../tx/cs/cs-api');
+const {OperationContext} = require('../../tx/cs/cs-api');
 const {Languages, Language} = require('../../library/languages');
 
 describe('FHIR CodeSystem Provider', () => {
@@ -33,32 +33,32 @@ describe('FHIR CodeSystem Provider', () => {
 
     test('should increment use count', () => {
       const initialCount = factory.useCount();
-      factory.build(new TxOperationContext('en-US'), [], simpleCS);
+      factory.build(new OperationContext('en-US'), [], simpleCS);
       expect(factory.useCount()).toBe(initialCount + 1);
     });
 
     test('should validate CodeSystem parameter', () => {
       expect(() => {
-        factory.build(new TxOperationContext('en-US'), [], null);
+        factory.build(new OperationContext('en-US'), [], null);
       }).toThrow('codeSystem parameter is required');
 
       expect(() => {
-        factory.build(new TxOperationContext('en-US'), [], {resourceType: 'ValueSet'});
+        factory.build(new OperationContext('en-US'), [], {resourceType: 'ValueSet'});
       }).toThrow('codeSystem must be a FHIR CodeSystem resource');
     });
 
     test('should validate supplements parameter', () => {
       expect(() => {
-        factory.build(new TxOperationContext('en-US'), 'not-an-array', simpleCS);
+        factory.build(new OperationContext('en-US'), 'not-an-array', simpleCS);
       }).toThrow('supplements must be an array');
 
       expect(() => {
-        factory.build(new TxOperationContext('en-US'), [{resourceType: 'ValueSet'}], simpleCS);
+        factory.build(new OperationContext('en-US'), [{resourceType: 'ValueSet'}], simpleCS);
       }).toThrow('Supplement 0 must be a FHIR CodeSystem resource');
     });
 
     test('should build provider with supplements', () => {
-      const provider = factory.build(new TxOperationContext('en-US'), [supplementCS], extensionsCS);
+      const provider = factory.build(new OperationContext('en-US'), [supplementCS], extensionsCS);
       expect(provider).toBeInstanceOf(FhirCodeSystemProvider);
       expect(provider.supplements).toHaveLength(1);
     });
@@ -68,9 +68,9 @@ describe('FHIR CodeSystem Provider', () => {
     let simpleProvider, deProvider, extensionsProvider;
 
     beforeEach(() => {
-      simpleProvider = factory.build(new TxOperationContext('en-US'), [], simpleCS);
-      deProvider = factory.build(new TxOperationContext('de-DE'), [], deCS);
-      extensionsProvider = factory.build(new TxOperationContext('en-US'), [supplementCS], extensionsCS);
+      simpleProvider = factory.build(new OperationContext('en-US'), [], simpleCS);
+      deProvider = factory.build(new OperationContext('de-DE'), [], deCS);
+      extensionsProvider = factory.build(new OperationContext('en-US'), [supplementCS], extensionsCS);
     });
 
     describe('name()', () => {
@@ -111,7 +111,7 @@ describe('FHIR CodeSystem Provider', () => {
         const noLangData = {...simpleCS.jsonObj};
         delete noLangData.language;
         const noLangCS = new CodeSystem(noLangData);
-        const noLangProvider = factory.build(new TxOperationContext('en-US'), [], noLangCS);
+        const noLangProvider = factory.build(new OperationContext('en-US'), [], noLangCS);
         expect(noLangProvider.defLang()).toBe('en');
       });
     });
@@ -122,7 +122,7 @@ describe('FHIR CodeSystem Provider', () => {
       });
 
       test('should return supplement for supplement CodeSystem', () => {
-        const supplementProvider = factory.build(new TxOperationContext('en-US'), [], supplementCS);
+        const supplementProvider = factory.build(new OperationContext('en-US'), [], supplementCS);
         expect(supplementProvider.contentMode()).toBe('supplement');
       });
     });
@@ -243,7 +243,7 @@ describe('FHIR CodeSystem Provider', () => {
         const noStatusData = {...simpleCS.jsonObj};
         delete noStatusData.status;
         const noStatusCS = new CodeSystem(noStatusData);
-        const noStatusProvider = factory.build(new TxOperationContext('en-US'), [], noStatusCS);
+        const noStatusProvider = factory.build(new OperationContext('en-US'), [], noStatusCS);
         expect(noStatusProvider.status()).toBeNull();
       });
 
@@ -260,7 +260,7 @@ describe('FHIR CodeSystem Provider', () => {
     let simpleProvider;
 
     beforeEach(() => {
-      simpleProvider = factory.build(new TxOperationContext('en-US'), [], simpleCS);
+      simpleProvider = factory.build(new OperationContext('en-US'), [], simpleCS);
     });
 
     describe('locate()', () => {
@@ -326,8 +326,8 @@ describe('FHIR CodeSystem Provider', () => {
     let simpleProvider, deProvider;
 
     beforeEach(() => {
-      simpleProvider = factory.build(new TxOperationContext('en-US'), [], simpleCS);
-      deProvider = factory.build(new TxOperationContext('en-US'), [], deCS);
+      simpleProvider = factory.build(new OperationContext('en-US'), [], simpleCS);
+      deProvider = factory.build(new OperationContext('en-US'), [], deCS);
     });
 
     test('should return status information when present', () => {
@@ -342,7 +342,7 @@ describe('FHIR CodeSystem Provider', () => {
       const noStatusData = {...simpleCS.jsonObj};
       delete noStatusData.status;
       const noStatusCS = new CodeSystem(noStatusData);
-      const noStatusProvider = factory.build(new TxOperationContext('en-US'), [], noStatusCS);
+      const noStatusProvider = factory.build(new OperationContext('en-US'), [], noStatusCS);
       expect(noStatusProvider.status()).toBeNull();
     });
 
@@ -358,7 +358,7 @@ describe('FHIR CodeSystem Provider', () => {
     let simpleProvider;
 
     beforeEach(() => {
-      simpleProvider = factory.build(new TxOperationContext('en-US'), [], simpleCS);
+      simpleProvider = factory.build(new OperationContext('en-US'), [], simpleCS);
     });
 
     describe('locate()', () => {
@@ -424,7 +424,7 @@ describe('FHIR CodeSystem Provider', () => {
     let deProvider;
 
     beforeEach(() => {
-      deProvider = factory.build(new TxOperationContext('de-DE'), [], deCS);
+      deProvider = factory.build(new OperationContext('de-DE'), [], deCS);
     });
 
     test('should correctly parse German language', () => {
@@ -455,7 +455,7 @@ describe('FHIR CodeSystem Provider', () => {
     let extensionsProvider;
 
     beforeEach(() => {
-      extensionsProvider = factory.build(new TxOperationContext('en-US'), [supplementCS], extensionsCS);
+      extensionsProvider = factory.build(new OperationContext('en-US'), [supplementCS], extensionsCS);
     });
 
     test('should include supplement in provider', () => {
@@ -541,7 +541,7 @@ describe('FHIR CodeSystem Provider', () => {
   describe('Real World Scenarios', () => {
 
     test('should handle complex multilingual CodeSystem', () => {
-      const provider = factory.build(new TxOperationContext('en-US,de;q=0.8,es;q=0.6'), [], deCS);
+      const provider = factory.build(new OperationContext('en-US,de;q=0.8,es;q=0.6'), [], deCS);
 
       const langs = Languages.fromAcceptLanguage('en-US,de;q=0.8,es;q=0.6');
       expect(provider.hasAnyDisplays(langs)).toBe(true);
@@ -550,7 +550,7 @@ describe('FHIR CodeSystem Provider', () => {
     });
 
     test('should handle extension-based CodeSystem with supplements', () => {
-      const provider = factory.build(new TxOperationContext('en-US'), [supplementCS], extensionsCS);
+      const provider = factory.build(new OperationContext('en-US'), [supplementCS], extensionsCS);
 
       expect(provider.system()).toBe('http://hl7.org/fhir/test/CodeSystem/extensions');
       expect(provider.supplements).toHaveLength(1);
@@ -567,7 +567,7 @@ describe('FHIR CodeSystem Provider', () => {
     let simpleProvider;
 
     beforeEach(() => {
-      simpleProvider = factory.build(new TxOperationContext('en-US'), [], simpleCS);
+      simpleProvider = factory.build(new OperationContext('en-US'), [], simpleCS);
     });
 
     describe('display()', () => {
@@ -589,13 +589,13 @@ describe('FHIR CodeSystem Provider', () => {
       });
 
       test('should handle language-specific displays', async () => {
-        const deProvider = factory.build(new TxOperationContext('de-DE'), [], deCS);
+        const deProvider = factory.build(new OperationContext('de-DE'), [], deCS);
         const display = await deProvider.display('code1');
         expect(display).toBe('Anzeige 1');
       });
 
       test('should handle designation-based displays', async () => {
-        const deProvider = factory.build(new TxOperationContext('es'), [], deCS);
+        const deProvider = factory.build(new OperationContext('es'), [], deCS);
         const display = await deProvider.display('code2');
         expect(display).toBe('Mostrar 2');
       });
@@ -667,7 +667,7 @@ describe('FHIR CodeSystem Provider', () => {
       });
 
       test('should return itemWeight from supplement', async () => {
-        const extensionsProvider = factory.build(new TxOperationContext('en-US'), [supplementCS], extensionsCS);
+        const extensionsProvider = factory.build(new OperationContext('en-US'), [supplementCS], extensionsCS);
         const weight = await extensionsProvider.itemWeight('code1');
         expect(weight).toBe('1.2');
       });
@@ -695,7 +695,7 @@ describe('FHIR CodeSystem Provider', () => {
       });
 
       test('should include supplement designations', async () => {
-        const extensionsProvider = factory.build(new TxOperationContext('en-US'), [supplementCS], extensionsCS);
+        const extensionsProvider = factory.build(new OperationContext('en-US'), [supplementCS], extensionsCS);
         const designations = await extensionsProvider.designations('code1');
         expect(designations).toBeDefined();
 
@@ -718,7 +718,7 @@ describe('FHIR CodeSystem Provider', () => {
       });
 
       test('should return extensions when present', async () => {
-        const extensionsProvider = factory.build(new TxOperationContext('en-US'), [], extensionsCS);
+        const extensionsProvider = factory.build(new OperationContext('en-US'), [], extensionsCS);
         const extensions = await extensionsProvider.extensions('code1');
         expect(extensions).toBeDefined();
         expect(Array.isArray(extensions)).toBe(true);
@@ -732,7 +732,7 @@ describe('FHIR CodeSystem Provider', () => {
       });
 
       test('should include supplement extensions', async () => {
-        const extensionsProvider = factory.build(new TxOperationContext('en-US'), [supplementCS], extensionsCS);
+        const extensionsProvider = factory.build(new OperationContext('en-US'), [supplementCS], extensionsCS);
         const extensions = await extensionsProvider.extensions('code1');
         expect(extensions).toBeDefined();
 
@@ -781,7 +781,7 @@ describe('FHIR CodeSystem Provider', () => {
       });
 
       test('should include supplement properties', async () => {
-        const extensionsProvider = factory.build(new TxOperationContext('en-US'), [supplementCS], extensionsCS);
+        const extensionsProvider = factory.build(new OperationContext('en-US'), [supplementCS], extensionsCS);
         const properties = await extensionsProvider.properties('code1');
 
         // Extensions CS code1 should have properties, but supplements don't add properties in our test data
@@ -870,7 +870,7 @@ describe('FHIR CodeSystem Provider', () => {
       });
 
       test('should return error message for CodeSystem without hierarchy', async () => {
-        const extensionsProvider = factory.build(new TxOperationContext('en-US'), [], extensionsCS);
+        const extensionsProvider = factory.build(new OperationContext('en-US'), [], extensionsCS);
         const result = await extensionsProvider.locateIsA('code1', 'code2');
         expect(result.context).toBeNull();
         expect(result.message).toContain('does not have parents');
@@ -904,7 +904,7 @@ describe('FHIR CodeSystem Provider', () => {
       });
 
       test('should return not-subsumed for CodeSystem without hierarchy', async () => {
-        const extensionsProvider = factory.build(new TxOperationContext('en-US'), [], extensionsCS);
+        const extensionsProvider = factory.build(new OperationContext('en-US'), [], extensionsCS);
         const result = await extensionsProvider.subsumesTest('code1', 'code2');
         expect(result).toBe('not-subsumed');
       });
@@ -1309,9 +1309,9 @@ describe('FHIR CodeSystem Provider', () => {
       let filterContext;
 
       beforeEach(() => {
-        simpleProvider = factory.build(new TxOperationContext('en-US'), [], simpleCS);
-        deProvider = factory.build(new TxOperationContext('en-US'), [], deCS);
-        extensionsProvider = factory.build(new TxOperationContext('en-US'), [supplementCS], extensionsCS);
+        simpleProvider = factory.build(new OperationContext('en-US'), [], simpleCS);
+        deProvider = factory.build(new OperationContext('en-US'), [], deCS);
+        extensionsProvider = factory.build(new OperationContext('en-US'), [supplementCS], extensionsCS);
         filterContext = {filters: []};
       });
 

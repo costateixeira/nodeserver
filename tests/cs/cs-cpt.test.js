@@ -1,7 +1,7 @@
 const fs = require('fs');
 const path = require('path');
 const { CPTServices, CPTServicesFactory, CPTConcept, CPTExpression } = require('../../tx/cs/cs-cpt');
-const { TxOperationContext } = require('../../tx/cs/cs-api');
+const { OperationContext } = require('../../tx/operation-context');
 const {Languages} = require("../../library/languages");
 
 describe('CPT Provider', () => {
@@ -61,7 +61,7 @@ describe('CPT Provider', () => {
 
     // Create factory and provider
     factory = new CPTServicesFactory(testDbPath);
-    provider = await factory.build(new TxOperationContext('en'), []);
+    provider = await factory.build(new OperationContext('en'), []);
   });
 
   afterAll(() => {
@@ -599,7 +599,7 @@ describe('CPT Provider', () => {
     test('should handle empty code lookup', async () => {
       // Recreate provider if needed
       if (!provider) {
-        provider = await factory.build(new TxOperationContext(Languages.fromAcceptLanguage('en')), []);
+        provider = await factory.build(new OperationContext(Languages.fromAcceptLanguage('en')), []);
       }
 
       const result = await provider.locate('');

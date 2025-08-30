@@ -1071,14 +1071,14 @@ class SnomedImporter {
       if (concept) {
         const termOffset = this.addString(desc.term);
         const effectiveTime = this.convertDateToSnomedDate(desc.effectiveTime);
-        if (desc.languageCode !== 'en') {
-          console.log('cs');
-        }
         const lang = this.mapLanguageCode(desc.languageCode);
+        const kind = this.conceptMap.get(desc.typeId);
+        const module = this.conceptMap.get(desc.moduleId);
+        const caps = this.conceptMap.get(desc.caseSignificanceId);
 
         const descOffset = this.descriptions.addDescription(
           termOffset, desc.id, effectiveTime, concept.index,
-          0, 0, 0, desc.active, lang
+          module.index, kind.index, caps.index, desc.active, lang
         );
 
         // Track description on concept

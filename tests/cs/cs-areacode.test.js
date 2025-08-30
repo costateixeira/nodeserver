@@ -1,4 +1,4 @@
-const { TxOperationContext } = require('../../tx/cs/cs-api');
+const { OperationContext } = require('../../tx/operation-context');
 const { AreaCodeFactoryProvider } = require('../../tx/cs/cs-areacode');
 const { Languages } = require('../../library/languages');
 
@@ -9,7 +9,7 @@ describe('AreaCodeServices', () => {
   beforeEach(async () => {
     factory = new AreaCodeFactoryProvider();
     await factory.load();
-    provider = factory.build(new TxOperationContext(Languages.fromAcceptLanguage('en')),[]);
+    provider = factory.build(new OperationContext(Languages.fromAcceptLanguage('en')),[]);
   });
 
   describe('Basic Functionality', () => {
@@ -309,10 +309,10 @@ describe('AreaCodeServices', () => {
       const factory = new AreaCodeFactoryProvider();
       expect(factory.useCount()).toBe(0);
 
-      factory.build(new TxOperationContext(Languages.fromAcceptLanguage('en')), []);
+      factory.build(new OperationContext(Languages.fromAcceptLanguage('en')), []);
       expect(factory.useCount()).toBe(1);
 
-      factory.build(new TxOperationContext(Languages.fromAcceptLanguage('en')), []);
+      factory.build(new OperationContext(Languages.fromAcceptLanguage('en')), []);
       expect(factory.useCount()).toBe(2);
     });
 
@@ -321,8 +321,8 @@ describe('AreaCodeServices', () => {
     });
 
     test('should build working providers', () => {
-      const provider1 = factory.build(new TxOperationContext(Languages.fromAcceptLanguage('en')), []);
-      const provider2 = factory.build(new TxOperationContext(Languages.fromAcceptLanguage('en')), []);
+      const provider1 = factory.build(new OperationContext(Languages.fromAcceptLanguage('en')), []);
+      const provider2 = factory.build(new OperationContext(Languages.fromAcceptLanguage('en')), []);
 
       expect(provider1).toBeTruthy();
       expect(provider2).toBeTruthy();

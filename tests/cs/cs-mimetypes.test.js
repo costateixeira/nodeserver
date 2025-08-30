@@ -1,4 +1,4 @@
-const { TxOperationContext } = require('../../tx/cs/cs-api');
+const { OperationContext } = require('../../tx/operation-context');
 const { MimeTypeServices, MimeTypeServicesFactory, MimeTypeConcept } = require('../../tx/cs/cs-mimetypes');
 const { Languages } = require('../../library/languages');
 const { CodeSystem } = require('../../tx/library/codesystem');
@@ -9,7 +9,7 @@ describe('MimeTypeServices', () => {
 
   beforeEach(() => {
     factory = new MimeTypeServicesFactory();
-    provider = factory.build(new TxOperationContext(Languages.fromAcceptLanguage('en')), []);
+    provider = factory.build(new OperationContext(Languages.fromAcceptLanguage('en')), []);
   });
 
   describe('Basic Functionality', () => {
@@ -194,10 +194,10 @@ describe('MimeTypeServices', () => {
       const factory = new MimeTypeServicesFactory();
       expect(factory.useCount()).toBe(0);
 
-      factory.build(new TxOperationContext('en'), []);
+      factory.build(new OperationContext('en'), []);
       expect(factory.useCount()).toBe(1);
 
-      factory.build(new TxOperationContext('en'), []);
+      factory.build(new OperationContext('en'), []);
       expect(factory.useCount()).toBe(2);
     });
 
@@ -206,8 +206,8 @@ describe('MimeTypeServices', () => {
     });
 
     test('should build working providers', () => {
-      const provider1 = factory.build(new TxOperationContext('en'), []);
-      const provider2 = factory.build(new TxOperationContext('en'), []);
+      const provider1 = factory.build(new OperationContext('en'), []);
+      const provider2 = factory.build(new OperationContext('en'), []);
 
       expect(provider1).toBeTruthy();
       expect(provider2).toBeTruthy();
@@ -428,7 +428,7 @@ describe('MimeTypeServices', () => {
       };
 
       const supplement = new CodeSystem(supplementData);
-      const providerWithSupplement = new MimeTypeServices(new TxOperationContext(Languages.fromAcceptLanguage('en')), [supplement]);
+      const providerWithSupplement = new MimeTypeServices(new OperationContext(Languages.fromAcceptLanguage('en')), [supplement]);
 
       const display = await providerWithSupplement.display('application/json');
       expect(display).toBe('JSON Application Data');
@@ -456,7 +456,7 @@ describe('MimeTypeServices', () => {
       };
 
       const supplement = new CodeSystem(supplementData);
-      const providerWithSupplement = new MimeTypeServices(new TxOperationContext(new Languages()), [supplement]);
+      const providerWithSupplement = new MimeTypeServices(new OperationContext(new Languages()), [supplement]);
 
       const languages = Languages.fromAcceptLanguage('en');
       expect(providerWithSupplement.hasAnyDisplays(languages)).toBe(true);
