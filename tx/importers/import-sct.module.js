@@ -162,7 +162,7 @@ class SnomedModule extends BaseTerminologyModule {
       "731000124108": { name: "US Edition", needsBase: true, lang: "en-US" },
       "32506021000036107": { name: "Australian Edition", needsBase: true, lang: "en-AU" },
       "449081005": { name: "Spanish Edition (International)", needsBase: true, lang: "es" },
-      "11000279109": { name: "Czech Edition", needsBase: true, lang: "cs-CZ" },
+      "11000279109": { name: "Czech Edition", needsBase: false, lang: "cs-CZ" },
       "554471000005108": { name: "Danish Edition", needsBase: true, lang: "da-DK" },
       "11000146104": { name: "Dutch Edition", needsBase: true, lang: "nl-NL" },
       "45991000052106": { name: "Swedish Edition", needsBase: true, lang: "sv-SE" },
@@ -1071,6 +1071,9 @@ class SnomedImporter {
       if (concept) {
         const termOffset = this.addString(desc.term);
         const effectiveTime = this.convertDateToSnomedDate(desc.effectiveTime);
+        if (desc.languageCode !== 'en') {
+          console.log('cs');
+        }
         const lang = this.mapLanguageCode(desc.languageCode);
 
         const descOffset = this.descriptions.addDescription(
@@ -1137,10 +1140,15 @@ class SnomedImporter {
     const langMap = {
       'en': 1,
       'en-US': 1,
-      'en-GB': 2,
-      'es': 3,
-      'fr': 4,
-      'de': 5
+      'en-GB': 1,
+      'fr': 2,
+      'nl': 3,
+      'es': 4,
+      'sv': 5,
+      'da': 6,
+      'de': 7,
+      'it': 8,
+      'cs': 9
     };
     return langMap[code] || 1;
   }
