@@ -1,9 +1,6 @@
-const fs = require('fs');
-const path = require('path');
 const sqlite3 = require('sqlite3').verbose();
 const assert = require('assert');
 const { CodeSystem } = require('../library/codesystem');
-const { Languages, Language } = require('../../library/languages');
 const { CodeSystemProvider, Designation, FilterExecutionContext, CodeSystemFactoryProvider } = require('./cs-api');
 
 class CPTConceptDesignation {
@@ -111,8 +108,8 @@ class CPTPrep extends FilterExecutionContext {
 }
 
 class CPTServices extends CodeSystemProvider {
-  constructor(db, supplements, sharedData) {
-    super(supplements);
+  constructor(opContext, supplements, db, sharedData) {
+    super(opContext, supplements);
     this.db = db;
 
     // Shared data from factory
@@ -135,7 +132,7 @@ class CPTServices extends CodeSystemProvider {
     return 'http://www.ama-assn.org/go/cpt';
   }
 
-  async version() {
+  version() {
     return this._version;
   }
 
@@ -152,9 +149,9 @@ class CPTServices extends CodeSystemProvider {
   }
 
   // Core concept methods
-  async code(opContext, context) {
-    this._ensureOpContext(opContext);
-    const ctxt = await this.#ensureContext(opContext, context);
+  async code(context) {
+    
+    const ctxt = await this.#ensureContext(context);
 
     if (ctxt instanceof CPTExpression) {
       return ctxt.expression();
@@ -164,16 +161,16 @@ class CPTServices extends CodeSystemProvider {
     return null;
   }
 
-  async display(opContext, context) {
-    this._ensureOpContext(opContext);
-    const ctxt = await this.#ensureContext(opContext, context);
+  async display(context) {
+    
+    const ctxt = await this.#ensureContext(context);
 
     if (!ctxt) {
       return null;
     }
 
     // Check supplements first
-    let disp = this._displayFromSupplements(opContext, await this.code(opContext, ctxt));
+    let disp = this._displayFromSupplements(await this.code(ctxt));
     if (disp) {
       return disp;
     }
@@ -187,14 +184,14 @@ class CPTServices extends CodeSystemProvider {
     return '';
   }
 
-  async definition(opContext, context) {
-    this._ensureOpContext(opContext);
-    return this.display(opContext, context);
+  async definition(context) {
+    
+    return this.display(context);
   }
 
-  async isAbstract(opContext, context) {
-    this._ensureOpContext(opContext);
-    const ctxt = await this.#ensureContext(opContext, context);
+  async isAbstract(context) {
+    
+    const ctxt = await this.#ensureContext(context);
 
     if (ctxt instanceof CPTExpression) {
       return false;
@@ -204,9 +201,9 @@ class CPTServices extends CodeSystemProvider {
     return false;
   }
 
-  async designations(opContext, context) {
-    this._ensureOpContext(opContext);
-    const ctxt = await this.#ensureContext(opContext, context);
+  async designations(context) {
+    
+    const ctxt = await this.#ensureContext(context);
     let designations = [];
 
     if (ctxt instanceof CPTExpression) {
@@ -224,11 +221,11 @@ class CPTServices extends CodeSystemProvider {
     return designations;
   }
 
-  async extendLookup(opContext, ctxt, props, params) {
-    this._ensureOpContext(opContext);
+  async extendLookup(ctxt, props, params) {
+    
 
     if (typeof ctxt === 'string') {
-      const located = await this.locate(opContext, ctxt);
+      const located = await this.locate(ctxt);
       if (!located.context) {
         throw new Error(located.message);
       }
@@ -241,7 +238,7 @@ class CPTServices extends CodeSystemProvider {
 
     if (ctxt instanceof CPTExpression) {
       // Extend lookup for the focus concept first
-      await this.extendLookup(opContext, ctxt.focus, props, params);
+      await this.extendLookup(ctxt.focus, props, params);
 
       // Add modifier properties
       for (const modifier of ctxt.modifiers) {
@@ -293,12 +290,12 @@ class CPTServices extends CodeSystemProvider {
     return props.includes(name);
   }
 
-  async #ensureContext(opContext, context) {
+  async #ensureContext(context) {
     if (context == null) {
       return null;
     }
     if (typeof context === 'string') {
-      const ctxt = await this.locate(opContext, context);
+      const ctxt = await this.locate(context);
       if (ctxt.context == null) {
         throw new Error(ctxt.message);
       } else {
@@ -421,8 +418,8 @@ class CPTServices extends CodeSystemProvider {
   }
 
   // Lookup methods
-  async locate(opContext, code) {
-    this._ensureOpContext(opContext);
+  async locate(code) {
+    
     assert(code == null || typeof code === 'string', 'code must be string');
     if (!code) return { context: null, message: 'Empty code' };
 
@@ -438,8 +435,8 @@ class CPTServices extends CodeSystemProvider {
   }
 
   // Iterator methods
-  async iterator(opContext, context) {
-    this._ensureOpContext(opContext);
+  async iterator(context) {
+    
 
     if (context === null) {
       // Iterate all concepts
@@ -450,8 +447,8 @@ class CPTServices extends CodeSystemProvider {
     }
   }
 
-  async nextContext(opContext, iteratorContext) {
-    this._ensureOpContext(opContext);
+  async nextContext(iteratorContext) {
+    
 
     if (!iteratorContext.more()) {
       return null;
@@ -463,8 +460,8 @@ class CPTServices extends CodeSystemProvider {
   }
 
   // Filter support
-  async doesFilter(opContext, prop, op, value) {
-    this._ensureOpContext(opContext);
+  async doesFilter(prop, op, value) {
+    
 
     if (prop === 'modifier' && op === 'equal' && ['true', 'false'].includes(value)) {
       return true;
@@ -481,13 +478,13 @@ class CPTServices extends CodeSystemProvider {
     return false;
   }
 
-  async getPrepContext(opContext, iterate) {
-    this._ensureOpContext(opContext);
-    return new CPTPrep();
+  async getPrepContext(iterate) {
+    
+    return new CPTPrep(iterate);
   }
 
-  async filter(opContext, filterContext, prop, op, value) {
-    this._ensureOpContext(opContext);
+  async filter(filterContext, prop, op, value) {
+    
 
     let list;
     let closed = true;
@@ -517,29 +514,29 @@ class CPTServices extends CodeSystemProvider {
     filterContext.filters.push(filter);
   }
 
-  async executeFilters(opContext, filterContext) {
-    this._ensureOpContext(opContext);
+  async executeFilters(filterContext) {
+    
     return filterContext.filters;
   }
 
-  async filterSize(opContext, filterContext, set) {
-    this._ensureOpContext(opContext);
+  async filterSize(filterContext, set) {
+    
     return set.list.length;
   }
 
-  async filterMore(opContext, filterContext, set) {
-    this._ensureOpContext(opContext);
+  async filterMore(filterContext, set) {
+    
     set.next();
     return set.index < set.list.length;
   }
 
-  async filterConcept(opContext, filterContext, set) {
-    this._ensureOpContext(opContext);
+  async filterConcept(filterContext, set) {
+    
     return set.list[set.index];
   }
 
-  async filterLocate(opContext, filterContext, set, code) {
-    this._ensureOpContext(opContext);
+  async filterLocate(filterContext, set, code) {
+    
 
     const concept = set.list.find(c => c.code === code);
     if (concept) {
@@ -548,8 +545,8 @@ class CPTServices extends CodeSystemProvider {
     return `Code ${code} is not in the specified filter`;
   }
 
-  async filterCheck(opContext, filterContext, set, concept) {
-    this._ensureOpContext(opContext);
+  async filterCheck(filterContext, set, concept) {
+    
 
     if (concept instanceof CPTExpression) {
       return !set.closed;
@@ -559,25 +556,23 @@ class CPTServices extends CodeSystemProvider {
     return false;
   }
 
-  async filterFinish(opContext, filterContext) {
-    this._ensureOpContext(opContext);
-    // Clean up resources if needed
-  }
 
-  async filtersNotClosed(opContext, filterContext) {
-    this._ensureOpContext(opContext);
+  async filtersNotClosed(filterContext) {
+    
     return filterContext.filters.some(f => !f.closed);
   }
 
   // Search filter - not implemented
-  async searchFilter(opContext, filterContext, filter, sort) {
-    this._ensureOpContext(opContext);
+  // eslint-disable-next-line no-unused-vars
+  async searchFilter(filterContext, filter, sort) {
+    
     throw new Error('Text search not implemented yet');
   }
 
   // Subsumption testing - not implemented
-  async subsumesTest(opContext, codeA, codeB) {
-    this._ensureOpContext(opContext);
+  async subsumesTest(codeA, codeB) {
+    await this.#ensureContext(codeA);
+    await this.#ensureContext(codeB);
     return false;
   }
 }
@@ -591,14 +586,22 @@ class CPTServicesFactory extends CodeSystemFactoryProvider {
     this._sharedData = null;
   }
 
+  // Metadata methods
+  system() {
+    return 'http://www.ama-assn.org/go/cpt';
+  }
+
+  version() {
+    return this._sharedData._version;
+  }
+
   async #ensureLoaded() {
     if (!this._loaded) {
-      await this.#loadSharedData();
-      this._loaded = true;
+      await this.load();
     }
   }
 
-  async #loadSharedData() {
+  async load() {
     const db = new sqlite3.Database(this.dbPath);
 
     try {
@@ -625,6 +628,7 @@ class CPTServicesFactory extends CodeSystemFactoryProvider {
     } finally {
       db.close();
     }
+    this._loaded = true;
   }
 
   async #loadVersion(db) {
@@ -715,7 +719,7 @@ class CPTServicesFactory extends CodeSystemFactoryProvider {
     // Create fresh database connection for this provider instance
     const db = new sqlite3.Database(this.dbPath);
 
-    return new CPTServices(db, supplements, this._sharedData);
+    return new CPTServices(opContext, supplements, db, this._sharedData);
   }
 
   static checkDB(dbPath) {

@@ -4,6 +4,7 @@
  */
 
 import { ConceptMap } from './ConceptMap.js';
+import {XMLBuilder, XMLParser} from "fast-xml-parser";
 
 /**
  * XML support for FHIR ConceptMap resources
@@ -73,7 +74,7 @@ export class ConceptMapXML {
       textNodeName: 'value', // FHIR puts primitive values in 'value' attribute
       parseAttributeValue: true,
       removeNSPrefix: true, // Remove namespace prefixes
-      isArray: (tagName, jPath, isLeafNode, isAttribute) => {
+      isArray: (tagName, jPath) => {
         // Check if this element should be an array based on FHIR rules
         return this._shouldBeArray(tagName, jPath);
       },

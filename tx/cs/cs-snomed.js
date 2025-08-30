@@ -1,4 +1,4 @@
-const { CodeSystemProvider, CodeSystemContentMode, Designation } = require('./cs-api');
+const { CodeSystemProvider, CodeSystemContentMode, Designation, CodeSystemFactoryProvider} = require('./cs-api');
 const {
   SnomedStrings, SnomedWords, SnomedStems, SnomedReferences,
   SnomedDescriptions, SnomedDescriptionIndex, SnomedConceptList,
@@ -9,7 +9,6 @@ const {
   SnomedExpressionServices, SnomedExpression, SnomedConcept,
   SnomedExpressionParser, NO_REFERENCE, SnomedServicesRenderOption
 } = require('./cs-snomed-expressions');
-const { Languages, Language } = require('../../library/languages');
 
 // Context kinds matching Pascal enum
 const SnomedProviderContextKind = {
@@ -247,7 +246,7 @@ class SnomedServices {
     }
   }
 
-  getDisplayName(reference, langIndex = 0) {
+  getDisplayName(reference = 0) {
     try {
       const concept = this.concepts.getConcept(reference);
       const descriptionsRef = concept.descriptions;
@@ -456,8 +455,8 @@ class SnomedServices {
  * SNOMED CT Code System Provider
  */
 class SnomedProvider extends CodeSystemProvider {
-  constructor(snomedServices, supplements = []) {
-    super(supplements);
+  constructor(opContext, supplements, snomedServices) {
+    super(opContext, supplements);
     this.sct = snomedServices;
   }
 
@@ -499,9 +498,9 @@ class SnomedProvider extends CodeSystemProvider {
   }
 
   // Core concept methods
-  async code(opContext, context) {
-    this._ensureOpContext(opContext);
-    const ctxt = await this.#ensureContext(opContext, context);
+  async code(context) {
+    
+    const ctxt = await this.#ensureContext(context);
 
     if (!ctxt) return null;
 
@@ -512,14 +511,14 @@ class SnomedProvider extends CodeSystemProvider {
     }
   }
 
-  async display(opContext, context) {
-    this._ensureOpContext(opContext);
-    const ctxt = await this.#ensureContext(opContext, context);
+  async display(context) {
+    
+    const ctxt = await this.#ensureContext(context);
 
     if (!ctxt) return null;
 
     // Check supplements first
-    let disp = this._displayFromSupplements(opContext, ctxt.getCode());
+    let disp = this._displayFromSupplements(ctxt.getCode());
     if (disp) return disp;
 
     if (ctxt.isComplex()) {
@@ -529,49 +528,50 @@ class SnomedProvider extends CodeSystemProvider {
     }
   }
 
-  async definition(opContext, context) {
-    this._ensureOpContext(opContext);
+  async definition(context) {
+    await this.#ensureContext(context);
     return null; // SNOMED doesn't provide definitions in this sense
   }
 
-  async isAbstract(opContext, context) {
-    this._ensureOpContext(opContext);
+  async isAbstract(context) {
+    await this.#ensureContext(context);
     return false; // SNOMED concepts are not abstract
   }
 
-  async isInactive(opContext, context) {
-    this._ensureOpContext(opContext);
-    const ctxt = await this.#ensureContext(opContext, context);
+  async isInactive(context) {
+    
+    const ctxt = await this.#ensureContext(context);
 
     if (!ctxt || ctxt.isComplex()) return false;
 
     return !this.sct.isActive(ctxt.getReference());
   }
 
-  async isDeprecated(opContext, context) {
-    this._ensureOpContext(opContext);
+  async isDeprecated(context) {
+    await this.#ensureContext(context);
+
     return false; // Handle via status if needed
   }
 
-  async getStatus(opContext, context) {
-    this._ensureOpContext(opContext);
-    const ctxt = await this.#ensureContext(opContext, context);
+  async getStatus(context) {
+    
+    const ctxt = await this.#ensureContext(context);
 
     if (!ctxt || ctxt.isComplex()) return null;
 
     return this.sct.isActive(ctxt.getReference()) ? 'active' : 'inactive';
   }
 
-  async designations(opContext, context) {
-    this._ensureOpContext(opContext);
-    const ctxt = await this.#ensureContext(opContext, context);
+  async designations(context) {
+    
+    const ctxt = await this.#ensureContext(context);
     const designations = [];
 
     if (!ctxt) return designations;
 
     if (ctxt.isComplex()) {
       // For complex expressions, just add the display
-      const display = await this.display(opContext, context);
+      const display = await this.display(context);
       if (display) {
         designations.push(new Designation('en-US', null, display));
       }
@@ -621,8 +621,8 @@ class SnomedProvider extends CodeSystemProvider {
   }
 
   // Lookup methods
-  async locate(opContext, code) {
-    this._ensureOpContext(opContext);
+  async locate(code) {
+    
 
     if (!code) return { context: null, message: 'Empty code' };
 
@@ -659,8 +659,8 @@ class SnomedProvider extends CodeSystemProvider {
     }
   }
 
-  async locateIsA(opContext, code, parent, disallowParent = false) {
-    this._ensureOpContext(opContext);
+  async locateIsA(code, parent, disallowParent = false) {
+    
 
     const childId = this.sct.stringToIdOrZero(code);
     const parentId = this.sct.stringToIdOrZero(parent);
@@ -690,8 +690,8 @@ class SnomedProvider extends CodeSystemProvider {
   }
 
   // Iterator methods
-  async iterator(opContext, context) {
-    this._ensureOpContext(opContext);
+  async iterator(context) {
+    
 
     if (!context) {
       // Iterate all active root concepts
@@ -702,7 +702,7 @@ class SnomedProvider extends CodeSystemProvider {
         total: this.sct.activeRoots.length
       };
     } else {
-      const ctxt = await this.#ensureContext(opContext, context);
+      const ctxt = await this.#ensureContext(context);
       if (!ctxt || ctxt.isComplex()) {
         return { context: ctxt, keys: [], current: 0, total: 0 };
       }
@@ -718,8 +718,8 @@ class SnomedProvider extends CodeSystemProvider {
     }
   }
 
-  async nextContext(opContext, iteratorContext) {
-    this._ensureOpContext(opContext);
+  async nextContext(iteratorContext) {
+    
 
     if (iteratorContext.current >= iteratorContext.total) {
       return null;
@@ -732,8 +732,8 @@ class SnomedProvider extends CodeSystemProvider {
   }
 
   // Filter support
-  async doesFilter(opContext, prop, op, value) {
-    this._ensureOpContext(opContext);
+  async doesFilter(prop, op, value) {
+    
 
     if (prop === 'concept') {
       const id = this.sct.stringToIdOrZero(value);
@@ -745,13 +745,14 @@ class SnomedProvider extends CodeSystemProvider {
     return false;
   }
 
-  async getPrepContext(opContext, iterate) {
-    this._ensureOpContext(opContext);
+  // eslint-disable-next-line no-unused-vars
+  async getPrepContext(iterate) {
+    
     return {}; // Simple filter context
   }
 
-  async filter(opContext, filterContext, prop, op, value) {
-    this._ensureOpContext(opContext);
+  async filter(filterContext, prop, op, value) {
+    
 
     if (prop === 'concept') {
       const id = this.sct.stringToIdOrZero(value);
@@ -776,13 +777,13 @@ class SnomedProvider extends CodeSystemProvider {
     throw new Error(`Unsupported filter property: ${prop}`);
   }
 
-  async executeFilters(opContext, filterContext) {
-    this._ensureOpContext(opContext);
+  async executeFilters(filterContext) {
+    
     return [filterContext];
   }
 
-  async filterSize(opContext, filterContext, set) {
-    this._ensureOpContext(opContext);
+  async filterSize(filterContext, set) {
+    
 
     if (set.matches && set.matches.length > 0) {
       return set.matches.length;
@@ -795,18 +796,18 @@ class SnomedProvider extends CodeSystemProvider {
     return 0;
   }
 
-  async filterMore(opContext, filterContext, set) {
-    this._ensureOpContext(opContext);
+  async filterMore(filterContext, set) {
+    
     set.cursor = set.cursor || 0;
 
-    const size = await this.filterSize(opContext, filterContext, set);
+    const size = await this.filterSize(filterContext, set);
     return set.cursor < size;
   }
 
-  async filterConcept(opContext, filterContext, set) {
-    this._ensureOpContext(opContext);
+  async filterConcept(filterContext, set) {
+    
 
-    const size = await this.filterSize(opContext, filterContext, set);
+    const size = await this.filterSize(filterContext, set);
     if (set.cursor >= size) {
       return null;
     }
@@ -826,10 +827,10 @@ class SnomedProvider extends CodeSystemProvider {
     return SnomedExpressionContext.fromReference(key);
   }
 
-  async filterLocate(opContext, filterContext, set, code) {
-    this._ensureOpContext(opContext);
+  async filterLocate(filterContext, set, code) {
+    
 
-    const conceptResult = await this.locate(opContext, code);
+    const conceptResult = await this.locate(code);
     if (!conceptResult.context) {
       return { context: null, message: conceptResult.message };
     }
@@ -857,8 +858,8 @@ class SnomedProvider extends CodeSystemProvider {
     }
   }
 
-  async filterCheck(opContext, filterContext, set, concept) {
-    this._ensureOpContext(opContext);
+  async filterCheck(filterContext, set, concept) {
+    
 
     if (!(concept instanceof SnomedExpressionContext)) {
       return false;
@@ -881,21 +882,15 @@ class SnomedProvider extends CodeSystemProvider {
     return false;
   }
 
-  async filterFinish(opContext, filterContext) {
-    this._ensureOpContext(opContext);
-    // Cleanup if needed
-  }
 
   // Search filter
-  async searchFilter(opContext, filterContext, filter, sort) {
-    this._ensureOpContext(opContext);
-
-    return this.sct.searchFilter(filter, false, true);
+  async searchFilter(filterContext, filter, sort) {
+    return this.sct.searchFilter(filter, false, sort);
   }
 
   // Subsumption testing
-  async subsumesTest(opContext, codeA, codeB) {
-    this._ensureOpContext(opContext);
+  async subsumesTest(codeA, codeB) {
+    
 
     try {
       const exprA = this.sct.expressionParser.parse(codeA);
@@ -934,13 +929,13 @@ class SnomedProvider extends CodeSystemProvider {
   }
 
   // Helper methods
-  async #ensureContext(opContext, context) {
+  async #ensureContext(context) {
     if (context === null) {
       return null;
     }
 
     if (typeof context === 'string') {
-      const result = await this.locate(opContext, context);
+      const result = await this.locate(context);
       if (!result.context) {
         throw new Error(result.message);
       }
@@ -958,24 +953,33 @@ class SnomedProvider extends CodeSystemProvider {
 /**
  * Factory for creating SNOMED services and providers
  */
-class SnomedServicesFactory {
+class SnomedServicesFactory extends CodeSystemFactoryProvider {
   constructor(filePath) {
+    super();
     this.filePath = filePath;
     this.uses = 0;
     this._loaded = false;
     this._sharedData = null;
   }
 
+  system() {
+    return 'http://snomed.info/sct';
+  }
+
+  version() {
+    return this._sharedData.versionUri;
+  }
+
   async #ensureLoaded() {
     if (!this._loaded) {
-      await this.#loadSharedData();
-      this._loaded = true;
+      await this.load();
     }
   }
 
-  async #loadSharedData() {
+  async load() {
     const reader = new SnomedFileReader(this.filePath);
     this._sharedData = await reader.loadSnomedData();
+    this._loaded = true;
   }
 
   defaultVersion() {
@@ -987,7 +991,7 @@ class SnomedServicesFactory {
     this.recordUse();
 
     const snomedServices = new SnomedServices(this._sharedData);
-    return new SnomedProvider(snomedServices, supplements);
+    return new SnomedProvider(opContext, supplements, snomedServices);
   }
 
   useCount() {

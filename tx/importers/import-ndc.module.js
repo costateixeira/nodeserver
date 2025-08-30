@@ -446,7 +446,7 @@ class NdcDataMigrator {
     this.currentProgress = 0;
   }
 
-  async migrate(sourceDir, destFile, version = 'unknown', options = {}) {
+  async migrate(sourceDir, destFile = 'unknown', options = {}) {
     if (options.verbose) console.log('Starting NDC data migration...');
 
     // Ensure destination directory exists
@@ -977,7 +977,7 @@ class NdcDataMigrator {
       { table: 'NDCRoutes', map: this.routesMap }
     ];
 
-    return new Promise((resolve, reject) => {
+    return new Promise((resolve) => {
       db.serialize(() => {
         lookups.forEach(lookup => {
           if (lookup.map) {

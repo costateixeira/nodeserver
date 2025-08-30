@@ -1,4 +1,4 @@
-const { CodeSystemProvider, TxOperationContext, Designation, FilterExecutionContext } = require('./cs-api');
+const { CodeSystemProvider, Designation, FilterExecutionContext } = require('./cs-api');
 const assert = require('assert');
 const { CodeSystem } = require("../library/codesystem");
 
@@ -19,8 +19,8 @@ class CurrencyConceptFilter {
 }
 
 class Iso4217Services extends CodeSystemProvider {
-  constructor(codes, codeMap) {
-    super();
+  constructor(opContext, supplements, codes, codeMap) {
+    super(opContext, supplements);
     this.codes = codes || [];
     this.codeMap = codeMap || new Map();
   }
@@ -55,55 +55,55 @@ class Iso4217Services extends CodeSystemProvider {
   }
 
   // Core concept methods
-  async code(opContext, code) {
-    this._ensureOpContext(opContext);
-    const ctxt = await this.#ensureContext(opContext, code);
+  async code(code) {
+    
+    const ctxt = await this.#ensureContext(code);
     return ctxt ? ctxt.code : null;
   }
 
-  async display(opContext, code) {
-    this._ensureOpContext(opContext);
-    const ctxt = await this.#ensureContext(opContext, code);
+  async display(code) {
+    
+    const ctxt = await this.#ensureContext(code);
     if (!ctxt) {
       return null;
     }
-    if (ctxt.display && opContext.langs.isEnglishOrNothing()) {
+    if (ctxt.display && this.opContext.langs.isEnglishOrNothing()) {
       return ctxt.display.trim();
     }
-    let disp = this._displayFromSupplements(opContext, ctxt.code);
+    let disp = this._displayFromSupplements(ctxt.code);
     if (disp) {
       return disp;
     }
     return ctxt.display ? ctxt.display.trim() : '';
   }
 
-  async definition(opContext, code) {
-    this._ensureOpContext(opContext);
-    const ctxt = await this.#ensureContext(opContext, code);
+  async definition(code) {
+    
+    await this.#ensureContext(code);
     return null; // No definitions provided
   }
 
-  async isAbstract(opContext, code) {
-    this._ensureOpContext(opContext);
-    const ctxt = await this.#ensureContext(opContext, code);
+  async isAbstract(code) {
+    
+    await this.#ensureContext(code);
     return false; // No abstract concepts
   }
 
-  async isInactive(opContext, code) {
-    this._ensureOpContext(opContext);
-    const ctxt = await this.#ensureContext(opContext, code);
+  async isInactive(code) {
+    
+    await this.#ensureContext(code);
     return false; // No inactive concepts
   }
 
-  async isDeprecated(opContext, code) {
-    this._ensureOpContext(opContext);
-    const ctxt = await this.#ensureContext(opContext, code);
+  async isDeprecated(code) {
+    
+    await this.#ensureContext(code);
     return false; // No deprecated concepts
   }
 
-  async designations(opContext, code) {
-    this._ensureOpContext(opContext);
-    const ctxt = await this.#ensureContext(opContext, code);
+  async designations(code) {
+    
+    const ctxt = await this.#ensureContext(code);
     let designations = [];
     if (ctxt != null) {
       designations.push(new Designation('en', CodeSystem.makeUseForDisplay(), ctxt.display));
@@ -112,12 +112,12 @@ class Iso4217Services extends CodeSystemProvider {
     return designations;
   }
 
-  async #ensureContext(opContext, code) {
+  async #ensureContext(code) {
     if (code == null) {
       return code;
     }
     if (typeof code === 'string') {
-      const ctxt = await this.locate(opContext, code);
+      const ctxt = await this.locate(code);
       if (ctxt.context == null) {
         throw new Error(ctxt.message);
       } else {
@@ -131,8 +131,8 @@ class Iso4217Services extends CodeSystemProvider {
   }
 
   // Lookup methods
-  async locate(opContext, code) {
-    this._ensureOpContext(opContext);
+  async locate(code) {
+    
     assert(code == null || typeof code === 'string', 'code must be string');
     if (!code) return { context: null, message: 'Empty code' };
 
@@ -144,17 +144,17 @@ class Iso4217Services extends CodeSystemProvider {
   }
 
   // Iterator methods
-  async iterator(opContext, code) {
-    this._ensureOpContext(opContext);
-    const ctxt = await this.#ensureContext(opContext, code);
+  async iterator(code) {
+    
+    const ctxt = await this.#ensureContext(code);
     if (!ctxt) {
       return { index: 0, total: this.totalCount() };
     }
     return null; // No child iteration
   }
 
-  async nextContext(opContext, iteratorContext) {
-    this._ensureOpContext(opContext);
+  async nextContext(iteratorContext) {
+    
     assert(iteratorContext, 'iteratorContext must be provided');
     if (iteratorContext && iteratorContext.index < iteratorContext.total) {
       const concept = this.codes[iteratorContext.index];
@@ -165,8 +165,8 @@ class Iso4217Services extends CodeSystemProvider {
   }
 
   // Filtering methods
-  async doesFilter(opContext, prop, op, value) {
-    this._ensureOpContext(opContext);
+  async doesFilter(prop, op, value) {
+    
     assert(prop != null && typeof prop === 'string', 'prop must be a non-null string');
     assert(op != null && typeof op === 'string', 'op must be a non-null string');
     assert(value != null && typeof value === 'string', 'value must be a non-null string');
@@ -174,8 +174,8 @@ class Iso4217Services extends CodeSystemProvider {
     return prop === 'decimals' && op === 'equals';
   }
 
-  async searchFilter(opContext, filterContext, filter, sort) {
-    this._ensureOpContext(opContext);
+  async searchFilter(filterContext, filter, sort) {
+    
     assert(filterContext && filterContext instanceof FilterExecutionContext, 'filterContext must be a FilterExecutionContext');
     assert(filter && typeof filter === 'string', 'filter must be a non-null string');
     assert(typeof sort === 'boolean', 'sort must be a boolean');
@@ -183,17 +183,8 @@ class Iso4217Services extends CodeSystemProvider {
     throw new Error('Search filter not implemented for ISO 4217');
   }
 
-  async specialFilter(opContext, filterContext, filter, sort) {
-    this._ensureOpContext(opContext);
-    assert(filterContext && filterContext instanceof FilterExecutionContext, 'filterContext must be a FilterExecutionContext');
-    assert(filter && typeof filter === 'string', 'filter must be a non-null string');
-    assert(typeof sort === 'boolean', 'sort must be a boolean');
-
-    throw new Error('Special filter not implemented for ISO 4217');
-  }
-
-  async filter(opContext, filterContext, prop, op, value) {
-    this._ensureOpContext(opContext);
+  async filter(filterContext, prop, op, value) {
+    
     assert(filterContext && filterContext instanceof FilterExecutionContext, 'filterContext must be a FilterExecutionContext');
     assert(prop != null && typeof prop === 'string', 'prop must be a non-null string');
     assert(op != null && typeof op === 'string', 'op must be a non-null string');
@@ -213,35 +204,35 @@ class Iso4217Services extends CodeSystemProvider {
     }
   }
 
-  async executeFilters(opContext, filterContext) {
-    this._ensureOpContext(opContext);
+  async executeFilters(filterContext) {
+    
     assert(filterContext && filterContext instanceof FilterExecutionContext, 'filterContext must be a FilterExecutionContext');
     return filterContext.filters;
   }
 
-  async filterSize(opContext, filterContext, set) {
-    this._ensureOpContext(opContext);
+  async filterSize(filterContext, set) {
+    
     assert(filterContext && filterContext instanceof FilterExecutionContext, 'filterContext must be a FilterExecutionContext');
     assert(set && set instanceof CurrencyConceptFilter, 'set must be a CurrencyConceptFilter');
     return set.list.length;
   }
 
-  async filtersNotClosed(opContext, filterContext) {
-    this._ensureOpContext(opContext);
+  async filtersNotClosed(filterContext) {
+    
     assert(filterContext && filterContext instanceof FilterExecutionContext, 'filterContext must be a FilterExecutionContext');
     return false; // Finite set
   }
 
-  async filterMore(opContext, filterContext, set) {
-    this._ensureOpContext(opContext);
+  async filterMore(filterContext, set) {
+    
     assert(filterContext && filterContext instanceof FilterExecutionContext, 'filterContext must be a FilterExecutionContext');
     assert(set && set instanceof CurrencyConceptFilter, 'set must be a CurrencyConceptFilter');
     set.cursor++;
     return set.cursor < set.list.length;
   }
 
-  async filterConcept(opContext, filterContext, set) {
-    this._ensureOpContext(opContext);
+  async filterConcept(filterContext, set) {
+    
     assert(filterContext && filterContext instanceof FilterExecutionContext, 'filterContext must be a FilterExecutionContext');
     assert(set && set instanceof CurrencyConceptFilter, 'set must be a CurrencyConceptFilter');
     if (set.cursor >= 0 && set.cursor < set.list.length) {
@@ -250,8 +241,8 @@ class Iso4217Services extends CodeSystemProvider {
     return null;
   }
 
-  async filterLocate(opContext, filterContext, set, code) {
-    this._ensureOpContext(opContext);
+  async filterLocate(filterContext, set, code) {
+    
     assert(filterContext && filterContext instanceof FilterExecutionContext, 'filterContext must be a FilterExecutionContext');
     assert(set && set instanceof CurrencyConceptFilter, 'set must be a CurrencyConceptFilter');
     assert(typeof code === 'string', 'code must be non-null string');
@@ -264,27 +255,25 @@ class Iso4217Services extends CodeSystemProvider {
     return `Code '${code}' not found in filter set`;
   }
 
-  async filterCheck(opContext, filterContext, set, concept) {
-    this._ensureOpContext(opContext);
+  async filterCheck(filterContext, set, concept) {
+    
     assert(filterContext && filterContext instanceof FilterExecutionContext, 'filterContext must be a FilterExecutionContext');
     assert(set && set instanceof CurrencyConceptFilter, 'set must be a CurrencyConceptFilter');
-    const ctxt = await this.#ensureContext(opContext, concept);
+    const ctxt = await this.#ensureContext(concept);
     return set.list.includes(ctxt);
   }
 
-  async filterFinish(opContext, filterContext) {
-    this._ensureOpContext(opContext);
-    // No cleanup needed
-  }
 
   // Subsumption
-  async subsumesTest(opContext, codeA, codeB) {
-    this._ensureOpContext(opContext);
+  async subsumesTest(codeA, codeB) {
+    await this.#ensureContext(codeA);
+    await this.#ensureContext(codeB);
     return false; // No subsumption relationships
   }
 
-  async locateIsA(opContext, code, parent) {
-    this._ensureOpContext(opContext);
+  async locateIsA(code, parent) {
+    await this.#ensureContext(code);
+    await this.#ensureContext(parent);
     return { context: null, message: 'Subsumption not supported for ISO 4217' };
   }
 }
@@ -294,16 +283,24 @@ class Iso4217FactoryProvider {
     this.uses = 0;
     this.codes = null;
     this.codeMap = null;
-    this.load();
   }
 
   defaultVersion() {
     return null; // No versioning for ISO 4217
   }
 
+  // Metadata methods
+  system() {
+    return 'urn:iso:std:iso:4217';
+  }
+
+  version() {
+    return null; // No version specified
+  }
+
   build(opContext, supplements) {
     this.uses++;
-    return new Iso4217Services(this.codes, this.codeMap);
+    return new Iso4217Services(opContext, supplements, this.codes, this.codeMap);
   }
 
   useCount() {
@@ -314,7 +311,7 @@ class Iso4217FactoryProvider {
     this.uses++;
   }
 
-  load() {
+  async load() {
     this.codes = [];
     this.codeMap = new Map();
 

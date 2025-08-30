@@ -28,9 +28,6 @@ const TEMPLATE_PATH = path.join(__dirname, 'xig-template.html');
 // Global database instance
 let xigDb = null;
 
-// Template cache
-let htmlTemplate = null;
-
 // Request tracking
 let requestStats = {
   total: 0,
@@ -51,97 +48,6 @@ const cacheEmitter = new EventEmitter();
 // Cache loading lock to prevent concurrent loads
 let cacheLoadInProgress = false;
 
-// Security Middleware Setup
-function setupSecurityMiddleware() {
-  // Security headers middleware
-  router.use((req, res, next) => {
-    res.setHeader('X-Content-Type-Options', 'nosniff');
-    res.setHeader('X-Frame-Options', 'DENY');
-    res.setHeader('X-XSS-Protection', '1; mode=block');
-    res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
-    res.setHeader('Content-Security-Policy', [
-      "default-src 'self'",
-      "script-src 'self' 'unsafe-inline'",
-      "style-src 'self' 'unsafe-inline'",
-      "img-src 'self' data: https:",
-      "font-src 'self'",
-      "connect-src 'self'",
-      "frame-ancestors 'none'"
-    ].join('; '));
-    res.removeHeader('X-Powered-By');
-    next();
-  });
-
-}
-
-// Parameter validation middleware
-function validateQueryParams(allowedParams = {}) {
-  return (req, res, next) => {
-    try {
-      const normalized = {};
-      
-      // Check for parameter pollution (arrays) and validate
-      for (const [key, value] of Object.entries(req.query)) {
-        if (Array.isArray(value)) {
-          return res.status(400).json({ 
-            error: 'Parameter pollution detected',
-            parameter: key 
-          });
-        }
-        
-        if (allowedParams[key]) {
-          const config = allowedParams[key];
-          
-          if (value !== undefined) {
-            if (typeof value !== 'string') {
-              return res.status(400).json({ 
-                error: `Parameter ${key} must be a string` 
-              });
-            }
-            
-            if (value.length > (config.maxLength || 255)) {
-              return res.status(400).json({ 
-                error: `Parameter ${key} too long (max ${config.maxLength || 255})` 
-              });
-            }
-            
-            if (config.pattern && !config.pattern.test(value)) {
-              return res.status(400).json({ 
-                error: `Parameter ${key} has invalid format` 
-              });
-            }
-            
-            normalized[key] = value;
-          } else if (config.required) {
-            return res.status(400).json({ 
-              error: `Parameter ${key} is required` 
-            });
-          } else {
-            normalized[key] = config.default || '';
-          }
-        } else if (value !== undefined) {
-          return res.status(400).json({ 
-            error: `Unknown parameter: ${key}` 
-          });
-        }
-      }
-      
-      // Set default values for missing optional parameters
-      for (const [key, config] of Object.entries(allowedParams)) {
-        if (normalized[key] === undefined && !config.required) {
-          normalized[key] = config.default || '';
-        }
-      }
-      
-      req.query = normalized;
-      next();
-    } catch (error) {
-      xigLog.error('Parameter validation error:', error);
-      res.status(500).json({ error: 'Parameter validation failed' });
-    }
-  };
-}
-
 // Enhanced HTML escaping
 function escapeHtml(text) {
   if (typeof text !== 'string') {
@@ -159,7 +65,7 @@ function escapeHtml(text) {
     '=': '&#x3D;'
   };
   
-  return text.replace(/[&<>"'`=\/]/g, function(m) { return map[m]; });
+  return text.replace(/[&<>"'`=/]/g, function(m) { return map[m]; });
 }
 
 // URL validation for external requests
@@ -694,18 +600,6 @@ function buildResourceListQuery(queryParams, offset = 0, limit = 50) {
     ${whereClause}
     ORDER BY ResourceType, Type, Description
     LIMIT ${limit} OFFSET ${offset}
-  `;
-  
-  return sql.trim();
-}
-
-function buildResourceCountQuery(queryParams) {
-  const whereClause = buildSqlFilter(queryParams);
-  
-  let sql = `
-    SELECT COUNT(*) as total
-    FROM Resources
-    ${whereClause}
   `;
   
   return sql.trim();
@@ -1702,7 +1596,7 @@ function validateDatabaseFile(filePath) {
       }
       
       // Try a simple query to ensure the database is accessible
-      testDb.get("SELECT name FROM sqlite_master WHERE type='table' LIMIT 1", (err, row) => {
+      testDb.get("SELECT name FROM sqlite_master WHERE type='table' LIMIT 1", (err) => {
         testDb.close();
         
         if (err) {
@@ -1963,7 +1857,7 @@ function trackRequest(req, res, next) {
   thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
   const cutoffDate = thirtyDaysAgo.toISOString().split('T')[0];
   
-  for (const [date, count] of requestStats.dailyCounts.entries()) {
+  for (const [date] of requestStats.dailyCounts.entries()) {
     if (date < cutoffDate) {
       requestStats.dailyCounts.delete(date);
     }
@@ -1976,7 +1870,7 @@ router.use(trackRequest);
 
 // Statistics functions
 function getDatabaseTableCounts() {
-  return new Promise((resolve, reject) => {
+  return new Promise((resolve) => {
     if (!xigDb) {
       resolve({ packages: 0, resources: 0 });
       return;
@@ -2228,9 +2122,9 @@ router.get('/', async (req, res) => {
     
     try {
       if (xigDb) {
-        const countQuery = buildResourceCountQuery(queryParams);
+        const { query: countQuery, params: countParams } = buildSecureResourceCountQuery(queryParams);
         resourceCount = await new Promise((resolve, reject) => {
-          xigDb.get(countQuery, [], (err, row) => {
+          xigDb.get(countQuery, countParams, (err, row) => {
             if (err) {
               reject(err);
             } else {
@@ -2607,7 +2501,7 @@ async function buildExtensionExamplesSection(resourceUrl) {
   return html;
 }
 // Helper function to build dependency tables
-function buildDependencyTable(dependencies, secure = false) {
+function buildDependencyTable(dependencies) {
   let html = '';
   let currentType = '';
   
@@ -2624,7 +2518,6 @@ function buildDependencyTable(dependencies, secure = false) {
     html += '<tr>';
     
     // Build the link to the resource detail page
-    const protocol = secure ? 'https' : 'http';
     const packagePid = dep.PID.replace(/#/g, '|'); // Convert # to | for URL
     const resourceUrl = `/xig/resource/${encodeURIComponent(packagePid)}/${encodeURIComponent(dep.ResourceType)}/${encodeURIComponent(dep.Id)}`;
     
@@ -2942,7 +2835,7 @@ module.exports = {
   // SQL filter functions
   buildSqlFilter,
   buildResourceListQuery,
-  buildResourceCountQuery,
+  buildSecureResourceCountQuery,
   sqlEscapeString,
   hasTerminologySource,
   gatherPageStatistics,

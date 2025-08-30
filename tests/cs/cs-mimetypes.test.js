@@ -1,17 +1,15 @@
 const { TxOperationContext } = require('../../tx/cs/cs-api');
 const { MimeTypeServices, MimeTypeServicesFactory, MimeTypeConcept } = require('../../tx/cs/cs-mimetypes');
-const { Languages, Language } = require('../../library/languages');
+const { Languages } = require('../../library/languages');
 const { CodeSystem } = require('../../tx/library/codesystem');
 
 describe('MimeTypeServices', () => {
   let factory;
   let provider;
-  let opContext;
 
   beforeEach(() => {
     factory = new MimeTypeServicesFactory();
-    provider = factory.build(null, []);
-    opContext = new TxOperationContext(Languages.fromAcceptLanguage('en'));
+    provider = factory.build(new TxOperationContext(Languages.fromAcceptLanguage('en')), []);
   });
 
   describe('Basic Functionality', () => {
@@ -32,7 +30,7 @@ describe('MimeTypeServices', () => {
     });
 
     test('should return empty version', () => {
-      expect(provider.version()).toBe('');
+      expect(provider.version()).toBeNull();
     });
 
     test('should not have displays by default', () => {
@@ -58,7 +56,7 @@ describe('MimeTypeServices', () => {
       ];
 
       for (const mimeType of validMimeTypes) {
-        const result = await provider.locate(opContext, mimeType);
+        const result = await provider.locate(mimeType);
         expect(result.context).toBeTruthy();
         expect(result.message).toBeNull();
         expect(result.context.code).toBe(mimeType);
@@ -74,7 +72,7 @@ describe('MimeTypeServices', () => {
       ];
 
       for (const mimeType of mimeTypesWithParams) {
-        const result = await provider.locate(opContext, mimeType);
+        const result = await provider.locate(mimeType);
         expect(result.context).toBeTruthy();
         expect(result.message).toBeNull();
         expect(result.context.code).toBe(mimeType);
@@ -95,12 +93,12 @@ describe('MimeTypeServices', () => {
 
       for (const invalidType of invalidMimeTypes) {
         console.log('Mimetype: '+invalidType);
-        const result = await provider.locate(opContext, invalidType);
+        const result = await provider.locate(invalidType);
         expect(result.context).toBeNull();
         expect(result.message).toContain('Invalid MIME type');
       }
 
-      const result = await provider.locate(opContext, '');
+      const result = await provider.locate('');
       expect(result.context).toBeNull();
       expect(result.message).toContain('Empty code');
     });
@@ -114,7 +112,7 @@ describe('MimeTypeServices', () => {
       ];
 
       for (const mimeType of mimeTypesWithWhitespace) {
-        const result = await provider.locate(opContext, mimeType);
+        const result = await provider.locate(mimeType);
         expect(result.context).toBeTruthy();
         expect(result.message).toBeNull();
       }
@@ -124,42 +122,42 @@ describe('MimeTypeServices', () => {
   describe('Code Lookup', () => {
     test('should return correct code for valid MIME types', async () => {
       const testMimeType = 'application/json';
-      const result = await provider.locate(opContext, testMimeType);
-      const code = await provider.code(opContext, result.context);
+      const result = await provider.locate(testMimeType);
+      const code = await provider.code(result.context);
       expect(code).toBe(testMimeType);
     });
 
     test('should return null for invalid MIME types', async () => {
-      await expect(provider.code(opContext, 'invalid-mime-type')).rejects.toThrow("Invalid MIME type 'invalid-mime-type'");
+      await expect(provider.code('invalid-mime-type')).rejects.toThrow("Invalid MIME type 'invalid-mime-type'");
     });
 
     test('should return correct display (trimmed code)', async () => {
       const testMimeType = '  text/plain  ';
-      const result = await provider.locate(opContext, testMimeType);
-      const display = await provider.display(opContext, result.context);
+      const result = await provider.locate(testMimeType);
+      const display = await provider.display(result.context);
       expect(display).toBe('text/plain');
     });
 
     test('should throw error for invalid MIME types', async () => {
-      await expect(provider.display(opContext, 'invalid')).rejects.toThrow("Invalid MIME type 'invalid'");
+      await expect(provider.display('invalid')).rejects.toThrow("Invalid MIME type 'invalid'");
     });
 
     test('should return null definition', async () => {
-      const result = await provider.locate(opContext, 'text/plain');
-      const definition = await provider.definition(opContext, result.context);
+      const result = await provider.locate('text/plain');
+      const definition = await provider.definition(result.context);
       expect(definition).toBeNull();
     });
 
     test('should return false for abstract, inactive, deprecated', async () => {
-      const result = await provider.locate(opContext, 'text/plain');
-      expect(await provider.isAbstract(opContext, result.context)).toBe(false);
-      expect(await provider.isInactive(opContext, result.context)).toBe(false);
-      expect(await provider.isDeprecated(opContext, result.context)).toBe(false);
+      const result = await provider.locate('text/plain');
+      expect(await provider.isAbstract(result.context)).toBe(false);
+      expect(await provider.isInactive(result.context)).toBe(false);
+      expect(await provider.isDeprecated(result.context)).toBe(false);
     });
 
     test('should return designations with display', async () => {
-      const result = await provider.locate(opContext, 'text/plain');
-      const designations = await provider.designations(opContext, result.context);
+      const result = await provider.locate('text/plain');
+      const designations = await provider.designations(result.context);
       expect(designations).toBeTruthy();
       expect(Array.isArray(designations)).toBe(true);
       expect(designations.length).toBeGreaterThan(0);
@@ -172,7 +170,7 @@ describe('MimeTypeServices', () => {
 
   describe('Iterator Functionality - Not Supported', () => {
     test('should create empty iterator', async () => {
-      const iterator = await provider.iterator(opContext, null);
+      const iterator = await provider.iterator(null);
       expect(iterator).toBe(null);
     });
 
@@ -180,12 +178,12 @@ describe('MimeTypeServices', () => {
 
   describe('Subsumption - Not Supported', () => {
     test('should not support subsumption', async () => {
-      expect(await provider.subsumesTest(opContext, 'text/plain', 'text/html')).toBe(false);
-      expect(await provider.subsumesTest(opContext, 'application/json', 'application/xml')).toBe(false);
+      expect(await provider.subsumesTest('text/plain', 'text/html')).toBe(false);
+      expect(await provider.subsumesTest('application/json', 'application/xml')).toBe(false);
     });
 
     test('should return error for locateIsA', async () => {
-      const result = await provider.locateIsA(opContext, 'text/plain', 'text');
+      const result = await provider.locateIsA('text/plain+fml', 'text/plain');
       expect(result.context).toBeNull();
       expect(result.message).toContain('not supported');
     });
@@ -196,20 +194,20 @@ describe('MimeTypeServices', () => {
       const factory = new MimeTypeServicesFactory();
       expect(factory.useCount()).toBe(0);
 
-      factory.build(opContext, []);
+      factory.build(new TxOperationContext('en'), []);
       expect(factory.useCount()).toBe(1);
 
-      factory.build(opContext, []);
+      factory.build(new TxOperationContext('en'), []);
       expect(factory.useCount()).toBe(2);
     });
 
     test('should return empty string for default version', () => {
-      expect(factory.defaultVersion()).toBe('');
+      expect(factory.defaultVersion()).toBeNull();
     });
 
     test('should build working providers', () => {
-      const provider1 = factory.build(opContext, []);
-      const provider2 = factory.build(opContext, []);
+      const provider1 = factory.build(new TxOperationContext('en'), []);
+      const provider2 = factory.build(new TxOperationContext('en'), []);
 
       expect(provider1).toBeTruthy();
       expect(provider2).toBeTruthy();
@@ -240,7 +238,7 @@ describe('MimeTypeServices', () => {
       ];
 
       for (const mimeType of textTypes) {
-        const result = await provider.locate(opContext, mimeType);
+        const result = await provider.locate(mimeType);
         expect(result.context).toBeTruthy();
         expect(result.context.mimeType.type).toBe('text');
       }
@@ -257,7 +255,7 @@ describe('MimeTypeServices', () => {
       ];
 
       for (const mimeType of applicationTypes) {
-        const result = await provider.locate(opContext, mimeType);
+        const result = await provider.locate(mimeType);
         expect(result.context).toBeTruthy();
         expect(result.context.mimeType.type).toBe('application');
       }
@@ -274,7 +272,7 @@ describe('MimeTypeServices', () => {
       ];
 
       for (const mimeType of imageTypes) {
-        const result = await provider.locate(opContext, mimeType);
+        const result = await provider.locate(mimeType);
         expect(result.context).toBeTruthy();
         expect(result.context.mimeType.type).toBe('image');
       }
@@ -289,7 +287,7 @@ describe('MimeTypeServices', () => {
       ];
 
       for (const mimeType of videoTypes) {
-        const result = await provider.locate(opContext, mimeType);
+        const result = await provider.locate(mimeType);
         expect(result.context).toBeTruthy();
         expect(result.context.mimeType.type).toBe('video');
       }
@@ -304,7 +302,7 @@ describe('MimeTypeServices', () => {
       ];
 
       for (const mimeType of audioTypes) {
-        const result = await provider.locate(opContext, mimeType);
+        const result = await provider.locate(mimeType);
         expect(result.context).toBeTruthy();
         expect(result.context.mimeType.type).toBe('audio');
       }
@@ -318,7 +316,7 @@ describe('MimeTypeServices', () => {
       ];
 
       for (const mimeType of multipartTypes) {
-        const result = await provider.locate(opContext, mimeType);
+        const result = await provider.locate(mimeType);
         expect(result.context).toBeTruthy();
         expect(result.context.mimeType.type).toBe('multipart');
       }
@@ -356,12 +354,12 @@ describe('MimeTypeServices', () => {
     });
 
     test('should return null for null code input', async () => {
-      const result = await provider.locate(opContext, null);
+      const result = await provider.locate(null);
       expect(result.context).toBeNull();
     });
 
     test('should handle empty code input', async () => {
-      const result = await provider.locate(opContext, '');
+      const result = await provider.locate('');
       expect(result.context).toBeNull();
       expect(result.message).toBe('Empty code');
     });
@@ -370,30 +368,30 @@ describe('MimeTypeServices', () => {
   describe('Edge Cases', () => {
     test('should handle repeated lookups correctly', async () => {
       for (let i = 0; i < 5; i++) {
-        const result = await provider.locate(opContext, 'application/json');
+        const result = await provider.locate('application/json');
         expect(result.context).toBeTruthy();
         expect(result.message).toBeNull();
 
-        const display = await provider.display(opContext, result.context);
+        const display = await provider.display(result.context);
         expect(display).toBe('application/json');
       }
     });
 
     test('should handle context passing through ensureContext', async () => {
-      const result = await provider.locate(opContext, 'text/plain');
+      const result = await provider.locate('text/plain');
       const concept = result.context;
 
       // Pass concept through ensureContext
-      const code1 = await provider.code(opContext, concept);
-      const display1 = await provider.display(opContext, concept);
+      const code1 = await provider.code(concept);
+      const display1 = await provider.display(concept);
 
       expect(code1).toBe('text/plain');
       expect(display1).toBe('text/plain');
     });
 
     test('should handle string codes through ensureContext', async () => {
-      const code = await provider.code(opContext, 'application/pdf');
-      const display = await provider.display(opContext, 'application/pdf');
+      const code = await provider.code('application/pdf');
+      const display = await provider.display('application/pdf');
 
       expect(code).toBe('application/pdf');
       expect(display).toBe('application/pdf');
@@ -401,10 +399,10 @@ describe('MimeTypeServices', () => {
 
     test('should handle case sensitivity', async () => {
       // MIME types are case-insensitive for type/subtype but case-sensitive for parameters
-      const result1 = await provider.locate(opContext, 'TEXT/PLAIN');
+      const result1 = await provider.locate('TEXT/PLAIN');
       expect(result1.context).toBeTruthy();
 
-      const result2 = await provider.locate(opContext, 'text/plain');
+      const result2 = await provider.locate('text/plain');
       expect(result2.context).toBeTruthy();
     });
   });
@@ -430,12 +428,12 @@ describe('MimeTypeServices', () => {
       };
 
       const supplement = new CodeSystem(supplementData);
-      const providerWithSupplement = new MimeTypeServices([supplement]);
+      const providerWithSupplement = new MimeTypeServices(new TxOperationContext(Languages.fromAcceptLanguage('en')), [supplement]);
 
-      const display = await providerWithSupplement.display(opContext, 'application/json');
+      const display = await providerWithSupplement.display('application/json');
       expect(display).toBe('JSON Application Data');
 
-      const designations = await providerWithSupplement.designations(opContext, 'application/json');
+      const designations = await providerWithSupplement.designations('application/json');
       expect(designations.length).toBeGreaterThan(1);
 
       const frenchDesignation = designations.find(d => d.language === 'fr');
@@ -458,7 +456,7 @@ describe('MimeTypeServices', () => {
       };
 
       const supplement = new CodeSystem(supplementData);
-      const providerWithSupplement = new MimeTypeServices([supplement]);
+      const providerWithSupplement = new MimeTypeServices(new TxOperationContext(new Languages()), [supplement]);
 
       const languages = Languages.fromAcceptLanguage('en');
       expect(providerWithSupplement.hasAnyDisplays(languages)).toBe(true);

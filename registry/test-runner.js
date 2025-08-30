@@ -5,9 +5,7 @@ const {
   ServerRegistries, 
   ServerRegistry, 
   ServerInformation, 
-  ServerVersionInformation,
-  ServerRegistryUtilities,
-  SECURITY_TYPES 
+  ServerVersionInformation
 } = require('./registry-model');
 const RegistryCrawler = require('./registry/crawler');
 const RegistryAPI = require('./registry-api');

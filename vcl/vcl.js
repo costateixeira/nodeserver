@@ -5,7 +5,7 @@
 //
 
 const express = require('express');
-const {parseVCL, parseVCLAndSetId, validateVCLExpression, VCLParseException} = require('./vcl-parser.js');
+const {parseVCLAndSetId, validateVCLExpression, VCLParseException} = require('./vcl-parser.js');
 
 const Logger = require('../common/logger');
 const vclLog = Logger.getInstance().child({ module: 'vcl' });
@@ -124,7 +124,7 @@ class VCLModule {
       '=': '&#x3D;'
     };
     
-    return str.replace(/[&<>"'`=\/]/g, (match) => escapeMap[match]);
+    return str.replace(/[&<>"'`=/]/g, (match) => escapeMap[match]);
   }
 
   // VCL expression validation
@@ -141,7 +141,7 @@ class VCLModule {
     // Basic character validation - allow VCL-specific characters
     // VCL expressions can contain: letters, numbers, dots, hyphens, underscores, 
     // colons, slashes, pipes, parentheses, square brackets, equals, commas, spaces
-    const allowedCharsPattern = /^[a-zA-Z0-9.\-_:\/|()[\]=, \t\r\n]*$/;
+    const allowedCharsPattern = /^[a-zA-Z0-9.\-_:/|()[\]=, \t\r\n]*$/;
     if (!allowedCharsPattern.test(vcl)) {
       throw new Error('VCL expression contains invalid characters');
     }

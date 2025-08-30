@@ -1360,12 +1360,7 @@ class SnomedFileReader {
       throw new Error(`Unsupported SNOMED cache version: ${result.cacheVersion}`);
     }
 
-    // Read inactive roots array
-    console.log(`About to read inactiveRootsLength at offset ${this.offset}, file size: ${this.buffer.length}`);
-    console.log(`Next 10 bytes: ${Array.from(this.buffer.subarray(this.offset, this.offset + 10)).map(b => `0x${b.toString(16).padStart(2, '0')}`).join(' ')}`);
-
     const inactiveRootsLength = this.readInteger();
-    console.log(`Read inactiveRootsLength: ${inactiveRootsLength}`);
 
     for (let i = 0; i < inactiveRootsLength; i++) {
       result.inactiveRoots.push(this.readUInt64());

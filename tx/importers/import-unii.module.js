@@ -480,11 +480,9 @@ class UniiDataMigrator {
               continue;
             }
 
-            let isnew = false;
             // Get or create UniiKey for this code
             let uniiKey = codeMap.get(code);
             if (!uniiKey) {
-              isnew = true;
               lastUniiKey++;
               uniiKey = lastUniiKey;
               insertUnii.run(uniiKey, code, cols[3]);

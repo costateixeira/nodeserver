@@ -3,21 +3,24 @@ const { AbstractValueSetProvider } = require('./vs-api');
 const { PackageContentLoader } = require('../../library/package-manager');
 const { ValueSetDatabase } = require('./vs-database');
 const { VersionUtilities } = require('../../library/version-utilities');
+const {validateParameter} = require("../../library/utilities");
 
 /**
  * Package-based ValueSet provider using shared database layer
  */
 class PackageValueSetProvider extends AbstractValueSetProvider {
   /**
-   * @param {string} packageFolder - Path to the extracted package folder
+   * @param {PackageContentLoader} packageLoader - Path to the extracted package folder
    */
-  constructor(packageFolder) {
+  constructor(packageLoader) {
     super();
-    this.packageFolder = packageFolder;
-    this.dbPath = path.join(packageFolder, '.valuesets.db');
+    validateParameter(packageLoader, "packageLoader", PackageContentLoader);
+    this.packageLoader = packageLoader;
+    this.dbPath = path.join(packageLoader.packageFolder, '.valuesets.db');
     this.database = new ValueSetDatabase(this.dbPath);
     this.valueSetMap = new Map();
     this.initialized = false;
+    this.count = 0;
   }
 
   /**
@@ -46,11 +49,8 @@ class PackageValueSetProvider extends AbstractValueSetProvider {
    * @private
    */
   async _populateDatabase() {
-    const loader = new PackageContentLoader(this.packageFolder);
-    await loader.initialize();
-
     // Get all ValueSet resources
-    const valueSetEntries = await loader.getResourcesByType('ValueSet');
+    const valueSetEntries = await this.packageLoader.getResourcesByType('ValueSet');
 
     if (valueSetEntries.length === 0) {
       return; // No value sets in this package
@@ -58,7 +58,7 @@ class PackageValueSetProvider extends AbstractValueSetProvider {
 
     const valueSets = [];
     for (const entry of valueSetEntries) {
-      const valueSet = await loader.loadFile(entry);
+      const valueSet = await this.packageLoader.loadFile(entry);
       if (valueSet.url) {
         valueSets.push(valueSet);
       }

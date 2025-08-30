@@ -7,9 +7,8 @@
 const {XMLParser} = require('fast-xml-parser');
 const {
   ConceptKind, Operator, TokenType, UcumException, Decimal, Utilities,
-  Concept, Unit, BaseUnit, DefinedUnit, Prefix, Value, Pair,
-  Component, Term, Symbol, Factor, Expression, Canonical, CanonicalUnit,
-  Registry, UcumVersionDetails
+  BaseUnit, DefinedUnit, Prefix, Value, Term, Symbol, Factor, Canonical, CanonicalUnit,
+  Registry
 } = require('./ucum-types.js');
 
 // Lexer for tokenizing UCUM expressions (port of Lexer.java)
@@ -925,6 +924,7 @@ class Converter {
     return result;
   }
 
+  // eslint-disable-next-line no-unused-vars
   _debug(indent, state, unit) {
     // Debug output - can be enabled for debugging
     // if (unit instanceof DefinedUnit) {

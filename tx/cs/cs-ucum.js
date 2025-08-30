@@ -3,8 +3,7 @@
  * Implementation of CodeSystemProvider for UCUM (Unified Code for Units of Measure)
  */
 
-const { CodeSystemProvider, TxOperationContext, Designation, FilterExecutionContext } = require('./cs-api');
-const { Languages } = require('../../library/languages');
+const { CodeSystemProvider, Designation, FilterExecutionContext, CodeSystemFactoryProvider} = require('./cs-api');
 const { CodeSystem } = require("../library/codesystem");
 const ValueSet = require("../library/valueset");
 const assert = require('assert');
@@ -36,8 +35,8 @@ class UcumFilterContext {
  * Provides validation and lookup for UCUM unit expressions
  */
 class UcumCodeSystemProvider extends CodeSystemProvider {
-  constructor(ucumService, commonUnits = null, supplements = null) {
-    super(supplements);
+  constructor(opContext, supplements, ucumService, commonUnits = null) {
+    super(opContext, supplements);
     assert(ucumService != null && ucumService instanceof UcumService, 'ucumService must be a UcumService');
     assert(!commonUnits || commonUnits instanceof ValueSet, 'if provided, commonUnits must be a ValueSet');
 
@@ -66,7 +65,7 @@ class UcumCodeSystemProvider extends CodeSystemProvider {
   }
 
   version() {
-    return this.ucumService.version();
+    return this.ucumService.ucumIdentification().version;
   }
 
   description() {
@@ -113,17 +112,17 @@ class UcumCodeSystemProvider extends CodeSystemProvider {
 
   // ========== Code Information Methods ==========
 
-  async code(opContext, code) {
-    this._ensureOpContext(opContext);
-    const ctxt = await this.#ensureContext(opContext, code);
+  async code(code) {
+    
+    const ctxt = await this.#ensureContext(code);
     return ctxt.code;
   }
 
-  async display(opContext, code) {
-    this._ensureOpContext(opContext);
-    const ctxt = await this.#ensureContext(opContext, code);
+  async display(code) {
+    
+    const ctxt = await this.#ensureContext(code);
 
-    if (opContext.langs.isEnglishOrNothing()) {
+    if (this.opContext.langs.isEnglishOrNothing()) {
       // Check for common units display first
       if (this.commonUnitList) {
         for (const concept of this.commonUnitList) {
@@ -134,7 +133,7 @@ class UcumCodeSystemProvider extends CodeSystemProvider {
       }
 
       // Check supplements
-      const supplementDisplay = this._displayFromSupplements(opContext, ctxt.code);
+      const supplementDisplay = this._displayFromSupplements(ctxt.code);
       if (supplementDisplay) {
         return supplementDisplay;
       }
@@ -144,7 +143,7 @@ class UcumCodeSystemProvider extends CodeSystemProvider {
     }
 
     // Non-English languages - check supplements first
-    const supplementDisplay = this._displayFromSupplements(opContext, ctxt.code);
+    const supplementDisplay = this._displayFromSupplements(ctxt.code);
     if (supplementDisplay) {
       return supplementDisplay;
     }
@@ -153,33 +152,33 @@ class UcumCodeSystemProvider extends CodeSystemProvider {
     return this.ucumService.analyse(ctxt.code);
   }
 
-  async definition(opContext, code) {
-    this._ensureOpContext(opContext);
-    await this.#ensureContext(opContext, code);
+  async definition(code) {
+    
+    await this.#ensureContext(code);
     return null; // UCUM doesn't provide definitions
   }
 
-  async isAbstract(opContext, code) {
-    this._ensureOpContext(opContext);
-    await this.#ensureContext(opContext, code);
+  async isAbstract(code) {
+    
+    await this.#ensureContext(code);
     return false; // UCUM codes are not abstract
   }
 
-  async isInactive(opContext, code) {
-    this._ensureOpContext(opContext);
-    await this.#ensureContext(opContext, code);
+  async isInactive(code) {
+    
+    await this.#ensureContext(code);
     return false; // We don't track inactive UCUM codes
   }
 
-  async isDeprecated(opContext, code) {
-    this._ensureOpContext(opContext);
-    await this.#ensureContext(opContext, code);
+  async isDeprecated(code) {
+    
+    await this.#ensureContext(code);
     return false; // We don't track deprecated UCUM codes
   }
 
-  async designations(opContext, code) {
-    this._ensureOpContext(opContext);
-    const ctxt = await this.#ensureContext(opContext, code);
+  async designations(code) {
+    
+    const ctxt = await this.#ensureContext(code);
 
     const designations = [];
 
@@ -205,12 +204,12 @@ class UcumCodeSystemProvider extends CodeSystemProvider {
     return designations;
   }
 
-  async #ensureContext(opContext, code) {
+  async #ensureContext(code) {
     if (code == null) {
       return code;
     }
     if (typeof code === 'string') {
-      const result = await this.locate(opContext, code);
+      const result = await this.locate(code);
       if (result.context == null) {
         throw new Error(result.message);
       } else {
@@ -225,8 +224,8 @@ class UcumCodeSystemProvider extends CodeSystemProvider {
 
   // ========== Lookup Methods ==========
 
-  async locate(opContext, code) {
-    this._ensureOpContext(opContext);
+  async locate(code) {
+    
     assert(code == null || typeof code === 'string', 'code must be string');
 
     if (!code) {
@@ -243,8 +242,8 @@ class UcumCodeSystemProvider extends CodeSystemProvider {
 
   // ========== Filter Methods ==========
 
-  async doesFilter(opContext, prop, op, value) {
-    this._ensureOpContext(opContext);
+  async doesFilter(prop, op, value) {
+    
     assert(prop != null && typeof prop === 'string', 'prop must be a non-null string');
     assert(op != null && typeof op === 'string', 'op must be a non-null string');
     assert(value != null && typeof value === 'string', 'value must be a non-null string');
@@ -253,8 +252,8 @@ class UcumCodeSystemProvider extends CodeSystemProvider {
     return (prop === 'canonical' && op === 'equals');
   }
 
-  async searchFilter(opContext, filterContext, filter, sort) {
-    this._ensureOpContext(opContext);
+  async searchFilter(filterContext, filter, sort) {
+    
     assert(filterContext && filterContext instanceof FilterExecutionContext, 'filterContext must be a FilterExecutionContext');
     assert(filter && typeof filter === 'string', 'filter must be a non-null string');
     assert(typeof sort === 'boolean', 'sort must be a boolean');
@@ -262,8 +261,8 @@ class UcumCodeSystemProvider extends CodeSystemProvider {
     throw new Error('Search filter not implemented for UCUM');
   }
 
-  async specialFilter(opContext, filterContext, filter, sort) {
-    this._ensureOpContext(opContext);
+  async specialFilter(filterContext, filter, sort) {
+    
     assert(filterContext && filterContext instanceof FilterExecutionContext, 'filterContext must be a FilterExecutionContext');
     assert(filter && typeof filter === 'string', 'filter must be a non-null string');
     assert(typeof sort === 'boolean', 'sort must be a boolean');
@@ -273,8 +272,8 @@ class UcumCodeSystemProvider extends CodeSystemProvider {
     // filterContext.filters.push(ucumFilter);
   }
 
-  async filter(opContext, filterContext, prop, op, value) {
-    this._ensureOpContext(opContext);
+  async filter(filterContext, prop, op, value) {
+    
     assert(filterContext && filterContext instanceof FilterExecutionContext, 'filterContext must be a FilterExecutionContext');
     assert(prop != null && typeof prop === 'string', 'prop must be a non-null string');
     assert(op != null && typeof op === 'string', 'op must be a non-null string');
@@ -292,14 +291,14 @@ class UcumCodeSystemProvider extends CodeSystemProvider {
     filterContext.filters.push(ucumFilter);
   }
 
-  async executeFilters(opContext, filterContext) {
-    this._ensureOpContext(opContext);
+  async executeFilters(filterContext) {
+    
     assert(filterContext && filterContext instanceof FilterExecutionContext, 'filterContext must be a FilterExecutionContext');
     return filterContext.filters;
   }
 
-  async filterSize(opContext, filterContext, set) {
-    this._ensureOpContext(opContext);
+  async filterSize(filterContext, set) {
+    
     assert(filterContext && filterContext instanceof FilterExecutionContext, 'filterContext must be a FilterExecutionContext');
     assert(set && set instanceof UcumFilterContext, 'set must be a UcumFilterContext');
 
@@ -309,14 +308,14 @@ class UcumCodeSystemProvider extends CodeSystemProvider {
     throw new Error('UCUM filter sets cannot be sized as they are based on a grammar');
   }
 
-  async filtersNotClosed(opContext, filterContext) {
-    this._ensureOpContext(opContext);
+  async filtersNotClosed(filterContext) {
+    
     assert(filterContext && filterContext instanceof FilterExecutionContext, 'filterContext must be a FilterExecutionContext');
     return true; // Grammar-based system is not closed
   }
 
-  async filterMore(opContext, filterContext, set) {
-    this._ensureOpContext(opContext);
+  async filterMore(filterContext, set) {
+    
     assert(filterContext && filterContext instanceof FilterExecutionContext, 'filterContext must be a FilterExecutionContext');
     assert(set && set instanceof UcumFilterContext, 'set must be a UcumFilterContext');
 
@@ -328,8 +327,8 @@ class UcumCodeSystemProvider extends CodeSystemProvider {
     throw new Error('UCUM filter sets cannot be iterated as they are based on a grammar');
   }
 
-  async filterConcept(opContext, filterContext, set) {
-    this._ensureOpContext(opContext);
+  async filterConcept(filterContext, set) {
+    
     assert(filterContext && filterContext instanceof FilterExecutionContext, 'filterContext must be a FilterExecutionContext');
     assert(set && set instanceof UcumFilterContext, 'set must be a UcumFilterContext');
 
@@ -341,8 +340,8 @@ class UcumCodeSystemProvider extends CodeSystemProvider {
     throw new Error('UCUM filter sets cannot be iterated as they are based on a grammar');
   }
 
-  async filterLocate(opContext, filterContext, set, code) {
-    this._ensureOpContext(opContext);
+  async filterLocate(filterContext, set, code) {
+    
     assert(filterContext && filterContext instanceof FilterExecutionContext, 'filterContext must be a FilterExecutionContext');
     assert(set && set instanceof UcumFilterContext, 'set must be a UcumFilterContext');
     assert(typeof code === 'string', 'code must be non-null string');
@@ -379,12 +378,12 @@ class UcumCodeSystemProvider extends CodeSystemProvider {
     }
   }
 
-  async filterCheck(opContext, filterContext, set, concept) {
-    this._ensureOpContext(opContext);
+  async filterCheck(filterContext, set, concept) {
+    
     assert(filterContext && filterContext instanceof FilterExecutionContext, 'filterContext must be a FilterExecutionContext');
     assert(set && set instanceof UcumFilterContext, 'set must be a UcumFilterContext');
 
-    const ctxt = await this.#ensureContext(opContext, concept);
+    const ctxt = await this.#ensureContext(concept);
 
     if (set.canonical === '') {
       // Special enumeration case
@@ -403,39 +402,27 @@ class UcumCodeSystemProvider extends CodeSystemProvider {
     }
   }
 
-  async filterFinish(opContext, filterContext) {
-    this._ensureOpContext(opContext);
-    // Nothing to clean up
-  }
 
-  // ========== Iterator Methods ==========
-
-  async iterator(opContext, context) {
-    this._ensureOpContext(opContext);
-    return null; // Cannot iterate UCUM codes (grammar-based)
-  }
-
-  async nextContext(opContext, iterator) {
-    this._ensureOpContext(opContext);
-    return null; // Cannot iterate UCUM codes
-  }
+  // ========== Not Iterator Methods: Cannot iterate UCUM codes ==========
 
   // ========== Additional Methods ==========
 
-  async sameConcept(opContext, a, b) {
-    this._ensureOpContext(opContext);
-    const codeA = await this.code(opContext, a);
-    const codeB = await this.code(opContext, b);
+  async sameConcept(a, b) {
+    
+    const codeA = await this.#ensureContext(a);
+    const codeB = await this.#ensureContext(b);
     return codeA === codeB;
   }
 
-  async subsumesTest(opContext, codeA, codeB) {
-    this._ensureOpContext(opContext);
+  async subsumesTest(codeA, codeB) {
+
+    await this.#ensureContext(codeA);
+    await this.#ensureContext(codeB);
     return false; // No subsumption in UCUM
   }
 
-  async extendLookup(opContext, ctxt, props, params) {
-    this._ensureOpContext(opContext);
+  async extendLookup(ctxt, props, params) {
+    
 
     if (props.includes('canonical')) {
       try {
@@ -450,28 +437,27 @@ class UcumCodeSystemProvider extends CodeSystemProvider {
     }
   }
 
-  async registerConceptMaps(list) {
-    // No concept maps for UCUM
-  }
-
-  async getTranslations(opContext, coding, target) {
-    this._ensureOpContext(opContext);
-    return null; // No translations available
-  }
-
 }
 
 /**
  * Factory for creating UCUM CodeSystem providers
  */
-class UcumCodeSystemFactory {
+class UcumCodeSystemFactory extends CodeSystemFactoryProvider {
   constructor(ucumService, commonUnits = null) {
-
+    super();
     assert(ucumService != null && ucumService instanceof UcumService, 'ucumService must be a UcumService');
     assert(!commonUnits || commonUnits instanceof ValueSet, 'if provided, commonUnits must be a ValueSet');
     this.ucumService = ucumService;
     this.commonUnits = commonUnits;
     this.uses = 0;
+  }
+
+  system() {
+    return 'http://unitsofmeasure.org'; // UCUM URI
+  }
+
+  version() {
+    return this.ucumService.ucumIdentification().getVersion();
   }
 
   defaultVersion() {
@@ -484,7 +470,7 @@ class UcumCodeSystemFactory {
 
   build(opContext, supplements) {
     this.recordUse();
-    return new UcumCodeSystemProvider(this.ucumService, this.commonUnits, supplements);
+    return new UcumCodeSystemProvider(opContext, supplements, this.ucumService, this.commonUnits);
   }
 
   useCount() {

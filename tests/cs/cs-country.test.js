@@ -1,16 +1,15 @@
-const { CountryCodeServices, CountryCodeFactoryProvider } = require('../../tx/cs/cs-country');
+const { CountryCodeFactoryProvider } = require('../../tx/cs/cs-country');
 const { TxOperationContext } = require('../../tx/cs/cs-api');
 const {Languages} = require("../../library/languages");
 
 describe('CountryCodeServices', () => {
   let factory;
   let provider;
-  let opContext;
 
-  beforeEach(() => {
+  beforeEach(async () => {
     factory = new CountryCodeFactoryProvider();
-    provider = factory.build(null, []);
-    opContext = new TxOperationContext(Languages.fromAcceptLanguage('en'));
+    await factory.load();
+    provider = factory.build(new TxOperationContext(Languages.fromAcceptLanguage('en')), []);
   });
 
   describe('Basic Functionality', () => {
@@ -48,12 +47,12 @@ describe('CountryCodeServices', () => {
       ];
 
       for (const [code, expectedDisplay] of testCodes) {
-        const result = await provider.locate(opContext, code);
+        const result = await provider.locate(code);
         expect(result.context).toBeTruthy();
         expect(result.message).toBeNull();
-        expect(await provider.code(opContext, result.context)).toBe(code);
+        expect(await provider.code(result.context)).toBe(code);
 
-        const display = await provider.display(opContext, result.context);
+        const display = await provider.display(result.context);
         expect(display).toBe(expectedDisplay);
       }
     });
@@ -69,12 +68,12 @@ describe('CountryCodeServices', () => {
       ];
 
       for (const [code, expectedDisplay] of testCodes) {
-        const result = await provider.locate(opContext, code);
+        const result = await provider.locate(code);
         expect(result.context).toBeTruthy();
         expect(result.message).toBeNull();
-        expect(await provider.code(opContext, result.context)).toBe(code);
+        expect(await provider.code(result.context)).toBe(code);
 
-        const display = await provider.display(opContext, result.context);
+        const display = await provider.display(result.context);
         expect(display).toBe(expectedDisplay);
       }
     });
@@ -90,12 +89,12 @@ describe('CountryCodeServices', () => {
       ];
 
       for (const [code, expectedDisplay] of testCodes) {
-        const result = await provider.locate(opContext, code);
+        const result = await provider.locate(code);
         expect(result.context).toBeTruthy();
         expect(result.message).toBeNull();
-        expect(await provider.code(opContext, result.context)).toBe(code);
+        expect(await provider.code(result.context)).toBe(code);
 
-        const display = await provider.display(opContext, result.context);
+        const display = await provider.display(result.context);
         expect(display).toBe(expectedDisplay);
       }
     });
@@ -104,87 +103,87 @@ describe('CountryCodeServices', () => {
       const invalidCodes = ['XX', 'ZZZ', '999'];
 
       for (const code of invalidCodes) {
-        const result = await provider.locate(opContext, code);
+        const result = await provider.locate(code);
         expect(result.context).toBeNull();
         expect(result.message).toContain('not found');
       }
     });
 
     test('should return empty definition', async () => {
-      const result = await provider.locate(opContext, 'US');
-      const definition = await provider.definition(opContext, result.context);
+      const result = await provider.locate('US');
+      const definition = await provider.definition(result.context);
       expect(definition).toBe(null);
     });
 
     test('should return false for abstract, inactive, deprecated', async () => {
-      const result = await provider.locate(opContext, 'US');
-      expect(await provider.isAbstract(opContext, result.context)).toBe(false);
-      expect(await provider.isInactive(opContext, result.context)).toBe(false);
-      expect(await provider.isDeprecated(opContext, result.context)).toBe(false);
+      const result = await provider.locate('US');
+      expect(await provider.isAbstract(result.context)).toBe(false);
+      expect(await provider.isInactive(result.context)).toBe(false);
+      expect(await provider.isDeprecated(result.context)).toBe(false);
     });
   });
 
   describe('Iterator Functionality', () => {
     test('should create iterator for all concepts', async () => {
-      const iterator = await provider.iterator(opContext, null);
+      const iterator = await provider.iterator(null);
       expect(iterator).toBeTruthy();
       expect(iterator.index).toBe(0);
       expect(iterator.total).toBe(provider.totalCount());
     });
 
     test('should iterate through concepts', async () => {
-      const iterator = await provider.iterator(opContext, null);
+      const iterator = await provider.iterator(null);
       const concepts = [];
 
       for (let i = 0; i < 20 && i < iterator.total; i++) {
-        const concept = await provider.nextContext(opContext, iterator);
+        const concept = await provider.nextContext(iterator);
         expect(concept).toBeTruthy();
         concepts.push(concept);
       }
 
       expect(concepts.length).toBe(Math.min(20, iterator.total));
       // Should have different codes
-      const codes = concepts.map(c => provider.code(opContext, c));
+      const codes = concepts.map(c => provider.code(c));
       expect(new Set(codes).size).toBe(codes.length);
     });
 
     test('should return null when iterator exhausted', async () => {
       const iterator = { index: provider.totalCount(), total: provider.totalCount() };
-      const concept = await provider.nextContext(opContext, iterator);
+      const concept = await provider.nextContext(iterator);
       expect(concept).toBeNull();
     });
   });
 
   describe('Filter Support', () => {
     test('should support code regex filters', async () => {
-      expect(await provider.doesFilter(opContext, 'code', 'regex', 'US.*')).toBe(true);
+      expect(await provider.doesFilter('code', 'regex', 'US.*')).toBe(true);
     });
 
     test('should not support other filters', async () => {
-      expect(await provider.doesFilter(opContext, 'display', 'regex', 'test')).toBe(false);
-      expect(await provider.doesFilter(opContext, 'code', 'equals', 'US')).toBe(false);
-      expect(await provider.doesFilter(opContext, 'code', 'contains', 'US')).toBe(false);
+      expect(await provider.doesFilter('display', 'regex', 'test')).toBe(false);
+      expect(await provider.doesFilter('code', 'equals', 'US')).toBe(false);
+      expect(await provider.doesFilter('code', 'contains', 'US')).toBe(false);
     });
 
   });
 
   describe('Regex Filtering', () => {
     test('should filter by 2-letter code pattern', async () => {
-      const ctxt = await provider.getPrepContext(opContext, false);
-      await provider.filter(opContext, ctxt, 'code', 'regex', 'U[S|A]');
-      const filters = await provider.executeFilters(opContext, ctxt);
+      const ctxt = await provider.getPrepContext(false);
+      await provider.filter(ctxt, 'code', 'regex', 'U[S|A]');
+      const filters = await provider.executeFilters(ctxt);
       expect(filters[0]).toBeTruthy();
       expect(filters[0].list).toBeTruthy();
       expect(filters[0].cursor).toBe(-1);
 
-      const size = await provider.filterSize(opContext, ctxt, filters[0]);
+      const size = await provider.filterSize(ctxt, filters[0]);
       expect(size).toBeGreaterThan(0);
 
       // Check that results match pattern
       const results = [];
       filters[0].cursor = -1;
-      while (await provider.filterMore(opContext, ctxt, filters[0])) {
-        const concept = await provider.filterConcept(opContext, ctxt, filters[0]);
+      while (await provider.filterMore(ctxt, filters[0])) {
+        const concept = await provider.filterConcept(ctxt, filters[0]);
         results.push(concept);
       }
 
@@ -195,15 +194,15 @@ describe('CountryCodeServices', () => {
     });
 
     test('should filter by 3-letter code pattern', async () => {
-      const ctxt = await provider.getPrepContext(opContext, false);
-      await provider.filter(opContext, ctxt, 'code', 'regex', 'US.*');
-      const filters = await provider.executeFilters(opContext, ctxt);
+      const ctxt = await provider.getPrepContext(false);
+      await provider.filter(ctxt, 'code', 'regex', 'US.*');
+      const filters = await provider.executeFilters(ctxt);
       const filter = filters[0];
 
       const results = [];
       filter.cursor = -1;
-      while (await provider.filterMore(opContext, ctxt, filter)) {
-        const concept = await provider.filterConcept(opContext, ctxt, filter);
+      while (await provider.filterMore(ctxt, filter)) {
+        const concept = await provider.filterConcept(ctxt, filter);
         results.push(concept);
       }
 
@@ -218,15 +217,15 @@ describe('CountryCodeServices', () => {
     });
 
     test('should filter by numeric code pattern', async () => {
-      const ctxt = await provider.getPrepContext(opContext, false);
-      await provider.filter(opContext, ctxt, 'code', 'regex', '8[0-9]{2}');
-      const filters = await provider.executeFilters(opContext, ctxt);
+      const ctxt = await provider.getPrepContext(false);
+      await provider.filter(ctxt, 'code', 'regex', '8[0-9]{2}');
+      const filters = await provider.executeFilters(ctxt);
       const filter = filters[0];
 
       const results = [];
       filter.cursor = -1;
-      while (await provider.filterMore(opContext, ctxt, filter)) {
-        const concept = await provider.filterConcept(opContext, ctxt, filter);
+      while (await provider.filterMore(ctxt, filter)) {
+        const concept = await provider.filterConcept(ctxt, filter);
         results.push(concept);
       }
 
@@ -243,15 +242,15 @@ describe('CountryCodeServices', () => {
     });
 
     test('should filter by exact match pattern', async () => {
-      const ctxt = await provider.getPrepContext(opContext, false);
-      await provider.filter(opContext, ctxt, 'code', 'regex', 'US');
-      const filters = await provider.executeFilters(opContext, ctxt);
+      const ctxt = await provider.getPrepContext(false);
+      await provider.filter(ctxt, 'code', 'regex', 'US');
+      const filters = await provider.executeFilters(ctxt);
       const filter = filters[0];
 
       const results = [];
       filter.cursor = -1;
-      while (await provider.filterMore(opContext, ctxt, filter)) {
-        const concept = await provider.filterConcept(opContext, ctxt, filter);
+      while (await provider.filterMore(ctxt, filter)) {
+        const concept = await provider.filterConcept(ctxt, filter);
         results.push(concept);
       }
 
@@ -261,19 +260,19 @@ describe('CountryCodeServices', () => {
     });
 
     test('should filter all 2-letter codes', async () => {
-      const ctxt = await provider.getPrepContext(opContext, false);
-      await provider.filter(opContext, ctxt, 'code', 'regex', '[A-Z]{2}');
-      const filters = await provider.executeFilters(opContext, ctxt);
+      const ctxt = await provider.getPrepContext(false);
+      await provider.filter(ctxt, 'code', 'regex', '[A-Z]{2}');
+      const filters = await provider.executeFilters(ctxt);
       const filter = filters[0];
 
-      const size = await provider.filterSize(opContext, ctxt, filter);
+      const size = await provider.filterSize(ctxt, filter);
       expect(size).toBeGreaterThan(100); // Should have many 2-letter codes
 
       // Sample some results
       const results = [];
       filter.cursor = -1;
-      for (let i = 0; i < 10 && await provider.filterMore(opContext, ctxt, filter); i++) {
-        const concept = await provider.filterConcept(opContext, ctxt, filter);
+      for (let i = 0; i < 10 && await provider.filterMore(ctxt, filter); i++) {
+        const concept = await provider.filterConcept(ctxt, filter);
         results.push(concept);
       }
 
@@ -284,19 +283,19 @@ describe('CountryCodeServices', () => {
     });
 
     test('should filter all 3-letter codes', async () => {
-      const ctxt = await provider.getPrepContext(opContext, false);
-      await provider.filter(opContext, ctxt, 'code', 'regex', '[A-Z]{3}');
-      const filters = await provider.executeFilters(opContext, ctxt);
+      const ctxt = await provider.getPrepContext(false);
+      await provider.filter(ctxt, 'code', 'regex', '[A-Z]{3}');
+      const filters = await provider.executeFilters(ctxt);
       const filter = filters[0];
 
-      const size = await provider.filterSize(opContext, ctxt, filter);
+      const size = await provider.filterSize(ctxt, filter);
       expect(size).toBeGreaterThan(100); // Should have many 3-letter codes
 
       // Sample some results
       const results = [];
       filter.cursor = -1;
-      for (let i = 0; i < 10 && await provider.filterMore(opContext, ctxt, filter); i++) {
-        const concept = await provider.filterConcept(opContext, ctxt, filter);
+      for (let i = 0; i < 10 && await provider.filterMore(ctxt, filter); i++) {
+        const concept = await provider.filterConcept(ctxt, filter);
         results.push(concept);
       }
 
@@ -307,19 +306,19 @@ describe('CountryCodeServices', () => {
     });
 
     test('should filter all numeric codes', async () => {
-      const ctxt = await provider.getPrepContext(opContext, false);
-      await provider.filter(opContext, ctxt, 'code', 'regex', '\\d{3}');
-      const filters = await provider.executeFilters(opContext, ctxt);
+      const ctxt = await provider.getPrepContext(false);
+      await provider.filter(ctxt, 'code', 'regex', '\\d{3}');
+      const filters = await provider.executeFilters(ctxt);
       const filter = filters[0];
 
-      const size = await provider.filterSize(opContext, ctxt, filter);
+      const size = await provider.filterSize(ctxt, filter);
       expect(size).toBeGreaterThan(100); // Should have many numeric codes
 
       // Sample some results
       const results = [];
       filter.cursor = -1;
-      for (let i = 0; i < 10 && await provider.filterMore(opContext, ctxt, filter); i++) {
-        const concept = await provider.filterConcept(opContext, ctxt, filter);
+      for (let i = 0; i < 10 && await provider.filterMore(ctxt, filter); i++) {
+        const concept = await provider.filterConcept(ctxt, filter);
         results.push(concept);
       }
 
@@ -330,52 +329,52 @@ describe('CountryCodeServices', () => {
     });
 
     test('should handle empty filter results', async () => {
-      const ctxt = await provider.getPrepContext(opContext, false);
-      await provider.filter(opContext, ctxt, 'code', 'regex', 'ZZZZZ');
-      const filters = await provider.executeFilters(opContext, ctxt);
+      const ctxt = await provider.getPrepContext(false);
+      await provider.filter(ctxt, 'code', 'regex', 'ZZZZZ');
+      const filters = await provider.executeFilters(ctxt);
       const filter = filters[0];
 
-      const size = await provider.filterSize(opContext, ctxt, filter);
+      const size = await provider.filterSize(ctxt, filter);
       expect(size).toBe(0);
 
-      expect(await provider.filterMore(opContext, ctxt, filter)).toBe(false);
+      expect(await provider.filterMore(ctxt, filter)).toBe(false);
     });
 
     test('should locate specific code in filter', async () => {
-      const ctxt = await provider.getPrepContext(opContext, false);
-      await provider.filter(opContext, ctxt, 'code', 'regex', 'US.*');
-      const filters = await provider.executeFilters(opContext, ctxt);
+      const ctxt = await provider.getPrepContext(false);
+      await provider.filter(ctxt, 'code', 'regex', 'US.*');
+      const filters = await provider.executeFilters(ctxt);
       const filter = filters[0];
 
-      const result = await provider.filterLocate(opContext, ctxt, filter, 'USA');
+      const result = await provider.filterLocate(ctxt, filter, 'USA');
       expect(result).toBeTruthy();
       expect(typeof result).not.toBe('string'); // Should not be error message
       expect(result.code).toBe('USA');
     });
 
     test('should not locate code not in filter', async () => {
-      const ctxt = await provider.getPrepContext(opContext, false);
-      await provider.filter(opContext, ctxt, 'code', 'regex', 'US.*');
-      const filters = await provider.executeFilters(opContext, ctxt);
+      const ctxt = await provider.getPrepContext(false);
+      await provider.filter(ctxt, 'code', 'regex', 'US.*');
+      const filters = await provider.executeFilters(ctxt);
       const filter = filters[0];
 
-      const result = await provider.filterLocate(opContext, ctxt, filter, 'CAN');
+      const result = await provider.filterLocate(ctxt, filter, 'CAN');
       expect(typeof result).toBe('string'); // Should be error message
       expect(result).toContain('not found');
     });
 
     test('should check if concept is in filter', async () => {
-      const ctxt = await provider.getPrepContext(opContext, false);
-      await provider.filter(opContext, ctxt, 'code', 'regex', 'US.*');
-      const filters = await provider.executeFilters(opContext, ctxt);
+      const ctxt = await provider.getPrepContext(false);
+      await provider.filter(ctxt, 'code', 'regex', 'US.*');
+      const filters = await provider.executeFilters(ctxt);
       const filter = filters[0];
 
       // Find a concept in the filter
       filter.cursor = -1;
-      await provider.filterMore(opContext, ctxt, filter);
-      const concept = await provider.filterConcept(opContext, ctxt, filter);
+      await provider.filterMore(ctxt, filter);
+      const concept = await provider.filterConcept(ctxt, filter);
 
-      const isInFilter = await provider.filterCheck(opContext, ctxt, filter, concept);
+      const isInFilter = await provider.filterCheck(ctxt, filter, concept);
       expect(isInFilter).toBe(true);
     });
   });
@@ -383,40 +382,35 @@ describe('CountryCodeServices', () => {
   describe('Filter Error Cases', () => {
     test('should throw error for unsupported property', async () => {
       await expect(
-        provider.filter(opContext, await provider.getPrepContext(opContext, false), 'display', 'regex', 'test')
+        provider.filter(await provider.getPrepContext(false), 'display', 'regex', 'test')
       ).rejects.toThrow('not supported');
     });
 
     test('should throw error for unsupported operator', async () => {
       await expect(
-        provider.filter(opContext, await provider.getPrepContext(opContext, false), 'code', 'equals', 'US')
+        provider.filter(await provider.getPrepContext(false), 'code', 'equals', 'US')
       ).rejects.toThrow('not supported');
     });
 
     test('should throw error for invalid regex', async () => {
       await expect(
-        provider.filter(opContext, await provider.getPrepContext(opContext, false), 'code', 'regex', '[invalid')
+        provider.filter(await provider.getPrepContext(false), 'code', 'regex', '[invalid')
       ).rejects.toThrow('Invalid regex pattern');
     });
 
     test('should throw error for search filter', async () => {
       await expect(
-        provider.searchFilter(opContext, await provider.getPrepContext(opContext, false), 'test', false)
+        provider.searchFilter(await provider.getPrepContext(false), 'test', false)
       ).rejects.toThrow('not implemented');
     });
 
-    test('should throw error for special filter', async () => {
-      await expect(
-        provider.specialFilter(opContext, await provider.getPrepContext(opContext, false), 'test', false)
-      ).rejects.toThrow('not implemented');
-    });
   });
 
   describe('Execute Filters', () => {
     test('should execute single filter', async () => {
-      const ctxt = await provider.getPrepContext(opContext, false);
-      await provider.filter(opContext, ctxt, 'code', 'regex', 'US.*');
-      const results = await provider.executeFilters(opContext, ctxt);
+      const ctxt = await provider.getPrepContext(false);
+      await provider.filter(ctxt, 'code', 'regex', 'US.*');
+      const results = await provider.executeFilters(ctxt);
 
       expect(results).toBeTruthy();
       expect(Array.isArray(results)).toBe(true);
@@ -424,18 +418,18 @@ describe('CountryCodeServices', () => {
     });
 
     test('should indicate filters are closed', async () => {
-      expect(await provider.filtersNotClosed(opContext, await provider.getPrepContext(opContext, false))).toBe(false);
+      expect(await provider.filtersNotClosed(await provider.getPrepContext(false))).toBe(false);
     });
   });
 
   describe('Subsumption', () => {
     test('should not support subsumption', async () => {
-      expect(await provider.subsumesTest(opContext, 'US', 'USA')).toBe('not-subsumed');
-      expect(await provider.subsumesTest(opContext, 'USA', 'US')).toBe('not-subsumed');
+      expect(await provider.subsumesTest('US', 'USA')).toBe('not-subsumed');
+      expect(await provider.subsumesTest('USA', 'US')).toBe('not-subsumed');
     });
 
     test('should return error for locateIsA', async () => {
-      const result = await provider.locateIsA(opContext, 'US', 'USA');
+      const result = await provider.locateIsA('US', 'USA');
       expect(result.context).toBeNull();
       expect(result.message).toContain('does not have parents');
     });
@@ -446,10 +440,10 @@ describe('CountryCodeServices', () => {
       const factory = new CountryCodeFactoryProvider();
       expect(factory.useCount()).toBe(0);
 
-      factory.build(opContext, []);
+      factory.build(new TxOperationContext(Languages.fromAcceptLanguage('en')), []);
       expect(factory.useCount()).toBe(1);
 
-      factory.build(opContext, []);
+      factory.build(new TxOperationContext(Languages.fromAcceptLanguage('en')), []);
       expect(factory.useCount()).toBe(2);
     });
 
@@ -458,8 +452,8 @@ describe('CountryCodeServices', () => {
     });
 
     test('should build working providers', () => {
-      const provider1 = factory.build(opContext, []);
-      const provider2 = factory.build(opContext, []);
+      const provider1 = factory.build(new TxOperationContext(Languages.fromAcceptLanguage('en')), []);
+      const provider2 = factory.build(new TxOperationContext(Languages.fromAcceptLanguage('en')), []);
 
       expect(provider1).toBeTruthy();
       expect(provider2).toBeTruthy();
@@ -471,18 +465,18 @@ describe('CountryCodeServices', () => {
   describe('Data Validation', () => {
     test('should have multiple formats for same countries', async () => {
       // Test that USA appears in multiple formats
-      const us2 = await provider.locate(opContext, 'US');
-      const us3 = await provider.locate(opContext, 'USA');
-      const usNum = await provider.locate(opContext, '840');
+      const us2 = await provider.locate('US');
+      const us3 = await provider.locate('USA');
+      const usNum = await provider.locate('840');
 
       expect(us2.context).toBeTruthy();
       expect(us3.context).toBeTruthy();
       expect(usNum.context).toBeTruthy();
 
       // All should refer to United States
-      const display2 = await provider.display(opContext, us2.context);
-      const display3 = await provider.display(opContext, us3.context);
-      const displayNum = await provider.display(opContext, usNum.context);
+      const display2 = await provider.display(us2.context);
+      const display3 = await provider.display(us3.context);
+      const displayNum = await provider.display(usNum.context);
 
       expect(display2).toContain('United States');
       expect(display3).toContain('United States');
@@ -499,17 +493,17 @@ describe('CountryCodeServices', () => {
       ];
 
       for (const country of majorCountries) {
-        const result2 = await provider.locate(opContext, country.two);
-        const result3 = await provider.locate(opContext, country.three);
-        const resultNum = await provider.locate(opContext, country.num);
+        const result2 = await provider.locate(country.two);
+        const result3 = await provider.locate(country.three);
+        const resultNum = await provider.locate(country.num);
 
         expect(result2.context).toBeTruthy();
         expect(result3.context).toBeTruthy();
         expect(resultNum.context).toBeTruthy();
 
-        const display2 = await provider.display(opContext, result2.context);
-        const display3 = await provider.display(opContext, result3.context);
-        const displayNum = await provider.display(opContext, resultNum.context);
+        const display2 = await provider.display(result2.context);
+        const display3 = await provider.display(result3.context);
+        const displayNum = await provider.display(resultNum.context);
 
         expect(display2).toContain(country.name);
         expect(display3).toContain(country.name);
@@ -521,7 +515,7 @@ describe('CountryCodeServices', () => {
   describe('Filter Cleanup', () => {
     test('should not throw on filter finish', () => {
       expect(() => {
-        provider.filterFinish(opContext, null);
+        provider.filterFinish(null);
       }).not.toThrow();
     });
   });

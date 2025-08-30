@@ -69,7 +69,7 @@ export class NamingSystemXML {
       textNodeName: 'value', // FHIR puts primitive values in 'value' attribute
       parseAttributeValue: true,
       removeNSPrefix: true, // Remove namespace prefixes
-      isArray: (tagName, jPath, isLeafNode, isAttribute) => {
+      isArray: (tagName, jPath) => {
         // Check if this element should be an array based on FHIR rules
         return this._shouldBeArray(tagName, jPath);
       },
@@ -134,7 +134,7 @@ export class NamingSystemXML {
    * @returns {boolean} True if should be array
    * @private
    */
-  static _shouldBeArray(tagName, jPath) {
+  static _shouldBeArray(tagName) {
     // Check if this is a known FHIR array element
     if (this._arrayElements.has(tagName)) {
       return true;
