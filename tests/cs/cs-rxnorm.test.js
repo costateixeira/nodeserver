@@ -3,7 +3,7 @@ const path = require('path');
 const sqlite3 = require('sqlite3').verbose();
 const { RxNormImporter } = require('../../tx/importers/import-rxnorm.module');
 const { RxNormServices, RxNormServicesFactory, RxNormConcept } = require('../../tx/cs/cs-rxnorm');
-const { TxOperationContext } = require('../../tx/cs/cs-api');
+const { OperationContext } = require('../../tx/operation-context');
 
 describe('RxNorm Import', () => {
   const sourceDir = path.resolve(__dirname, '../../tx/data/rxnorm');
@@ -182,7 +182,7 @@ describe('RxNorm Provider', () => {
 
     // Create factory and provider
     factory = new RxNormServicesFactory(testDbPath);
-    provider = await factory.build(new TxOperationContext('en'), []);
+    provider = await factory.build(new OperationContext('en'), []);
   });
 
   afterAll(() => {

@@ -6,7 +6,8 @@ const {
   LanguageComponent 
 } = require('../../tx/cs/cs-lang');
 const { LanguageDefinitions, Languages, Language } = require('../../library/languages');
-const { TxOperationContext, FilterExecutionContext} = require('../../tx/cs/cs-api');
+const { FilterExecutionContext} = require('../../tx/cs/cs-api');
+const {OperationContext} = require("../../tx/operation-context");
 
 describe('IETF Language CodeSystem Provider', () => {
   let languageDefinitions;
@@ -18,7 +19,7 @@ describe('IETF Language CodeSystem Provider', () => {
     languageDefinitions = await LanguageDefinitions.fromFile(dataPath);
     
     // Create provider instance
-    provider = new IETFLanguageCodeProvider(new TxOperationContext(Languages.fromAcceptLanguage('en-US')), [], languageDefinitions);
+    provider = new IETFLanguageCodeProvider(new OperationContext(Languages.fromAcceptLanguage('en-US')), [], languageDefinitions);
   });
 
   describe('Metadata', () => {
@@ -296,13 +297,13 @@ describe('IETF Language CodeSystem Provider', () => {
 
     test('should validate supplement types', () => {
       expect(() => {
-        new IETFLanguageCodeProvider(new TxOperationContext(Languages.fromAcceptLanguage('en-US')), ['invalid'], languageDefinitions);
+        new IETFLanguageCodeProvider(new OperationContext(Languages.fromAcceptLanguage('en-US')), ['invalid'], languageDefinitions);
       }).toThrow('must be a CodeSystem instance');
     });
 
     test('should validate supplement array type', () => {
       expect(() => {
-        new IETFLanguageCodeProvider(new TxOperationContext(Languages.fromAcceptLanguage('en-US')), 'invalid', languageDefinitions);
+        new IETFLanguageCodeProvider(new OperationContext(Languages.fromAcceptLanguage('en-US')), 'invalid', languageDefinitions);
       }).toThrow('Supplements must be an array');
     });
   });
@@ -401,18 +402,18 @@ describe('IETF Language CodeSystem Provider', () => {
     });
 
     test('should build providers and track usage', () => {
-      const provider1 = factory.build(new TxOperationContext(Languages.fromAcceptLanguage('en-US')), null);
+      const provider1 = factory.build(new OperationContext(Languages.fromAcceptLanguage('en-US')), null);
       expect(provider1).toBeInstanceOf(IETFLanguageCodeProvider);
       expect(factory.useCount()).toBe(1);
 
-      const provider2 = factory.build(new TxOperationContext(Languages.fromAcceptLanguage('en-US')), []);
+      const provider2 = factory.build(new OperationContext(Languages.fromAcceptLanguage('en-US')), []);
       expect(provider2).toBeInstanceOf(IETFLanguageCodeProvider);
       expect(factory.useCount()).toBe(2);
     });
 
     test('should pass supplements to built providers', () => {
       const supplements = [];
-      const provider = factory.build(new TxOperationContext(Languages.fromAcceptLanguage('en-US')), supplements);
+      const provider = factory.build(new OperationContext(Languages.fromAcceptLanguage('en-US')), supplements);
       expect(provider.supplements).toBe(supplements);
     });
   });

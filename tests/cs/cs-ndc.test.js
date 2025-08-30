@@ -3,7 +3,7 @@ const fs = require('fs');
 const path = require('path');
 const { NdcDataMigrator } = require('../../tx/importers/import-ndc.module');
 const { NdcServices, NdcServicesFactory, NdcConcept } = require('../../tx/cs/cs-ndc');
-const { TxOperationContext } = require('../../tx/cs/cs-api');
+const { OperationContext } = require('../../tx/operation-context');
 
 describe('NDC Module Import', () => {
   const testSourceDir = path.resolve(__dirname, '../../tx/data/ndc');
@@ -289,7 +289,7 @@ describe('NDC Provider', () => {
     // Create factory and provider
     factory = new NdcServicesFactory(testDbPath);
     await factory.load();
-    provider = await factory.build(new TxOperationContext('en'), []);
+    provider = await factory.build(new OperationContext('en'), []);
   });
 
   afterAll(() => {

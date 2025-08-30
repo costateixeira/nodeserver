@@ -1,7 +1,7 @@
 const fs = require('fs');
 const path = require('path');
 const { OMOPServices, OMOPServicesFactory, OMOPConcept } = require('../../tx/cs/cs-omop');
-const { TxOperationContext } = require('../../tx/cs/cs-api');
+const { OperationContext } = require('../../tx/operation-context');
 
 describe('OMOP Provider', () => {
   const testDbPath = path.resolve(__dirname, '../../tx/data/omop-fragment.db');
@@ -30,7 +30,7 @@ describe('OMOP Provider', () => {
 
     // Create factory and provider
     factory = new OMOPServicesFactory(testDbPath);
-    provider = await factory.build(new TxOperationContext('en'), []);
+    provider = await factory.build(new OperationContext('en'), []);
 
     // Populate test data by querying the database
     await populateTestData();

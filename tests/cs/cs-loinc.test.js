@@ -3,7 +3,7 @@ const fs = require('fs');
 const path = require('path');
 const { LoincDataMigrator } = require('../../tx/importers/import-loinc.module');
 const { LoincServices, LoincServicesFactory, LoincProviderContext } = require('../../tx/cs/cs-loinc');
-const { TxOperationContext } = require('../../tx/cs/cs-api');
+const { OperationContext } = require('../../tx/operation-context');
 const {validateParameter} = require("../../library/utilities");
 
 describe('LOINC Module Import', () => {
@@ -440,7 +440,7 @@ describe('LOINC Provider', () => {
 
     // Create factory and provider
     factory = new LoincServicesFactory(testDbPath);
-    provider = await factory.build(new TxOperationContext('en'), []);
+    provider = await factory.build(new OperationContext('en'), []);
   });
 
   afterAll(() => {
