@@ -1,5 +1,5 @@
 const { HGVSServices, HGVSServicesFactory, HGVSCode } = require('../../tx/cs/cs-hgvs');
-const { TxOperationContext } = require('../../tx/cs/cs-api');
+const { OperationContext } = require('../../tx/operation-context');
 
 describe('HGVS Provider', () => {
   let factory;
@@ -27,7 +27,7 @@ describe('HGVS Provider', () => {
   beforeAll(async () => {
     // Create factory and provider
     factory = new HGVSServicesFactory();
-    provider = await factory.build(new TxOperationContext('en'), []);
+    provider = await factory.build(new OperationContext('en'), []);
   });
 
   describe('Factory and Basic Setup', () => {

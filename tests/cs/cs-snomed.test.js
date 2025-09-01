@@ -25,7 +25,7 @@ const {
 const { SnomedServicesFactory } = require('../../tx/cs/cs-snomed');
 
 const {SnomedImporter} = require("../../tx/importers/import-sct.module");
-const { TxOperationContext } = require('../../tx/cs/cs-api');
+const { OperationContext } = require('../../tx/operation-context');
 
 // Shared cache file paths and utilities
 const testCachePath = path.resolve(__dirname, '../../data/snomed-testing.cache');
@@ -496,7 +496,7 @@ describe('SNOMED CT Subset Validation', () => {
 
     // Create factory and provider
     factory = new SnomedServicesFactory(cacheFilePath);
-    provider = await factory.build(new TxOperationContext('en'), []);
+    provider = await factory.build(new OperationContext('en'), []);
   });
 
   afterAll(() => {

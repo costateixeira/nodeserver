@@ -2,9 +2,9 @@ const path = require('path');
 const fs = require('fs');
 const sqlite3 = require('sqlite3').verbose();
 const { Languages } = require('../../library/languages');
-const { TxOperationContext } = require('../../tx/cs/cs-api');
 const { UniiServicesFactory, UniiConcept } = require('../../tx/cs/cs-unii');
 const { UniiDataMigrator } = require('../../tx/importers/import-unii.module');
+const {OperationContext} = require("../../tx/operation-context");
 
 describe('UniiDataMigrator', () => {
   const repoRoot = path.join(__dirname, '..', '..');
@@ -52,7 +52,7 @@ describe('UniiServices', () => {
   beforeEach(async () => {
     factory = new UniiServicesFactory('./data/unii-testing.db');
     await factory.load();
-    provider = factory.build(new TxOperationContext(Languages.fromAcceptLanguage('en')), []);
+    provider = factory.build(new OperationContext(Languages.fromAcceptLanguage('en')), []);
   });
 
   afterEach(() => {
@@ -282,10 +282,10 @@ describe('UniiServices', () => {
       const factory = new UniiServicesFactory('./data/unii-testing.db');
       expect(factory.useCount()).toBe(0);
 
-      const provider1 = factory.build(new TxOperationContext("en"), []);
+      const provider1 = factory.build(new OperationContext("en"), []);
       expect(factory.useCount()).toBe(1);
 
-      const provider2 = factory.build(new TxOperationContext("en"), []);
+      const provider2 = factory.build(new OperationContext("en"), []);
       expect(factory.useCount()).toBe(2);
 
       provider1.close();
@@ -299,8 +299,8 @@ describe('UniiServices', () => {
 
     test('should build working providers', () => {
       const factory = new UniiServicesFactory('./data/unii-testing.db');
-      const provider1 = factory.build(new TxOperationContext('en'), []);
-      const provider2 = factory.build(new TxOperationContext('en'), []);
+      const provider1 = factory.build(new OperationContext('en'), []);
+      const provider2 = factory.build(new OperationContext('en'), []);
 
       expect(provider1).toBeTruthy();
       expect(provider2).toBeTruthy();
@@ -422,8 +422,8 @@ describe('UniiServices', () => {
     });
 
     test('should properly close database connections', () => {
-      const provider1 = factory.build(new TxOperationContext('en'), []);
-      const provider2 = factory.build(new TxOperationContext('en'), []);
+      const provider1 = factory.build(new OperationContext('en'), []);
+      const provider2 = factory.build(new OperationContext('en'), []);
 
       expect(() => {
         provider1.close();

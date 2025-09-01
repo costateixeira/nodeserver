@@ -3,23 +3,7 @@
 const assert = require('assert');
 const {CodeSystem, CodeSystemContentMode} = require("../library/codesystem");
 const {Languages, Language} = require("../../library/languages");
-
-class TxOperationContext {
-
-  constructor(langs) {
-    this.langs = this._ensureLanguages(langs);
-  }
-
-  _ensureLanguages(param) {
-    assert(typeof param === 'string' || param instanceof Languages, 'Parameter must be string or Languages object');
-    return typeof param === 'string' ? Languages.fromAcceptLanguage(param) : param;
-  }
-
-  /**
-   * @type {Languages} languages specified in request
-   */
-  langs;
-}
+const { OperationContext } = require("../operation-context");
 
 class Designation {
   language;
@@ -39,7 +23,7 @@ class FilterExecutionContext {
 
 class CodeSystemProvider {
   /**
-   * {TxOperationContext} The context in which this is executing
+   * {OperationContext} The context in which this is executing
    */
   opContext;
 
@@ -56,7 +40,7 @@ class CodeSystemProvider {
   }
 
   _ensureOpContext(opContext) {
-    assert(opContext && opContext instanceof TxOperationContext, "opContext is not an instance of TxOperationContext");
+    assert(opContext && opContext instanceof OperationContext, "opContext is not an instance of OperationContext");
   }
 
   /**
@@ -682,7 +666,6 @@ class CodeSystemFactoryProvider {
 }
 
 module.exports = {
-  TxOperationContext,
   Designation,
   FilterExecutionContext,
   CodeSystemProvider,
