@@ -74,6 +74,10 @@
       "searchParametersPath": null,
       "debounceMs": 500
     },
+    "feed": {
+      "enabled": false,
+      "baseUrl": ""  // optional; if empty, derived from request host. Set when behind a reverse proxy.
+    },
     "token": {
       "enabled": true,
       "database": "/absolute/path/to/token.db",
